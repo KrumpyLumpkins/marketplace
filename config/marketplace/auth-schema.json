@@ -1,0 +1,90 @@
+{
+  "types": {
+    "StarknetDomain": [
+      {
+        "name": "name",
+        "type": "shortstring"
+      },
+      {
+        "name": "version",
+        "type": "shortstring"
+      },
+      {
+        "name": "chainId",
+        "type": "shortstring"
+      },
+      {
+        "name": "revision",
+        "type": "shortstring"
+      }
+    ],
+    "Login": [
+      {
+        "name": "origin",
+        "type": "felt"
+      },
+      {
+        "name": "nonce",
+        "type": "felt"
+      },
+      {
+        "name": "expires",
+        "type": "u128"
+      }
+    ]
+  },
+  "domainTypeHash": "0x1ff2f602e42168014d405a94f75e8a93d640751d71d16311266e140d8b0a210",
+  "loginTypeHash": "0x335b2778d86f5aa38a48ee9de7e369bf4f3a513d857439d95a7cc2aa8d74d0a",
+  "vector": {
+    "typedData": {
+      "types": {
+        "StarknetDomain": [
+          {
+            "name": "name",
+            "type": "shortstring"
+          },
+          {
+            "name": "version",
+            "type": "shortstring"
+          },
+          {
+            "name": "chainId",
+            "type": "shortstring"
+          },
+          {
+            "name": "revision",
+            "type": "shortstring"
+          }
+        ],
+        "Login": [
+          {
+            "name": "origin",
+            "type": "felt"
+          },
+          {
+            "name": "nonce",
+            "type": "felt"
+          },
+          {
+            "name": "expires",
+            "type": "u128"
+          }
+        ]
+      },
+      "primaryType": "Login",
+      "domain": {
+        "name": "Biblio Marketplace",
+        "version": "1",
+        "chainId": "SN_SEPOLIA",
+        "revision": "1"
+      },
+      "message": {
+        "origin": "123",
+        "nonce": "456",
+        "expires": "2000000000"
+      }
+    },
+    "account": "0x123",
+    "hash": "0x1fb6ae98d2694f33bc34ca8c88e3c1beb98c78706a5fccf78730b56f05262ff"
+  }
+}

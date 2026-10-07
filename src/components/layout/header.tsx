@@ -4,16 +4,10 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { type SVGProps, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAccount, useConnect, useDisconnect } from "@starknet-react/core";
+import { useAccount, useDisconnect } from "@starknet-react/core";
 import { Github, Menu, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { WalletConnectButton } from "./wallet-connect-button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,20 +35,6 @@ const CartSidebar = dynamic(
 
 function formatAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
-
-function connectorLabel(connector: { id: string; name?: string }) {
-  if (connector.name && connector.name.trim().length > 0) {
-    return connector.name;
-  }
-
-  return connector.id;
-}
-
-function connectorIconUrl(connector: { icon?: unknown }) {
-  return typeof connector.icon === "string" && connector.icon.trim().length > 0
-    ? connector.icon
-    : null;
 }
 
 const ECOSYSTEM_LINKS = [
@@ -112,22 +92,11 @@ export function Header() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { address, isConnected } = useAccount();
-  const { connect, connectors, isPending: isConnecting } = useConnect();
   const { disconnect, isPending: isDisconnecting } = useDisconnect();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [walletModalOpen, setWalletModalOpen] = useState(false);
   const [searchInput, setSearchInput] = useState(() => searchParams.get("q") ?? "");
 
-  const isBusy = isConnecting || isDisconnecting;
-
-  const handleConnect = async (connector: (typeof connectors)[number]) => {
-    try {
-      await connect({ connector });
-      setWalletModalOpen(false);
-    } catch (error) {
-      console.error("Failed to connect wallet", error);
-    }
-  };
+  const isBusy = isDisconnecting;
 
   const handleSearchSubmit = () => {
     const normalized = searchInput.trim().replace(/\s+/g, " ");
@@ -276,9 +245,13 @@ export function Header() {
 
       <div className="border-b border-[color:var(--realm-border-etched)] bg-[color:var(--realm-bg-void)]/95 backdrop-blur-xl">
         <div className="mx-auto flex min-h-14 items-center px-3 sm:px-4 lg:px-8">
-          <div className="flex w-full items-center gap-2 overflow-x-auto py-2 sm:gap-3">
+          <div className="flex w-full flex-wrap items-center gap-2 py-2 sm:flex-nowrap sm:gap-3">
+            <div className="order-2 flex w-full min-w-0 items-center gap-3 sm:order-none sm:flex-1">
+              <Link href="/#collections" aria-label="Browse collections" className="inline-flex min-h-11 shrink-0 items-center text-sm font-medium text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                Collections
+              </Link>
             <form
-              className="relative shrink-0"
+              className="relative min-w-0 flex-1"
               role="search"
               onSubmit={(event) => {
                 event.preventDefault();
@@ -288,21 +261,22 @@ export function Header() {
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
               <Input
                 aria-label="Search"
-                placeholder="Search..."
+                placeholder="Search collections, items…"
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
-                className="h-9 w-[14rem] border-[color:var(--realm-border-etched)] bg-[color:var(--realm-surface-iron)]/80 pl-9 text-foreground placeholder:text-muted-foreground/70 sm:w-72 lg:w-96"
+                className="h-9 w-full border-[color:var(--realm-border-etched)] bg-[color:var(--realm-surface-iron)]/80 pl-9 text-foreground placeholder:text-muted-foreground/70 sm:max-w-72 lg:max-w-96"
               />
             </form>
+            </div>
 
-            <div className="ml-auto flex shrink-0 items-center justify-end gap-2 sm:gap-3">
+            <div className="ml-auto flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end sm:gap-3">
               <CartSidebar />
 
               <Button
               size="sm"
               variant="ghost"
               asChild
-              className="h-9 rounded-[6px] border border-[color:var(--realm-border-etched)] bg-[color:var(--realm-surface-iron)]/70 px-3 text-[color:var(--realm-text-muted)] hover:border-[color:var(--realm-border-strong)]"
+              className="min-h-11 rounded-[6px] border border-[color:var(--realm-border-etched)] bg-[color:var(--realm-surface-iron)]/70 px-3 text-[color:var(--realm-text-muted)] hover:border-[color:var(--realm-border-strong)]"
             >
               <Link href="/portfolio">Portfolio</Link>
               </Button>
@@ -336,61 +310,14 @@ export function Header() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button
-                type="button"
-                size="sm"
-                className="h-9 px-3"
-                onClick={() => setWalletModalOpen(true)}
-                disabled={connectors.length === 0 || isBusy}
-              >
-                Connect Wallet
-              </Button>
+              <WalletConnectButton className="min-h-11 px-3" />
               )}
             </div>
           </div>
         </div>
       </div>
 
-      <Dialog open={walletModalOpen} onOpenChange={setWalletModalOpen}>
-        <DialogContent showCloseButton={!isBusy}>
-          <DialogHeader>
-            <DialogTitle className="realm-title text-xl">SELECT WALLET</DialogTitle>
-            <DialogDescription>
-              Choose a wallet connector to continue.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            {connectors.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No wallet connectors are available.
-              </p>
-            ) : (
-              connectors.map((connector) => (
-                <Button
-                  key={connector.id}
-                  className="w-full justify-start gap-2"
-                  disabled={isBusy}
-                  onClick={() => {
-                    void handleConnect(connector);
-                  }}
-                  type="button"
-                  variant="outline"
-                >
-                  {connectorIconUrl(connector) ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={connectorIconUrl(connector)!}
-                      alt={`${connectorLabel(connector)} icon`}
-                      className="h-5 w-5"
-                    />
-                  ) : null}
-                  {connectorLabel(connector)}
-                </Button>
-              ))
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+
     </header>
   );
 }

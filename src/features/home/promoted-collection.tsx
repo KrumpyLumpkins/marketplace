@@ -1,4 +1,5 @@
 "use client";
+import { MarketPrice } from "@/components/marketplace/market-price";
 
 import { useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
@@ -8,10 +9,7 @@ import {
   useCollectionQuery,
   useCollectionListingsQuery,
 } from "@/lib/marketplace/hooks";
-import {
-  formatPriceForDisplay,
-  formatNumberish,
-} from "@/lib/marketplace/token-display";
+import { formatNumberish } from "@/lib/marketplace/token-display";
 import { getCollectionBannerImage } from "@/lib/marketplace/collection-banners";
 import { cheapestListingByTokenId } from "@/features/cart/listing-utils";
 import { COLLECTION_LISTING_SAMPLE_LIMIT } from "@/lib/marketplace/query-limits";
@@ -54,23 +52,23 @@ export function PromotedCollection({
     [listingsQuery.data],
   );
 
-  const floorPrice = useMemo(() => {
-    let minPrice: bigint | null = null;
-    for (const listing of cheapestListings.values()) {
-      try {
-        const parsed = BigInt(listing.price);
-        if (minPrice === null || parsed < minPrice) {
-          minPrice = parsed;
-        }
-      } catch {
-        // skip
-      }
-    }
-    if (minPrice === null) return null;
-    return formatPriceForDisplay(minPrice.toString());
-  }, [cheapestListings]);
+  const floor = useMemo(
+    () =>
+      [...cheapestListings.values()].reduce<
+        | (typeof cheapestListings extends Map<string, infer V> ? V : never)
+        | null
+      >(
+        (lowest, listing) =>
+          !lowest || BigInt(listing.price) < BigInt(lowest.price)
+            ? listing
+            : lowest,
+        null,
+      ),
+    [cheapestListings],
+  );
 
-  const totalSupply = formatNumberish(collectionQuery.data?.totalSupply) ?? null;
+  const totalSupply =
+    formatNumberish(collectionQuery.data?.totalSupply) ?? null;
   const listingCount = Array.isArray(listingsQuery.data)
     ? String(listingsQuery.data.length)
     : null;
@@ -132,10 +130,15 @@ export function PromotedCollection({
             <div className="h-6 w-40 animate-pulse rounded bg-muted" />
           ) : (
             <>
-              {floorPrice ? (
+              {floor ? (
                 <div className="realm-stat-pill px-2.5 py-1 text-xs">
                   <span className="text-muted-foreground mr-1">Floor</span>
-                  <span className="font-medium text-primary">{floorPrice}</span>
+                  <span className="font-medium text-primary">
+                    <MarketPrice
+                      amount={floor.price}
+                      currency={floor.currency}
+                    />
+                  </span>
                 </div>
               ) : null}
               {totalSupply ? (

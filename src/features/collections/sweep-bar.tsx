@@ -1,4 +1,5 @@
 "use client"
+import {formatCurrencyAmount} from "@/lib/marketplace/amount-display";
 
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
@@ -86,7 +87,7 @@ export function SweepBar({
   const selectedCandidates = candidates.slice(0, selectedCount)
   const selectedTotal = totalPrice(selectedCandidates)
   const formattedTotal =
-    formatPriceForDisplay(selectedTotal.toString()) ?? "0"
+    candidates[0]?.orderId.includes(':') ? formatCurrencyAmount(selectedTotal,candidates[0].currency) : formatPriceForDisplay(selectedTotal.toString()) ?? '0'
   const currency = selectedCandidates[0]?.currency ?? candidates[0]?.currency ?? ""
 
   return (

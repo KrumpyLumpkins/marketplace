@@ -10,14 +10,14 @@ import type {
   FetchCollectionTokensOptions,
   TokenDetails,
   TokenDetailsOptions,
-} from "@cartridge/arcade/marketplace";
+} from "@/lib/marketplace/types";
 import {
   useMarketplaceCollection,
   useMarketplaceCollectionListings,
   useMarketplaceCollectionOrders,
   useMarketplaceToken,
   useMarketplaceTokenBalances,
-} from "@cartridge/arcade/marketplace/react";
+} from "@/lib/marketplace/react";
 import {
   alternateTokenId,
   canonicalizeTokenId,
@@ -71,7 +71,7 @@ export function useCollectionTokensQuery(
     ] as const,
     queryFn: async () => {
       const { fetchCollectionTokens } = await import(
-        "@cartridge/arcade/marketplace"
+        "@/lib/marketplace/api-client"
       );
       return fetchCollectionTokens(options);
     },
@@ -278,7 +278,7 @@ export function useTraitValuesQuery(options: {
     queryFn: async () => {
       if (!options.traitName) return [];
       const { fetchTraitValues } = await import(
-        "@cartridge/arcade/marketplace"
+        "@/lib/marketplace/api-client"
       );
       const result = await fetchTraitValues({
         address: options.address,
@@ -312,7 +312,7 @@ export function useTokenHolderQuery(options: {
 async function fetchAllTokenBalancePages(
   options: FetchTokenBalancesOptions,
 ): Promise<FetchTokenBalancesResult> {
-  const { fetchTokenBalances } = await import("@cartridge/arcade/marketplace");
+  const { fetchTokenBalances } = await import("@/lib/marketplace/api-client");
   const balances: NonNullable<FetchTokenBalancesResult["page"]>["balances"] = [];
   let cursor = options.cursor ?? null;
 

@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
-import type { CollectionOrdersOptions } from "@cartridge/arcade/marketplace";
+import type { CollectionOrdersOptions } from "@/lib/marketplace/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -22,7 +22,7 @@ const {
   mockGetMarketplaceRuntimeConfig: vi.fn(),
 }));
 
-vi.mock("@cartridge/arcade/marketplace/react", () => ({
+vi.mock("@/lib/marketplace/react", () => ({
   useMarketplaceCollection: mockUseMarketplaceCollection,
   useMarketplaceCollectionTokens: mockUseMarketplaceCollectionTokens,
   useMarketplaceCollectionOrders: mockUseMarketplaceCollectionOrders,
@@ -81,7 +81,7 @@ describe("marketplace hooks", () => {
     const pageData = { page: { tokens: [], nextCursor: null }, error: null };
     const mockFetchCollectionTokens = vi.fn().mockResolvedValue(pageData);
 
-    vi.doMock("@cartridge/arcade/marketplace", () => ({
+    vi.doMock("@/lib/marketplace/api-client", () => ({
       fetchCollectionTokens: mockFetchCollectionTokens,
     }));
 
@@ -308,7 +308,7 @@ describe("marketplace hooks", () => {
         error: null,
       });
 
-    vi.doMock("@cartridge/arcade/marketplace", () => ({
+    vi.doMock("@/lib/marketplace/api-client", () => ({
       fetchTokenBalances: mockFetchTokenBalances,
     }));
 
@@ -357,7 +357,7 @@ describe("marketplace hooks", () => {
       error: null,
     });
 
-    vi.doMock("@cartridge/arcade/marketplace", () => ({
+    vi.doMock("@/lib/marketplace/api-client", () => ({
       fetchTokenBalances: mockFetchTokenBalances,
     }));
 
@@ -390,7 +390,7 @@ describe("marketplace hooks", () => {
         errors: [],
       });
 
-      vi.doMock("@cartridge/arcade/marketplace", () => ({
+      vi.doMock("@/lib/marketplace/api-client", () => ({
         fetchTraitNamesSummary: mockFetchTraitNamesSummary,
       }));
 
@@ -436,7 +436,7 @@ describe("marketplace hooks", () => {
         errors: [],
       });
 
-      vi.doMock("@cartridge/arcade/marketplace", () => ({
+      vi.doMock("@/lib/marketplace/api-client", () => ({
         fetchTraitValues: mockFetchTraitValues,
       }));
 
@@ -476,7 +476,7 @@ describe("marketplace hooks", () => {
         errors: [],
       });
 
-      vi.doMock("@cartridge/arcade/marketplace", () => ({
+      vi.doMock("@/lib/marketplace/api-client", () => ({
         fetchTraitValues: mockFetchTraitValues,
       }));
 

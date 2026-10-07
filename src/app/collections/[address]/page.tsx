@@ -29,7 +29,7 @@ export default async function CollectionPage({
   });
 
   return (
-    <main className="flex min-h-screen w-full items-start px-4 pb-6 sm:px-6 lg:px-8">
+    <main className="flex min-h-screen w-full items-start px-4 pb-6 sm:px-6">
       <HydrationBoundary state={dehydrate(queryClient)}>
         <Suspense>
           <CollectionRouteContainer address={address} cursor={cursor ?? null} />

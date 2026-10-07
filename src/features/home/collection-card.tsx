@@ -1,3 +1,4 @@
+import { MarketPrice } from "@/components/marketplace/market-price";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +19,7 @@ export function CollectionCard({
   projectId,
   imageUrl,
   floorPrice,
+  floorCurrency,
   totalSupply,
   listingCount,
   featured,
@@ -108,7 +110,7 @@ export function CollectionCard({
           <CardContent className={cn("space-y-1", featured ? "px-4 py-4" : "px-3 py-3")}>
             <p className={cn("realm-title truncate", featured ? "text-xl" : "text-base")}>{name}</p>
             {floorPrice ? (
-              <p className={cn("text-xs", featured ? "text-primary" : "text-muted-foreground")}>Floor {floorPrice}</p>
+              <p className={cn("text-xs", featured ? "text-primary" : "text-muted-foreground")}>Floor <MarketPrice amount={floorPrice} currency={floorCurrency} formatted /></p>
             ) : null}
             {totalSupply ? (
               <p className="text-xs text-muted-foreground">Items {totalSupply}</p>

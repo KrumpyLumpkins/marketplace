@@ -1,0 +1,591 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { createServer } from "node:http";
+import { randomUUID, timingSafeEqual } from "node:crypto";
+import { createClientIdentity } from "./client-identity.mjs";
+import { bestBid } from "./bids.mjs";
+import { Catalog } from "./catalog.mjs";
+import { Auth } from "./auth.mjs";
+import { preflight } from "./preflight.mjs";
+import {
+  address,
+  uint,
+  orderKey,
+  ApiError,
+  fromU256,
+  u256Felts,
+} from "./domain.mjs";
+import { SELECTORS } from "./decode.mjs";
+function options(params) {
+  const o = Object.fromEntries(params);
+  for (const k of ["filters", "tokenIds", "collections"])
+    if (o[k]) {
+      try {
+        o[k] = JSON.parse(o[k]);
+      } catch {
+        throw new ApiError("INVALID_QUERY", `Invalid ${k}.`);
+      }
+    }
+  return o;
+}
+async function body(req) {
+  let size = 0;
+  const chunks = [];
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > 65536)
+      throw new ApiError("BODY_TOO_LARGE", "Maximum body size is 64 KiB.", 413);
+    chunks.push(chunk);
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString() || "{}");
+  } catch {
+    throw new ApiError("INVALID_JSON", "Invalid JSON.");
+  }
+}
+function cookieToken(req) {
+  return req.headers.cookie
+    ?.split(";")
+    .map((s) => s.trim())
+    .find((s) => s.startsWith("biblio_session="))
+    ?.slice("biblio_session=".length);
+}
+export function createApi({ store, config, rpc, verifySignature }) {
+  const catalog = new Catalog(store, config);
+  const origin = new URL(config.origin ?? "http://localhost:3000").origin;
+  const auth = new Auth(store, {
+    origin,
+    chainId: config.chainId,
+    verify:
+      verifySignature ??
+      (async (account, hash, signature) => {
+        if (!rpc)
+          throw new ApiError(
+            "RPC_UNAVAILABLE",
+            "Wallet verification is unavailable.",
+            503,
+          );
+        const result = await rpc.contract(
+          account,
+          SELECTORS.is_valid_signature,
+          [hash, String(signature.length), ...signature],
+        );
+        return (
+          result.length === 1 && BigInt(result[0]) === BigInt("0x56414c4944")
+        );
+      }),
+  });
+  const limits = new Map();
+  const clientIdentity = createClientIdentity(config);
+  const api = createServer(async (req, res) => {
+    const requestId = randomUUID();
+    let readTransaction = false;
+    res.setHeader("X-Request-ID", requestId);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Content-Type", "application/json");
+    const send = (data, status = 200) => {
+      res.writeHead(status);
+      res.end(JSON.stringify(data));
+    };
+    try {
+      if ((req.url?.length ?? 0) > 8192)
+        throw new ApiError("INVALID_QUERY", "URL is too long.", 414);
+      if (req.headers.origin && req.headers.origin !== origin)
+        throw new ApiError("ORIGIN_MISMATCH", "Origin not allowed.", 403);
+      if (req.headers.origin === origin) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+        res.setHeader("Vary", "Origin");
+      }
+      if (req.method === "OPTIONS") {
+        res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+        res.setHeader(
+          "Access-Control-Allow-Headers",
+          "Content-Type,Authorization",
+        );
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+      const url = new URL(req.url, "http://localhost");
+      // Deployment probes must not compete with a visitor's quota.
+      if (url.pathname === "/health/live") {
+        send({ live: true });
+        return;
+      }
+      const now = Date.now(),
+        ip = await clientIdentity(req),
+        entry = limits.get(ip);
+      const bucket =
+        entry && entry.expires > now
+          ? entry
+          : { count: 0, expires: now + 60000 };
+      bucket.count++;
+      limits.set(ip, bucket);
+      if (limits.size > 10000) limits.delete(limits.keys().next().value);
+      if (bucket.count > 300)
+        throw new ApiError(
+          "RATE_LIMITED",
+          "Too many requests. Retry shortly.",
+          429,
+        );
+      const parts = url.pathname
+        .split("/")
+        .filter(Boolean)
+        .map(decodeURIComponent);
+      if (url.pathname === "/health/ready") {
+        const status = catalog.status();
+        send(status, status.safeForCheckout ? 200 : 503);
+        return;
+      }
+      if (url.pathname === "/rpc" && req.method === "POST") {
+        const request = await body(req);
+        const methods = new Set([
+          "starknet_specVersion",
+          "starknet_chainId",
+          "starknet_blockNumber",
+          "starknet_getBlockWithTxHashes",
+          "starknet_getBlockWithTxs",
+          "starknet_getTransactionReceipt",
+          "starknet_getTransactionStatus",
+          "starknet_getTransactionByHash",
+          "starknet_getNonce",
+          "starknet_call",
+          "starknet_estimateFee",
+          "starknet_estimateMessageFee",
+          "starknet_getClassHashAt",
+          "starknet_getClass",
+          "starknet_getClassAt",
+          "starknet_addInvokeTransaction",
+        ]);
+        if (
+          !request ||
+          request.jsonrpc !== "2.0" ||
+          !["string", "number"].includes(typeof request.id) ||
+          !methods.has(request.method)
+        ) {
+          send({
+            jsonrpc: "2.0",
+            id: request?.id ?? null,
+            error: { code: -32601, message: "Unsupported wallet RPC method." },
+          });
+          return;
+        }
+        try {
+          if (!rpc)
+            throw new ApiError(
+              "RPC_UNAVAILABLE",
+              "Wallet RPC is not configured.",
+              503,
+            );
+          const result = await rpc.call(request.method, request.params ?? []);
+          send({ jsonrpc: "2.0", id: request.id, result });
+        } catch (error) {
+          send({
+            jsonrpc: "2.0",
+            id: request.id,
+            error: {
+              code: error.details?.rpcCode ?? -32603,
+              message: error.message,
+              ...(error.details?.data ? { data: error.details.data } : {}),
+            },
+          });
+        }
+        return;
+      }
+      if (
+        parts[0] !== "v1" ||
+        parts[1] !== "chains" ||
+        parts[2] !== config.chain
+      )
+        throw new ApiError("INVALID_CHAIN", "Unknown API chain or route.");
+      const route = parts.slice(3),
+        q = options(url.searchParams),
+        token = cookieToken(req),
+        account = auth.account(token);
+      if (route[0] === "assets" && req.method === "GET") {
+        const name = route[1];
+        if (
+          !config.assetDir ||
+          !name ||
+          !/^([a-f0-9]{64})\.(png|jpg|gif|webp|svg)$/.test(name)
+        )
+          throw new ApiError("NOT_FOUND", "Asset unavailable.", 404);
+        let bytes;
+        try {
+          bytes = await readFile(join(config.assetDir, name));
+        } catch {
+          throw new ApiError("NOT_FOUND", "Asset unavailable.", 404);
+        }
+        res.setHeader(
+          "Content-Type",
+          {
+            png: "image/png",
+            jpg: "image/jpeg",
+            webp: "image/webp",
+            gif: "image/gif",
+            svg: "image/svg+xml",
+          }[name.split(".").at(-1)],
+        );
+        res.setHeader(
+          "Content-Security-Policy",
+          "sandbox; default-src 'none'; style-src 'unsafe-inline'",
+        );
+        res.setHeader("Cache-Control", "public,max-age=31536000,immutable");
+        res.writeHead(200);
+        res.end(bytes);
+        return;
+      }
+      const requireAccount = () => {
+        if (!account)
+          throw new ApiError(
+            "UNAUTHENTICATED",
+            "Connect and verify your wallet.",
+            401,
+          );
+        return account;
+      };
+      const operator = () => {
+        const supplied =
+          req.headers.authorization?.replace(/^Bearer /, "") ?? "";
+        const secret = config.operatorToken;
+        if (
+          !secret ||
+          Buffer.byteLength(supplied) !== Buffer.byteLength(secret) ||
+          !timingSafeEqual(Buffer.from(secret), Buffer.from(supplied))
+        )
+          throw new ApiError(
+            "FORBIDDEN",
+            "Operator credentials required.",
+            403,
+          );
+      };
+      const data = req.method === "POST" ? await body(req) : null;
+      if (req.method === "GET" && !["quote", "best-bid"].includes(route[3])) {
+        store.db.exec("BEGIN");
+        readTransaction = true;
+      }
+      let result;
+      if (req.method === "POST" && token && req.headers.origin !== origin)
+        throw new ApiError(
+          "ORIGIN_MISMATCH",
+          "Authenticated writes require a matching Origin.",
+          403,
+        );
+      if (route[0] === "auth") {
+        if (route[1] === "challenge" && req.method === "POST")
+          result = auth.challenge(data.account, data.origin);
+        else if (route[1] === "verify" && req.method === "POST") {
+          const session = await auth.verify(data.id, data.signature);
+          res.setHeader(
+            "Set-Cookie",
+            `biblio_session=${session.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400${origin.startsWith("https:") ? "; Secure" : ""}`,
+          );
+          result = { account: session.account, expires: session.expires };
+        } else if (route[1] === "session" && req.method === "GET")
+          result = { account };
+        else if (route[1] === "logout" && req.method === "POST") {
+          auth.logout(token);
+          res.setHeader(
+            "Set-Cookie",
+            "biblio_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0",
+          );
+          result = { loggedOut: true };
+        }
+      } else if (route[0] === "notifications") {
+        const a = requireAccount();
+        if (req.method === "GET") result = store.notifications(a);
+        else if (req.method === "POST" && route[1] === "read") {
+          if (typeof data.id !== "string")
+            throw new ApiError("INVALID_QUERY", "Notification ID required.");
+          store.app
+            .prepare(
+              "UPDATE notifications SET is_read=1 WHERE account=? AND id=?",
+            )
+            .run(a, data.id);
+          result = { updated: true };
+        }
+      } else if (route[0] === "reports" && req.method === "POST") {
+        const a = requireAccount();
+        if (
+          typeof data.reason !== "string" ||
+          data.reason.trim().length < 5 ||
+          data.reason.length > 2000
+        )
+          throw new ApiError(
+            "INVALID_REPORT",
+            "A reason of 5–2000 characters is required.",
+          );
+        const collection = address(data.collection);
+        catalog.collection(collection);
+        const id = randomUUID();
+        store.app
+          .prepare(
+            "INSERT INTO reports(id,account,body,created) VALUES(?,?,?,?)",
+          )
+          .run(
+            id,
+            a,
+            JSON.stringify({
+              collection,
+              tokenId: data.tokenId == null ? null : uint(data.tokenId),
+              reason: data.reason.trim(),
+            }),
+            Date.now(),
+          );
+        result = { id, status: "open" };
+      } else if (route[0] === "operator") {
+        operator();
+        if (route[1] === "reports" && req.method === "GET")
+          result = store.app
+            .prepare("SELECT * FROM reports ORDER BY created DESC LIMIT 100")
+            .all()
+            .map((r) => ({ ...r, body: JSON.parse(r.body) }));
+        else if (route[1] === "reports" && req.method === "POST") {
+          if (!["open", "resolved", "dismissed"].includes(data.status))
+            throw new ApiError("INVALID_QUERY", "Invalid report state.");
+          store.app
+            .prepare("UPDATE reports SET status=? WHERE id=?")
+            .run(data.status, data.id);
+          result = { updated: true };
+        } else if (route[1] === "collections" && req.method === "POST") {
+          const collection = address(data.address),
+            old = store.get("collection", collection);
+          if (!old)
+            throw new ApiError(
+              "NOT_REGISTERED",
+              "Add contract/start block to registry before publishing.",
+              409,
+            );
+          if (data.hidden === true)
+            store.app
+              .prepare("INSERT OR REPLACE INTO moderation VALUES(?,?)")
+              .run(
+                collection,
+                JSON.stringify({
+                  reason: String(data.reason ?? "Under review"),
+                  at: Date.now(),
+                }),
+              );
+          else if (data.hidden === false)
+            store.app
+              .prepare("DELETE FROM moderation WHERE collection=?")
+              .run(collection);
+          if (typeof data.verified === "boolean")
+            store.app
+              .prepare("INSERT OR REPLACE INTO app_meta VALUES(?,?)")
+              .run(
+                `verification:${collection}`,
+                JSON.stringify({ verified: data.verified, at: Date.now() }),
+              );
+          result = { updated: true };
+        }
+        if (route[1] === "metadata" && req.method === "POST") {
+          const collection = address(data.collection);
+          if (!store.get("collection", collection))
+            throw new ApiError(
+              "NOT_REGISTERED",
+              "Collection is not registered.",
+            );
+          const tokenId = data.tokenId == null ? null : uint(data.tokenId);
+          store.put("metadata_job", `${collection}:${tokenId ?? "*"}`, {
+            collection,
+            tokenId,
+            state: "pending",
+            requestedAt: Date.now(),
+          });
+          result = { queued: true };
+        }
+        if (route[1] === "audit" && req.method === "GET")
+          result = store.app
+            .prepare("SELECT * FROM audit ORDER BY id DESC LIMIT 100")
+            .all();
+        if (req.method === "POST")
+          store.app
+            .prepare(
+              "INSERT INTO audit(actor,action,body,created) VALUES(?,?,?,?)",
+            )
+            .run("operator", route.join("/"), JSON.stringify(data), Date.now());
+      } else if (
+        route[0] === "checkout" &&
+        route[1] === "preflight" &&
+        req.method === "POST"
+      )
+        result = await preflight(store, rpc, config, data);
+      else if (
+        route[0] === "orders" &&
+        route[1] === "lookup" &&
+        req.method === "POST"
+      ) {
+        if (
+          !Array.isArray(data.orders) ||
+          !data.orders.length ||
+          data.orders.length > 25
+        )
+          throw new ApiError("INVALID_QUERY", "Expected 1–25 order keys.");
+        result = {
+          orders: data.orders.map((k) => ({
+            key: k,
+            order: store.get(
+              "order",
+              orderKey(
+                config.chain,
+                config.marketplace ?? "0",
+                k.maker,
+                k.nonce,
+              ),
+            ),
+          })),
+        };
+      } else if (req.method === "GET") {
+        if (route[0] === "collections") {
+          if (!route[1]) result = catalog.collections();
+          else if (!route[2]) result = catalog.collection(route[1]);
+          else if (route[2] === "tokens") result = catalog.tokens(route[1], q);
+          else if (route[2] === "traits")
+            result = catalog.traits(route[1], { ...q, traitName: route[3] });
+          else if (route[2] === "orders") result = catalog.orders(route[1], q);
+          else if (route[2] === "listings")
+            result = catalog.orders(route[1], {
+              ...q,
+              kind: "listing",
+              state: "open",
+              availableOnly: true,
+            });
+          else if (route[2] === "offers")
+            result = catalog.orders(route[1], {
+              ...q,
+              kind: "offer",
+              state: "open",
+            });
+          else if (route[2] === "stats") result = catalog.stats(route[1], q);
+          else if (route[2] === "activity")
+            result = catalog.activity({ ...q, collection: route[1] });
+        } else if (route[0] === "tokens" && route[1] && route[2]) {
+          if (!route[3]) result = catalog.token(route[1], route[2]);
+          else if (route[3] === "activity")
+            result = catalog.activity({
+              ...q,
+              collection: route[1],
+              tokenId: uint(route[2]),
+            });
+          else if (route[3] === "best-bid")
+            result = await bestBid(store, rpc, config, route[1], route[2], q);
+          else if (route[3] === "quote") {
+            if (!rpc || !config.marketplace)
+              throw new ApiError(
+                "NOT_DEPLOYED",
+                "Marketplace quote is unavailable.",
+                503,
+              );
+            const values = await rpc.contract(
+              config.marketplace,
+              SELECTORS.quote_terms,
+              [
+                address(route[1]),
+                ...u256Felts(route[2]),
+                ...u256Felts(q.price),
+              ],
+            );
+            if (values.length !== 7)
+              throw new ApiError(
+                "INVALID_QUOTE",
+                "Unexpected royalty quote.",
+                502,
+              );
+            result = {
+              protocolFee: fromU256(values[0], values[1]),
+              royaltyRecipient: address(values[2]),
+              royaltyAmount: fromU256(values[3], values[4]),
+              sellerProceeds: fromU256(values[5], values[6]),
+              buyerDebit: uint(q.price),
+            };
+          }
+        } else if (route[0] === "accounts" && route[1]) {
+          if (route[2] === "holdings") result = catalog.holdings(route[1], q);
+          else if (route[2] === "orders")
+            result = catalog.orders(q.collection, {
+              ...q,
+              ...(q.direction === "received"
+                ? { received: route[1] }
+                : { maker: route[1] }),
+              ...(q.direction === "listed" ? { kind: "listing" } : {}),
+            });
+          else if (route[2] === "activity")
+            result = catalog.activity({ ...q, account: route[1] });
+        } else if (route[0] === "transactions" && route[1]) {
+          const hash = "0x" + BigInt(uint(route[1], 252)).toString(16);
+          const activity = store.db
+            .prepare(
+              "SELECT body FROM entities WHERE kind='activity' AND json_extract(body,'$.provenance.transactionHash')=? AND json_extract(body,'$.type') IN ('order_created','order_filled','order_cancelled','initialized','trading_changed','collection_policy','currency_policy','admin_proposed','admin_transferred') LIMIT 1",
+            )
+            .get(hash);
+          const event = activity ? JSON.parse(activity.body) : null;
+          const canonical = event
+            ? store.db
+                .prepare("SELECT hash FROM blocks WHERE number=?")
+                .get(event.provenance.blockNumber)
+            : null;
+          result = {
+            reflected:
+              !!canonical &&
+              BigInt(canonical.hash) === BigInt(event.provenance.blockHash),
+            block: event?.provenance.blockNumber ?? null,
+          };
+        } else if (route[0] === "search") result = catalog.search(q.q);
+        else if (route[0] === "indexer" && route[1] === "status")
+          result = catalog.status();
+        else if (route[0] === "marketplace" && route[1] === "config")
+          result = {
+            ...store.get("config", "marketplace"),
+            chain: config.chain,
+            chainId: config.chainId,
+            marketplace: config.marketplace,
+            currencies: config.currencies,
+            collections: config.collections,
+            demo: !!config.demo,
+            status: catalog.status(),
+          };
+      }
+      if (result === undefined)
+        throw new ApiError("NOT_FOUND", "Route not found.", 404);
+      const response = {
+        data: result,
+        meta: {
+          schemaVersion: "1.0.0",
+          chain: config.chain,
+          marketplace: config.marketplace,
+          indexedBlock: store.head()?.number ?? null,
+          generation: store.generation(),
+          generatedAt: new Date().toISOString(),
+        },
+        requestId,
+      };
+      if (readTransaction) {
+        store.db.exec("COMMIT");
+        readTransaction = false;
+      }
+      send(response);
+    } catch (e) {
+      if (readTransaction) store.db.exec("ROLLBACK");
+      if (!res.headersSent)
+        send(
+          {
+            error: {
+              code: e.code ?? "INTERNAL_ERROR",
+              message:
+                e instanceof ApiError ? e.message : "Unexpected server error.",
+              requestId,
+              retryable: e.status >= 500,
+            },
+          },
+          e.status ?? 500,
+        );
+      else res.end();
+    }
+  });
+  api.requestTimeout = 15000;
+  api.headersTimeout = 10000;
+  return api;
+}

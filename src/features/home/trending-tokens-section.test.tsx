@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import type { NormalizedToken } from "@cartridge/arcade/marketplace";
+import type { NormalizedToken } from "@/lib/marketplace/types";
 import { TrendingTokensSection } from "@/features/home/trending-tokens-section";
 
 const { mockMarketplaceTokenCard } = vi.hoisted(() => ({

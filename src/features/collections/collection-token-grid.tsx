@@ -1,8 +1,12 @@
 "use client";
+import {formatCurrencyAmount} from "@/lib/marketplace/amount-display";
 
 import Link from "next/link";
+import { AssetGrid } from "@/components/marketplace/asset-grid";
+import { useMarketCurrency } from "@/lib/marketplace/currency-store";
+import { decodeRangeFilterValue } from "@/lib/marketplace/traits";
 import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
-import type { NormalizedToken } from "@cartridge/arcade/marketplace";
+import type { NormalizedToken } from "@/lib/marketplace/types";
 import {
   useCollectionListingsQuery,
   useCollectionTokensQuery,
@@ -33,12 +37,10 @@ import { getCollectionFilterConfig } from "@/lib/marketplace/collection-filter-c
 import {
   exactAttributeFiltersFromActiveFilters,
   filterTokensByActiveFilters,
-  numericTraitValueByName,
   type ActiveFilters,
 } from "@/lib/marketplace/traits";
 import { COLLECTION_LISTING_SAMPLE_LIMIT } from "@/lib/marketplace/query-limits";
-import { expandTokenIdQueryVariants } from "@/lib/marketplace/token-id";
-import { realmResourceCount, realmResources } from "@/lib/marketplace/token-attributes";
+import { realmResources } from "@/lib/marketplace/token-attributes";
 import { cn } from "@/lib/utils";
 import { useEntrance } from "@/lib/animation";
 import {
@@ -64,10 +66,6 @@ type CollectionTokenGridProps = {
 type GridDensityMode = "compact" | "dense";
 type GridLayoutMode = GridDensityMode | "list";
 
-const GRID_CLASSES_BY_DENSITY: Record<GridDensityMode, string> = {
-  compact: "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
-  dense: "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6",
-};
 const EMPTY_ACTIVE_FILTERS: ActiveFilters = {};
 
 function dedupeTokens(tokens: NormalizedToken[]) {
@@ -166,117 +164,6 @@ function isAliveAdventurer(token: NormalizedToken) {
   return true;
 }
 
-function sortablePrice(
-  token: NormalizedToken,
-  listingPrices: Map<string, { price: string }>,
-  listingPriceMap: Map<string, string>,
-) {
-  const tokenKey = displayTokenId(token);
-  const rawPrice =
-    listingPrices.get(tokenKey)?.price ??
-    listingPriceMap.get(tokenKey) ??
-    tokenPrice(token);
-  if (!rawPrice) {
-    return null;
-  }
-
-  try {
-    return BigInt(rawPrice);
-  } catch {
-    return null;
-  }
-}
-
-function sortTokens(
-  tokens: NormalizedToken[],
-  sortMode: CollectionSortMode,
-  listingPrices: Map<string, { price: string }>,
-  listingPriceMap: Map<string, string>,
-) {
-  if (sortMode === "recent") {
-    return tokens;
-  }
-
-  const traitNameBySortMode: Partial<Record<CollectionSortMode, string>> = {
-    "power-asc": "Power",
-    "power-desc": "Power",
-    "level-asc": "Level",
-    "level-desc": "Level",
-    "health-asc": "Health",
-    "health-desc": "Health",
-    "resource-count-asc": "Resource count",
-    "resource-count-desc": "Resource count",
-  };
-  const ordered = [...tokens];
-  ordered.sort((left, right) => {
-    if (sortMode === "resource-count-asc" || sortMode === "resource-count-desc") {
-      const leftValue = realmResourceCount(left.metadata);
-      const rightValue = realmResourceCount(right.metadata);
-      if (leftValue === rightValue) {
-        return tokenId(left).localeCompare(tokenId(right));
-      }
-
-      const isAscending = sortMode === "resource-count-asc";
-      if (leftValue < rightValue) {
-        return isAscending ? -1 : 1;
-      }
-
-      return isAscending ? 1 : -1;
-    }
-
-    const traitName = traitNameBySortMode[sortMode];
-    if (traitName) {
-      const leftValue = numericTraitValueByName(left.metadata, traitName);
-      const rightValue = numericTraitValueByName(right.metadata, traitName);
-
-      if (leftValue === null && rightValue === null) {
-        return tokenId(left).localeCompare(tokenId(right));
-      }
-      if (leftValue === null) {
-        return 1;
-      }
-      if (rightValue === null) {
-        return -1;
-      }
-      if (leftValue === rightValue) {
-        return tokenId(left).localeCompare(tokenId(right));
-      }
-
-      const isAscending = sortMode.endsWith("-asc");
-      if (leftValue < rightValue) {
-        return isAscending ? -1 : 1;
-      }
-
-      return isAscending ? 1 : -1;
-    }
-
-    const leftPrice = sortablePrice(left, listingPrices, listingPriceMap);
-    const rightPrice = sortablePrice(right, listingPrices, listingPriceMap);
-
-    if (leftPrice === null && rightPrice === null) {
-      return tokenId(left).localeCompare(tokenId(right));
-    }
-    if (leftPrice === null) {
-      return 1;
-    }
-    if (rightPrice === null) {
-      return -1;
-    }
-    if (leftPrice === rightPrice) {
-      return tokenId(left).localeCompare(tokenId(right));
-    }
-
-    const isAscending = sortMode === "price-asc";
-    if (leftPrice < rightPrice) {
-      return isAscending ? -1 : 1;
-    }
-
-    return isAscending ? 1 : -1;
-  });
-
-  return ordered;
-}
-
 type GridPaginationState = {
   cursor: string | null | undefined;
   tokens: NormalizedToken[];
@@ -320,6 +207,7 @@ export function CollectionTokenGrid({
   sortControls,
   sweepPreviewTokenIds,
 }: CollectionTokenGridProps) {
+  const currency = useMarketCurrency(state => state.currency);
   const { addListingToCart, isRecentlyAdded } = useAddToCartFeedback();
   const collectionFilterConfig = useMemo(
     () => getCollectionFilterConfig(address),
@@ -328,7 +216,6 @@ export function CollectionTokenGrid({
   const showInlineResources = collectionFilterConfig.showInlineResources === true;
   const tokenCardConfig = collectionFilterConfig.tokenCard;
   const [gridMode, setGridMode] = useState<GridLayoutMode>("compact");
-  const [armedListedTokenEnrichmentScopeKey, setArmedListedTokenEnrichmentScopeKey] = useState("");
   const tokenIdsKey = useMemo(() => tokenIds?.join(",") ?? "", [tokenIds]);
   const activeFiltersKey = useMemo(
     () =>
@@ -344,10 +231,6 @@ export function CollectionTokenGrid({
     () => exactAttributeFiltersFromActiveFilters(activeFilters),
     [activeFilters],
   );
-  const listedTokenEnrichmentScopeKey = useMemo(
-    () => [address, projectId ?? "", tokenIdsKey, activeFiltersKey].join("::"),
-    [activeFiltersKey, address, projectId, tokenIdsKey],
-  );
   const [pagination, dispatch] = useReducer(gridPaginationReducer, {
     cursor: undefined,
     tokens: [],
@@ -361,6 +244,12 @@ export function CollectionTokenGrid({
     cursor: pagination.cursor,
     fetchImages: true,
     attributeFilters,
+    sort: sortMode,
+    currency,
+    filters: Object.entries(activeFilters ?? {}).map(([name, values]) => {
+      const range = [...values].map(decodeRangeFilterValue).find(Boolean);
+      return range ? {name, ...range} : {name, values: [...values].map(v => v === "true" ? true : v === "false" ? false : /^\d+$/.test(v) && Number.isSafeInteger(Number(v)) ? Number(v) : v)};
+    }),
   });
   const listingQuery = useCollectionListingsQuery({
     collection: address,
@@ -377,17 +266,7 @@ export function CollectionTokenGrid({
 
   useEffect(() => {
     dispatch({ type: "RESET" });
-  }, [address, projectId, limit, tokenIdsKey, activeFiltersKey]);
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setArmedListedTokenEnrichmentScopeKey(listedTokenEnrichmentScopeKey);
-    }, 0);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [listedTokenEnrichmentScopeKey]);
+  }, [address, projectId, limit, tokenIdsKey, activeFiltersKey, sortMode, currency]);
 
   useEffect(() => {
     if (!tokenQuery.isSuccess) return;
@@ -395,7 +274,7 @@ export function CollectionTokenGrid({
     dispatch({ type: "APPEND_PAGE", pageTokens });
   }, [tokenQuery.data, tokenQuery.isSuccess]);
 
-  const listingPrices = cheapestListingByTokenId(listingQuery.data);
+  const listingPrices = cheapestListingByTokenId([...(listingQuery.data ?? []), ...pagination.tokens.flatMap(t => t.best_listing ? [t.best_listing] : [])]);
   const listingPriceMap = listingPriceByTokenId(listingQuery.data);
   const isAdventurersCollection = useMemo(
     () =>
@@ -407,39 +286,10 @@ export function CollectionTokenGrid({
     [address],
   );
 
-  // Always resolve listed token IDs so listed inventory remains visible even
-  // when the paginated token query does not include those tokens on page 1.
-  const listedQueryTokenIds = useMemo(
-    () => expandTokenIdQueryVariants(listingPriceMap.keys()),
-    [listingPriceMap],
-  );
-  const listedTokensQuery = useCollectionTokensQuery(
-    {
-      address,
-      project: projectId,
-      tokenIds: listedQueryTokenIds.length > 0 ? listedQueryTokenIds : undefined,
-      limit: Math.max(listedQueryTokenIds.length, 1),
-      fetchImages: true,
-      attributeFilters,
-    },
-    {
-      enabled:
-        armedListedTokenEnrichmentScopeKey === listedTokenEnrichmentScopeKey
-        && !tokenIds?.length
-        && listedQueryTokenIds.length > 0,
-    },
-  );
-
   const nextCursor = tokenQuery.data?.page?.nextCursor ?? null;
   const canLoadMore = Boolean(nextCursor);
-
-  // Append explicitly-fetched listed tokens after the current page to preserve
-  // recent ordering while still surfacing listed inventory that lives off-page.
-  const visibleTokens = useMemo(() => {
-    const listedTokens = listedTokensQuery.data?.page?.tokens;
-    if (!listedTokens?.length) return pagination.tokens;
-    return dedupeTokens([...pagination.tokens, ...listedTokens]);
-  }, [pagination.tokens, listedTokensQuery.data?.page?.tokens]);
+  // The API applies sorting and filters across the full collection before pagination.
+  const visibleTokens = pagination.tokens;
   const filteredVisibleTokens = useMemo(
     () => filterTokensByActiveFilters(visibleTokens, activeFilters ?? EMPTY_ACTIVE_FILTERS),
     [activeFilters, visibleTokens],
@@ -466,11 +316,11 @@ export function CollectionTokenGrid({
   }, [displayTokens, visibleTokensSignature]);
 
   const sortedTokens = useMemo(
-    () => sortTokens(displayTokens, sortMode, listingPrices, listingPriceMap),
-    [displayTokens, listingPriceMap, listingPrices, sortMode],
+    () => displayTokens,
+    [displayTokens],
   );
   const isListMode = gridMode === "list";
-  const gridClasses = GRID_CLASSES_BY_DENSITY[isListMode ? "compact" : gridMode];
+  const density = isListMode ? "compact" : gridMode;
 
   // Grid entrance stagger animation — re-triggers on filter/sort changes via key
   const gridAnimationKey = `${activeFiltersKey}-${sortMode}-${gridMode}`;
@@ -520,16 +370,16 @@ export function CollectionTokenGrid({
       </div>
 
       {tokenQuery.isLoading && pagination.tokens.length === 0 ? (
-        <div className={cn("grid gap-3", gridClasses)}>
+        <AssetGrid density={density}>
           {Array.from({ length: 6 }).map((_, index) => (
             <Card key={index}>
               <CardContent className="space-y-2 p-3">
-                <Skeleton className="h-40 w-full" data-testid="token-skeleton" />
+                <Skeleton className="aspect-[4/5] w-full" data-testid="token-skeleton" />
                 <Skeleton className="h-4 w-2/3" />
               </CardContent>
             </Card>
           ))}
-        </div>
+        </AssetGrid>
       ) : null}
 
       {tokenQuery.isError ? (
@@ -541,10 +391,10 @@ export function CollectionTokenGrid({
       ) : null}
 
       {!tokenQuery.isLoading && !isListMode ? (
-        <div
+        <AssetGrid
           ref={gridRef}
           key={gridAnimationKey}
-          className={cn("grid gap-3", gridClasses)}
+          density={density}
           data-testid="collection-token-grid-cards"
         >
           {sortedTokens.map((token) => {
@@ -574,7 +424,7 @@ export function CollectionTokenGrid({
                   )}
                 >
                   <MarketplaceTokenCard
-                    buyNowLabel={isAdded ? "Added" : "Buy Now"}
+                    buyNowLabel={isAdded ? "Added" : "Add to cart"}
                     cardContentAriaLabel={`token-${tokenKey}`}
                     cardContentRole="article"
                     currency={cheapestListing?.currency ?? null}
@@ -594,13 +444,6 @@ export function CollectionTokenGrid({
                         }
                         : undefined
                     }
-                    onSelect={
-                      cardItem && !isSweepPreview
-                        ? () => {
-                          addListingToCart(cardItem, { openCart: false });
-                        }
-                        : undefined
-                    }
                     price={price}
                     showActions
                     token={token}
@@ -609,7 +452,7 @@ export function CollectionTokenGrid({
               </div>
             );
           })}
-        </div>
+        </AssetGrid>
       ) : null}
 
       {!tokenQuery.isLoading && isListMode ? (
@@ -633,7 +476,7 @@ export function CollectionTokenGrid({
                     cheapestListing?.price ??
                     listingPriceMap.get(tokenKey) ??
                     tokenPrice(token);
-                  const displayPrice = formatPriceForDisplay(price);
+                  const displayPrice = token.amountsInBaseUnits && price!=null ? formatCurrencyAmount(price,currency) : formatPriceForDisplay(price);
 
                   return (
                     <TableRow key={tokenId(token)} className={cn(isSweepPreview && "bg-muted/60")}>

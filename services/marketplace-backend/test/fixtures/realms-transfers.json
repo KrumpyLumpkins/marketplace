@@ -1,0 +1,56 @@
+{
+  "source": "https://starknet-rpc.publicnode.com",
+  "chain": "SN_MAIN",
+  "capturedOn": "2026-10-08",
+  "scope": "Three historical Transfer events; not complete collection history",
+  "events": [
+    {
+      "from_address": "0x7ae27a31bb6526e3de9cf02f081f6ce0615ac12a6d7b85ee58b8ad7947a2809",
+      "keys": [
+        "0x99cd8bde557814842a3121e8ddfd433a539b8c9f14bf31ebf108d12e6196e9",
+        "0x0",
+        "0x74c2664cfc8aff6b1e24befa444488f89a060f9a58550cd5ef1f9c4809a80c3",
+        "0x40e",
+        "0x0"
+      ],
+      "data": [],
+      "block_number": 664768,
+      "block_hash": "0x4448c28cfe9ea9928884b355c37b260da14a524db47a250a945c71bfb2a4ec4",
+      "transaction_hash": "0x519a0257d1b09b255324dac34aab3f5e01a9a88a73cef02a0c9084881892eb8",
+      "transaction_index": 201,
+      "event_index": 0
+    },
+    {
+      "from_address": "0x7ae27a31bb6526e3de9cf02f081f6ce0615ac12a6d7b85ee58b8ad7947a2809",
+      "keys": [
+        "0x99cd8bde557814842a3121e8ddfd433a539b8c9f14bf31ebf108d12e6196e9",
+        "0x0",
+        "0x37c6b561b367a85b68668e8663041b9e2f4199c346fbda97dc0c2167f7a6016",
+        "0x726",
+        "0x0"
+      ],
+      "data": [],
+      "block_number": 665018,
+      "block_hash": "0x7f5ff53119028c493b12ddcf4f5b8065c8f2060a8546697a2f9274409389463",
+      "transaction_hash": "0x9a9bc087dd983f1cc1bc0cfa8079aeecf17dd93a2ac1179fdd14474cdcd6ec",
+      "transaction_index": 225,
+      "event_index": 0
+    },
+    {
+      "from_address": "0x7ae27a31bb6526e3de9cf02f081f6ce0615ac12a6d7b85ee58b8ad7947a2809",
+      "keys": [
+        "0x99cd8bde557814842a3121e8ddfd433a539b8c9f14bf31ebf108d12e6196e9",
+        "0x0",
+        "0x5b0a0def8c8eea7c4b1002502386c067d218d95a8346b0842f7b8cd53447201",
+        "0x44d",
+        "0x0"
+      ],
+      "data": [],
+      "block_number": 665025,
+      "block_hash": "0x21037d220f5dbbb005b77600d2666470c1ecfb9cccb016292e79614d60bb4a6",
+      "transaction_hash": "0x370db5fc80f7f2f48083406d10cf12c4c90a12ce663152fcdf4c03d053af59f",
+      "transaction_index": 147,
+      "event_index": 0
+    }
+  ]
+}

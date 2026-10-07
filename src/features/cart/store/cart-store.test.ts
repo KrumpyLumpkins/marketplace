@@ -306,3 +306,9 @@ describe("cart store - mutation actions", () => {
     expect(store.getState().items.some((item) => item.orderId === "100")).toBe(true);
   });
 });
+
+it('explains why incompatible legacy cart entries cannot be reused',()=>{
+ localStorage.clear();
+ localStorage.setItem('marketplace-cart-v1',JSON.stringify({state:{items:[{orderId:'old'}]}}));
+ const store=createCartStore();expect(store.getState().items).toEqual([]);expect(store.getState().lastActionError).toContain('previous marketplace');
+});

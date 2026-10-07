@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "network": "SN_MAIN",
+  "deployer": "",
+  "deployerClassHash": "",
+  "administrator": "",
+  "administratorClassHash": "",
+  "feeRecipient": "",
+  "feeBps": null,
+  "salt": "",
+  "udc": {
+    "address": "0x02ceed65a4bd731034c01113685c831b01c15d7d432f71afb1cf1634b53a2125",
+    "classHash": ""
+  },
+  "maxFeeFri": "",
+  "collections": [],
+  "currencies": [],
+  "release": {
+    "contractAudit": "",
+    "assetCompatibility": "",
+    "sepoliaRehearsal": "",
+    "releaseApproval": ""
+  }
+}

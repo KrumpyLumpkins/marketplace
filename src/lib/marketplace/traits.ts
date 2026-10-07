@@ -154,7 +154,7 @@ export function aggregateTraitValuePages(pages: TraitValuePage[]) {
 async function defaultFetchTraitNamesSummary(
   options: FetchTraitNamesSummaryOptions,
 ) {
-  const marketplace = await import("@cartridge/arcade/marketplace");
+  const marketplace = await import("@/lib/marketplace/api-client");
   return marketplace.fetchTraitNamesSummary(options);
 }
 
@@ -173,7 +173,7 @@ export async function fetchTraitNamesSummary(
 }
 
 async function defaultFetchTraitValues(options: FetchTraitValuesOptions) {
-  const marketplace = await import("@cartridge/arcade/marketplace");
+  const marketplace = await import("@/lib/marketplace/api-client");
   return marketplace.fetchTraitValues(options);
 }
 

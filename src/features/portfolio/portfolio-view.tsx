@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useSyncExternalStore } from "react";
 import { useAccount } from "@starknet-react/core";
 import { Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,9 @@ function isValidAddress(value: string) {
   return /^0x[0-9a-fA-F]+$/.test(value);
 }
 
+const subscribeHydration=()=>()=>{};
 export function PortfolioView({ initialAddress = "" }: PortfolioViewProps) {
+  const hydrated=useSyncExternalStore(subscribeHydration,()=>true,()=>false);
   const { isConnected, address: connectedAddress } = useAccount();
   const defaultAddress =
     initialAddress || (isConnected && connectedAddress ? connectedAddress : "");
@@ -37,7 +39,7 @@ export function PortfolioView({ initialAddress = "" }: PortfolioViewProps) {
 
   return (
     <main
-      className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8"
+      className="market-page mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl flex-col gap-4"
       data-testid="portfolio-view"
     >
       <h1 className="realm-title text-3xl">Portfolio</h1>
@@ -61,6 +63,7 @@ export function PortfolioView({ initialAddress = "" }: PortfolioViewProps) {
             Wallet address
           </label>
           <Input
+            disabled={!hydrated}
             aria-label="Wallet address"
             id="portfolio-address-input"
             onChange={(event) => setAddressInput(event.target.value)}
@@ -69,7 +72,7 @@ export function PortfolioView({ initialAddress = "" }: PortfolioViewProps) {
             className="border-[color:var(--realm-border-etched)] bg-[color:var(--realm-surface-iron)]/80 text-foreground placeholder:text-muted-foreground/70"
           />
         </div>
-        <Button className="sm:w-auto" type="submit">
+        <Button className="sm:w-auto" type="submit" disabled={!hydrated}>
           Load holdings
         </Button>
       </form>

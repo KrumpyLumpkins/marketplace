@@ -1,0 +1,32 @@
+{
+  "name": "@biblio/marketplace-react",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@biblio/marketplace": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "engines": {
+    "node": ">=22.22"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "@tanstack/react-query": "^5.90.21"
+  }
+}

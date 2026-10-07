@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "chains": {
+    "SN_MAIN": {
+      "chainId": "0x534e5f4d41494e",
+      "marketplace": null,
+      "marketplaceStartBlock": null,
+      "marketplaceClassHash": null,
+      "collections": [
+        {
+          "address": "0x07ae27a31bb6526e3de9cf02f081f6ce0615ac12a6d7b85ee58b8ad7947a2809",
+          "name": "Realms",
+          "standard": "ERC721",
+          "startBlock": 664162,
+          "metadata": {
+            "enabled": true
+          }
+        }
+      ],
+      "currencies": []
+    }
+  }
+}

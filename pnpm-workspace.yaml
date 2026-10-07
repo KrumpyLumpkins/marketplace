@@ -1,0 +1,16 @@
+packages:
+  - packages/*
+  - services/marketplace-backend
+
+# Wallet packages still pin vulnerable transitives. Keep replacements within
+# each existing major; remove these pins when upstream resolves patched versions.
+# See docs/OPERATIONS.md for the audit baseline and remaining advisories.
+overrides:
+  'axios@>=1.0.0 <1.20.0': 1.20.0
+  'defu@>=6.0.0 <6.1.5': 6.1.5
+  'form-data@>=4.0.0 <4.0.6': 4.0.6
+  'h3@>=1.0.0 <1.15.9': 1.15.9
+  'jayson>ws': 7.5.11
+  'ethers>ws': 8.21.0
+  'viem>ws': 8.21.0
+  '@solana/rpc-subscriptions-channel-websocket>ws': 8.21.0

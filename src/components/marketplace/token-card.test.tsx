@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { MarketplaceTokenCard } from "@/components/marketplace/token-card";
 import { ResourceTraitIcons } from "@/components/marketplace/resource-trait-icons";
-import type { NormalizedToken } from "@cartridge/arcade/marketplace";
+import type { NormalizedToken } from "@/lib/marketplace/types";
 
 function token(
   tokenId: string,

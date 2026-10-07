@@ -1,4 +1,4 @@
-import type { NormalizedToken } from "@cartridge/arcade/marketplace";
+import type { NormalizedToken } from "@/lib/marketplace/types";
 import { normalizeCollectionTokenId } from "@/lib/marketplace/token-id";
 
 function normalizeMetadata(token: NormalizedToken) {

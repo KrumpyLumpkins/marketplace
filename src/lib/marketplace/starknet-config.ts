@@ -1,35 +1,49 @@
 import { ControllerConnector } from "@cartridge/connector";
 import { mainnet, sepolia } from "@starknet-react/chains";
-import { braavos, cartridge, jsonRpcProvider, ready } from "@starknet-react/core";
+import {
+  braavos,
+  cartridge,
+  jsonRpcProvider,
+  ready,
+} from "@starknet-react/core";
 import type { MarketplaceRuntimeConfig } from "@/lib/marketplace/config";
 
-type MarketplaceChainLabel = MarketplaceRuntimeConfig["chainLabel"];
-
-const CARTRIDGE_RPC_BASE_URL = "https://api.cartridge.gg/x/starknet";
-
-let _controllerConnector: ControllerConnector | null = null;
-function getControllerConnector() {
-  if (!_controllerConnector) {
-    _controllerConnector = new ControllerConnector();
+const controllers = new Map<string, ControllerConnector>();
+export function buildStarknetConfig(
+  chainLabel: MarketplaceRuntimeConfig["chainLabel"],
+) {
+  const chain =
+    chainLabel === "SN_MAIN"
+      ? mainnet
+      : chainLabel === "SN_SEPOLIA" || chainLabel === "LOCAL"
+        ? sepolia
+        : undefined;
+  const nodeUrl =
+    process.env.NEXT_PUBLIC_STARKNET_RPC_URL ??
+    (typeof window !== "undefined"
+      ? `${window.location.origin}/api/marketplace/rpc`
+      : `${process.env.MARKETPLACE_API_URL ?? "http://127.0.0.1:3100"}/rpc`);
+  const defaultChainId = chain
+    ? (`0x${chain.id.toString(16)}` as `0x${string}`)
+    : undefined;
+  const key = `${defaultChainId}:${nodeUrl}`;
+  let controller = controllers.get(key);
+  if (!controller) {
+    // Controller owns its wallet transport. Custom RPC configuration performs synchronous
+    // network I/O in this SDK constructor and would break browsing during an outage.
+    controller = new ControllerConnector({ defaultChainId });
+    controllers.set(key, controller);
   }
-  return _controllerConnector;
-}
-
-export function buildStarknetConfig(chainLabel: MarketplaceChainLabel) {
   return {
-    chains: [mainnet, sepolia],
+    chains: chain ? [chain] : [mainnet, sepolia],
+    // A single backend RPC belongs to one network; never expose it as both.
     provider: jsonRpcProvider({
-      rpc: (chain) => ({
-        nodeUrl: `${CARTRIDGE_RPC_BASE_URL}/${chain.network}`,
-      }),
+      rpc: (requested) =>
+        !chain || requested.id === chain.id ? { nodeUrl } : null,
     }),
     explorer: cartridge,
-    connectors: [getControllerConnector(), ready(), braavos()],
-    defaultChainId:
-      chainLabel === "SN_MAIN"
-        ? mainnet.id
-        : chainLabel === "SN_SEPOLIA"
-          ? sepolia.id
-          : undefined,
+    connectors: [controller, ready(), braavos()],
+    defaultChainId: chain?.id,
+    autoConnect: true,
   };
 }

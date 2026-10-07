@@ -22,11 +22,13 @@ vi.mock("@cartridge/connector", () => ({
 import { buildStarknetConfig } from "@/lib/marketplace/starknet-config";
 
 describe("starknet config", () => {
-  it("maps SN_MAIN chain label to cartridge-backed mainnet defaults", () => {
+  it("maps SN_MAIN chain label to owned RPC mainnet defaults", () => {
     const config = buildStarknetConfig("SN_MAIN");
 
-    expect(mockControllerConnectorOptions).toHaveBeenCalledWith(undefined);
-    expect(config.chains).toEqual([mainnet, sepolia]);
+    expect(mockControllerConnectorOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ defaultChainId: "0x534e5f4d41494e" }),
+    );
+    expect(config.chains).toEqual([mainnet]);
     expect(config.defaultChainId).toBe(mainnet.id);
     expect(config.provider).toBeTypeOf("function");
     expect(config.connectors).toHaveLength(3);
@@ -36,19 +38,16 @@ describe("starknet config", () => {
     const sepoliaProvider = config.provider(sepolia);
 
     expect(mainnetProvider).not.toBeNull();
-    expect(sepoliaProvider).not.toBeNull();
-    expect(mainnetProvider?.channel.nodeUrl).toContain(
-      "https://api.cartridge.gg/x/starknet/mainnet",
-    );
-    expect(sepoliaProvider?.channel.nodeUrl).toContain(
-      "https://api.cartridge.gg/x/starknet/sepolia",
-    );
+    expect(sepoliaProvider).toBeNull();
+    expect(mainnetProvider?.channel.nodeUrl).toContain("/api/marketplace/rpc");
   });
 
   it("maps SN_SEPOLIA chain label to the sepolia default chain", () => {
     const config = buildStarknetConfig("SN_SEPOLIA");
 
     expect(config.defaultChainId).toBe(sepolia.id);
+    expect(config.provider(mainnet)).toBeNull();
+    expect(config.autoConnect).toBe(true);
   });
 
   it("does not force a default chain for custom chain labels", () => {

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CollectionTokenGrid } from "@/features/collections/collection-token-grid";
@@ -193,55 +193,6 @@ describe("collection token grid", () => {
     );
   });
 
-  it("defers_listed_token_enrichment_until_after_initial_render", async () => {
-    mockUseCollectionTokensQuery.mockReturnValue({
-      data: { page: { tokens: [token("1")], nextCursor: null }, error: null },
-      isLoading: false,
-      isSuccess: true,
-      isError: false,
-      error: null,
-      isFetching: false,
-      refetch: vi.fn(),
-    });
-    mockUseCollectionListingsQuery.mockReturnValue(
-      successListingsResult([
-        { id: 101, tokenId: "7", price: 25, currency: "0xfee", quantity: 1 },
-      ]),
-    );
-
-    render(<CollectionTokenGrid address="0xabc" projectId="project-a" />);
-
-    expect(mockUseCollectionTokensQuery).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({
-        address: "0xabc",
-        project: "project-a",
-        tokenIds: undefined,
-      }),
-    );
-    expect(mockUseCollectionTokensQuery).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        address: "0xabc",
-        project: "project-a",
-        tokenIds: expect.arrayContaining(["7", "0x7"]),
-      }),
-      expect.objectContaining({ enabled: false }),
-    );
-
-    await screen.findByText("Token #1");
-
-    await waitFor(() => {
-      expect(mockUseCollectionTokensQuery).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          address: "0xabc",
-          project: "project-a",
-          tokenIds: expect.arrayContaining(["7", "0x7"]),
-        }),
-        expect.objectContaining({ enabled: true }),
-      );
-    });
-  });
 
   it("token_grid_uses_image_fallback_when_missing", async () => {
     mockUseCollectionTokensQuery.mockReturnValue({
@@ -342,7 +293,7 @@ describe("collection token grid", () => {
     expect(link2).toHaveAttribute("href", "/collections/0xabc/2");
   });
 
-  it("active_filters_passed_as_attributeFilters_to_sdk_query", () => {
+  it("active_filters_passed_to_owned_query", () => {
     const filters: ActiveFilters = { Background: new Set(["Blue"]) };
     mockUseCollectionTokensQuery.mockReturnValue({
       data: { page: { tokens: [], nextCursor: null }, error: null },
@@ -410,7 +361,7 @@ describe("collection token grid", () => {
     );
   });
 
-  it("range_filters_stay_client_side_and_do_not_forward_exact_attribute_filters", async () => {
+  it("range_filters_do_not_become_exact_match_filters", async () => {
     const filters: ActiveFilters = { Level: new Set([encodeRangeFilterValue(10, 20)]) };
     mockUseCollectionTokensQuery.mockReturnValue({
       data: {
@@ -555,7 +506,7 @@ describe("collection token grid", () => {
     const user = userEvent.setup();
     render(<CollectionTokenGrid address="0xabc" projectId="project-a" />);
 
-    await user.click(screen.getByRole("button", { name: /buy now/i }));
+    await user.click(screen.getByRole("button", { name: /add to cart/i }));
 
     expect(mockCartAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -600,7 +551,7 @@ describe("collection token grid", () => {
     render(<CollectionTokenGrid address="0xabc" projectId="project-a" />);
 
     expect(await screen.findByText("120")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /buy now/i }));
+    await user.click(screen.getByRole("button", { name: /add to cart/i }));
 
     expect(mockCartAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -658,7 +609,7 @@ describe("collection token grid", () => {
     const user = userEvent.setup();
     render(<CollectionTokenGrid address="0xabc" projectId="project-a" />);
 
-    await user.click(screen.getByRole("button", { name: /buy now/i }));
+    await user.click(screen.getByRole("button", { name: /add to cart/i }));
 
     expect(mockCartAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -701,13 +652,13 @@ describe("collection token grid", () => {
     const user = userEvent.setup();
     render(<CollectionTokenGrid address="0xabc" projectId="project-a" />);
 
-    await user.click(screen.getByRole("button", { name: /buy now/i }));
+    await user.click(screen.getByRole("button", { name: /add to cart/i }));
 
     expect(mockCartSetOpen).toHaveBeenCalledWith(true);
     expect(screen.queryByRole("button", { name: /added/i })).toBeNull();
   });
 
-  it("clicking_card_body_adds_listing_without_opening_cart", async () => {
+  it("card_body_links_to_details_without_changing_cart", async () => {
     mockUseCollectionTokensQuery.mockReturnValue({
       data: {
         page: {
@@ -734,19 +685,11 @@ describe("collection token grid", () => {
       ]),
     );
 
-    const user = userEvent.setup();
     render(<CollectionTokenGrid address="0xabc" projectId="project-a" />);
 
-    await user.click(await screen.findByRole("article", { name: "token-1" }));
-
-    expect(mockCartAddItem).toHaveBeenCalledWith(
-      expect.objectContaining({
-        orderId: "22",
-        collection: "0xabc",
-        tokenId: "1",
-        price: "120",
-      }),
-    );
+    const link = await screen.findByRole("link", { name: "token-1" });
+    expect(link).toHaveAttribute("href", "/collections/0xabc/1");
+    expect(mockCartAddItem).not.toHaveBeenCalled();
     expect(mockCartSetOpen).not.toHaveBeenCalled();
   });
 
@@ -775,9 +718,7 @@ describe("collection token grid", () => {
     expect(screen.queryByRole("button", { name: /standard/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /comfort/i })).toBeNull();
     expect(screen.getByTestId("collection-token-grid-cards")).toHaveClass(
-      "grid-cols-2",
-      "sm:grid-cols-3",
-      "lg:grid-cols-4",
+      "market-asset-grid",
     );
   });
 
@@ -803,11 +744,11 @@ describe("collection token grid", () => {
 
     const grid = screen.getByTestId("collection-token-grid-cards");
     await user.click(screen.getByRole("button", { name: /compact/i }));
-    expect(grid).toHaveClass("grid-cols-2", "sm:grid-cols-3", "lg:grid-cols-4");
+    expect(grid).toHaveClass("market-asset-grid");
 
     await user.click(screen.getByRole("button", { name: /dense/i }));
     const denseGrid = screen.getByTestId("collection-token-grid-cards");
-    expect(denseGrid).toHaveClass("grid-cols-2", "sm:grid-cols-3", "lg:grid-cols-6");
+    expect(denseGrid).toHaveClass("market-asset-grid-dense");
   });
 
   it("list_view_renders_tokens_in_a_table_layout", async () => {
@@ -952,300 +893,9 @@ describe("collection token grid", () => {
     expect(screen.queryByText(/grep/i)).toBeNull();
   });
 
-  it("applies_price_ascending_sort_when_requested", async () => {
-    mockUseCollectionTokensQuery.mockReturnValue({
-      data: {
-        page: {
-          tokens: [token("1"), token("2"), token("3")],
-          nextCursor: null,
-        },
-        error: null,
-      },
-      isLoading: false,
-      isSuccess: true,
-      isError: false,
-      error: null,
-      isFetching: false,
-      refetch: vi.fn(),
-    });
-    mockUseCollectionListingsQuery.mockReturnValue(
-      successListingsResult([
-        { id: 1, tokenId: 1, price: 300, currency: "0xfee", quantity: 1 },
-        { id: 2, tokenId: 2, price: 100, currency: "0xfee", quantity: 1 },
-      ]),
-    );
 
-    render(
-      <CollectionTokenGrid
-        address="0xabc"
-        projectId="project-a"
-        sortMode="price-asc"
-      />,
-    );
 
-    await screen.findByRole("article", { name: "token-2" });
-    expect(
-      screen.getAllByRole("article").map((card) => card.getAttribute("aria-label")),
-    ).toEqual(["token-2", "token-1", "token-3"]);
-  });
 
-  it("recent_sort_includes_listed_tokens_not_present_on_first_page", async () => {
-    mockUseCollectionTokensQuery.mockImplementation((options) => {
-      if (Array.isArray(options?.tokenIds)) {
-        const includesListedToken = options.tokenIds.includes("99");
-        return {
-          data: {
-            page: {
-              tokens: includesListedToken ? [token("99")] : [],
-              nextCursor: null,
-            },
-            error: null,
-          },
-          isLoading: false,
-          isSuccess: true,
-          isError: false,
-          error: null,
-          isFetching: false,
-          refetch: vi.fn(),
-        };
-      }
-
-      return {
-        data: {
-          page: {
-            tokens: [token("1"), token("2")],
-            nextCursor: null,
-          },
-          error: null,
-        },
-        isLoading: false,
-        isSuccess: true,
-        isError: false,
-        error: null,
-        isFetching: false,
-        refetch: vi.fn(),
-      };
-    });
-    mockUseCollectionListingsQuery.mockReturnValue(
-      successListingsResult([
-        { id: 99, tokenId: 99, price: 44, currency: "0xfee", quantity: 1 },
-      ]),
-    );
-
-    render(
-      <CollectionTokenGrid
-        address="0xabc"
-        projectId="project-a"
-        sortMode="recent"
-      />,
-    );
-
-    expect(
-      await screen.findByRole("article", { name: "token-99" }),
-    ).toBeVisible();
-  });
-
-  it("price_sort_includes_listed_tokens_resolved_by_padded_token_ids", async () => {
-    const padded1120 = `0x${"460".padStart(64, "0")}`;
-    mockUseCollectionTokensQuery.mockImplementation((options) => {
-      if (Array.isArray(options?.tokenIds)) {
-        const includesPadded = options.tokenIds.includes(padded1120);
-        return {
-          data: {
-            page: {
-              tokens: includesPadded
-                ? [token("0x460", { metadata: { name: "Token #1120" } })]
-                : [],
-              nextCursor: null,
-            },
-            error: null,
-          },
-          isLoading: false,
-          isSuccess: true,
-          isError: false,
-          error: null,
-          isFetching: false,
-          refetch: vi.fn(),
-        };
-      }
-
-      return {
-        data: {
-          page: {
-            tokens: [token("1"), token("2"), token("3")],
-            nextCursor: null,
-          },
-          error: null,
-        },
-        isLoading: false,
-        isSuccess: true,
-        isError: false,
-        error: null,
-        isFetching: false,
-        refetch: vi.fn(),
-      };
-    });
-    mockUseCollectionListingsQuery.mockReturnValue(
-      successListingsResult([
-        { id: 99, tokenId: 1120, price: 44, currency: "0xfee", quantity: 1 },
-      ]),
-    );
-
-    render(
-      <CollectionTokenGrid
-        address="0xabc"
-        projectId="project-a"
-        sortMode="price-asc"
-      />,
-    );
-
-    expect(
-      await screen.findByRole("article", { name: "token-1120" }),
-    ).toBeVisible();
-  });
-
-  it("applies_price_descending_sort_when_requested", async () => {
-    mockUseCollectionTokensQuery.mockReturnValue({
-      data: {
-        page: {
-          tokens: [token("1"), token("2"), token("3")],
-          nextCursor: null,
-        },
-        error: null,
-      },
-      isLoading: false,
-      isSuccess: true,
-      isError: false,
-      error: null,
-      isFetching: false,
-      refetch: vi.fn(),
-    });
-    mockUseCollectionListingsQuery.mockReturnValue(
-      successListingsResult([
-        { id: 1, tokenId: 1, price: 300, currency: "0xfee", quantity: 1 },
-        { id: 2, tokenId: 2, price: 100, currency: "0xfee", quantity: 1 },
-      ]),
-    );
-
-    render(
-      <CollectionTokenGrid
-        address="0xabc"
-        projectId="project-a"
-        sortMode="price-desc"
-      />,
-    );
-
-    await screen.findByRole("article", { name: "token-1" });
-    expect(
-      screen.getAllByRole("article").map((card) => card.getAttribute("aria-label")),
-    ).toEqual(["token-1", "token-2", "token-3"]);
-  });
-
-  it("sorts_beasts_by_power_descending_then_token_id", async () => {
-    mockUseCollectionTokensQuery.mockReturnValue({
-      data: {
-        page: {
-          tokens: [
-            token("2", {
-              metadata: {
-                name: "Token #2",
-                attributes: [{ trait_type: "Power", value: "90" }],
-              },
-            }),
-            token("1", {
-              metadata: {
-                name: "Token #1",
-                attributes: [{ trait_type: "Power", value: "90" }],
-              },
-            }),
-            token("3", {
-              metadata: {
-                name: "Token #3",
-                attributes: [{ trait_type: "Power", value: "70" }],
-              },
-            }),
-            token("4", {
-              metadata: {
-                name: "Token #4",
-                attributes: [{ trait_type: "Power", value: "unknown" }],
-              },
-            }),
-          ],
-          nextCursor: null,
-        },
-        error: null,
-      },
-      isLoading: false,
-      isSuccess: true,
-      isError: false,
-      error: null,
-      isFetching: false,
-      refetch: vi.fn(),
-    });
-
-    render(
-      <CollectionTokenGrid
-        address="0xbeast"
-        projectId="project-beasts"
-        sortMode="power-desc"
-      />,
-    );
-
-    await screen.findByRole("article", { name: "token-1" });
-    expect(
-      screen.getAllByRole("article").map((card) => card.getAttribute("aria-label")),
-    ).toEqual(["token-1", "token-2", "token-3", "token-4"]);
-  });
-
-  it("sorts_beasts_by_health_ascending_with_missing_values_last", async () => {
-    mockUseCollectionTokensQuery.mockReturnValue({
-      data: {
-        page: {
-          tokens: [
-            token("1", {
-              metadata: {
-                name: "Token #1",
-                attributes: [{ trait_type: "Health", value: "500" }],
-              },
-            }),
-            token("2", {
-              metadata: {
-                name: "Token #2",
-                attributes: [{ trait_type: "Health", value: "200" }],
-              },
-            }),
-            token("3", {
-              metadata: {
-                name: "Token #3",
-                attributes: [],
-              },
-            }),
-          ],
-          nextCursor: null,
-        },
-        error: null,
-      },
-      isLoading: false,
-      isSuccess: true,
-      isError: false,
-      error: null,
-      isFetching: false,
-      refetch: vi.fn(),
-    });
-
-    render(
-      <CollectionTokenGrid
-        address="0xbeast"
-        projectId="project-beasts"
-        sortMode="health-asc"
-      />,
-    );
-
-    await screen.findByRole("article", { name: "token-2" });
-    expect(
-      screen.getAllByRole("article").map((card) => card.getAttribute("aria-label")),
-    ).toEqual(["token-2", "token-1", "token-3"]);
-  });
 
   it("renders_inline_resource_icons_on_realms_cards_only", async () => {
     mockUseCollectionTokensQuery.mockReturnValue({
@@ -1325,62 +975,6 @@ describe("collection token grid", () => {
     expect(traitIcons).toHaveTextContent("Wood");
   });
 
-  it("sorts_realms_by_resource_count", async () => {
-    mockUseCollectionTokensQuery.mockReturnValue({
-      data: {
-        page: {
-          tokens: [
-            token("3", {
-              metadata: {
-                name: "Realm #3",
-                attributes: [{ trait_type: "Resource", value: "Stone" }],
-              },
-            }),
-            token("1", {
-              metadata: {
-                name: "Realm #1",
-                attributes: [
-                  { trait_type: "Resource", value: "Coal" },
-                  { trait_type: "Resource", value: "Stone" },
-                  { trait_type: "Resource", value: "Wood" },
-                ],
-              },
-            }),
-            token("2", {
-              metadata: {
-                name: "Realm #2",
-                attributes: [
-                  { trait_type: "Resource", value: "Coal" },
-                  { trait_type: "Resource", value: "Stone" },
-                ],
-              },
-            }),
-          ],
-          nextCursor: null,
-        },
-        error: null,
-      },
-      isLoading: false,
-      isSuccess: true,
-      isError: false,
-      error: null,
-      isFetching: false,
-      refetch: vi.fn(),
-    });
-
-    render(
-      <CollectionTokenGrid
-        address="0x123"
-        projectId="project-realms"
-        sortMode="resource-count-desc"
-      />,
-    );
-
-    await screen.findByRole("article", { name: "token-1" });
-    expect(
-      screen.getAllByRole("article").map((card) => card.getAttribute("aria-label")),
-    ).toEqual(["token-1", "token-2", "token-3"]);
-  });
 
   it("highlights_sweep_preview_tokens_by_order_id", async () => {
     mockUseCollectionTokensQuery.mockReturnValue({
@@ -1421,4 +1015,13 @@ describe("collection token grid", () => {
     expect(previewRingWrapper).toHaveClass("ring-2", "ring-primary", "ring-offset-2", "ring-offset-background");
     expect(nonPreviewRingWrapper).not.toHaveClass("ring-2");
   });
+  it.each(["price-asc", "price-desc", "power-desc", "health-asc", "resource-count-desc"] as const)("delegates %s to full-dataset API and preserves returned order", async (sortMode) => {
+    mockUseCollectionTokensQuery.mockReturnValue({data:{page:{tokens:[token("90"),token("2")],nextCursor:null}},isSuccess:true,isLoading:false});
+    render(<CollectionTokenGrid address="0xabc" sortMode={sortMode}/>);
+    await screen.findByRole("article",{name:"token-90"});
+    expect(mockUseCollectionTokensQuery).toHaveBeenCalledWith(expect.objectContaining({sort:sortMode,currency:expect.any(String)}));
+    expect(screen.getAllByRole("article").map(card=>card.getAttribute("aria-label"))).toEqual(["token-90","token-2"]);
+    expect(mockUseCollectionTokensQuery.mock.calls.every(call=>call[0].tokenIds===undefined)).toBe(true);
+  });
+
 });

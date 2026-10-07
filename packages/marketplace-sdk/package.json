@@ -1,0 +1,29 @@
+{
+  "name": "@biblio/marketplace",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./abi.json": "./dist/abi.json"
+  },
+  "dependencies": {
+    "@tanstack/query-core": "5.90.20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "engines": {
+    "node": ">=22.22"
+  }
+}

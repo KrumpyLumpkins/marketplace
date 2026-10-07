@@ -1,12 +1,4 @@
-import type { NormalizedToken } from "@cartridge/arcade/marketplace";
-
-export type SidebarCollection = {
-  address: string;
-  name: string;
-  projectId?: string;
-  imageUrl?: string | null;
-  floorPrice?: string | null;
-};
+import type { NormalizedToken } from "@/lib/marketplace/types";
 
 export type FeaturedCollection = {
   address: string;
@@ -14,6 +6,7 @@ export type FeaturedCollection = {
   projectId?: string;
   imageUrl?: string | null;
   floorPrice?: string | null;
+  floorCurrency?: string | null;
   totalSupply?: string | null;
   listingCount?: string | null;
 };
@@ -31,6 +24,7 @@ export type CollectionCardData = {
   projectId?: string;
   imageUrl?: string | null;
   floorPrice?: string | null;
+  floorCurrency?: string | null;
   totalSupply?: string | null;
   listingCount?: string | null;
 };

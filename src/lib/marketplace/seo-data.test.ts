@@ -21,7 +21,7 @@ const {
   },
 }));
 
-vi.mock("@cartridge/arcade/marketplace", () => ({
+vi.mock("@/lib/marketplace/api-client", () => ({
   createMarketplaceClient: mockCreateMarketplaceClient,
 }));
 

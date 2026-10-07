@@ -331,3 +331,22 @@
     --animation-enabled: 0;
   }
 }
+
+/* Marketplace spacing: 16/24px page gutters, 16px sections, 12px asset gaps. */
+.market-page {
+  padding: 1rem;
+}
+.market-asset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+  gap: 0.75rem;
+}
+.market-asset-grid-dense {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr));
+}
+@media (min-width: 640px) {
+  .market-page { padding: 1.5rem; }
+}
+@media (max-width: 639px) {
+  .market-asset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

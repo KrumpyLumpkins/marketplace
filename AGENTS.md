@@ -1,238 +1,54 @@
-# AGENTS.md
+# Working in this repository
 
-```text
-    _    ____ _____ _   _ _____ ____
-   / \  / ___| ____| \ | |_   _/ ___|
-  / _ \| |  _|  _| |  \| | | | \___ \\
- / ___ \ |_| | |___| |\  | | |  ___) |
-/_/   \_\____|_____|_| \_| |_| |____/
-```
+## Direction and sources of truth
 
-Contributor and coding-agent playbook for `biblio/marketplace`.
+Keep the existing UI. Build standalone Cairo settlement and an owned Node.js indexer/API, with on-chain ERC-721 orders and atomic carts. The new paths are implemented locally; dated Arcade assessments are historical migration input. Consult the build plan for remaining validation and launch gates.
 
-## 1) Mission and Constraints
+- Before implementation or scope changes, read [the build plan](docs/BUILD-PLAN.md). It owns launch scope, milestones, dependencies and acceptance gates.
+- For order types, calldata, events, fees, royalties or permissions, read [contract design](docs/CONTRACT-SCOPE.md) and the relevant [architecture decision](docs/adr/0001-standalone-cairo-marketplace.md).
+- For indexing, storage, queries, metadata, authentication or recovery, read [backend design](docs/BACKEND-SCOPE.md).
+- For reusable reads or trading workflows, read [SDK integration](packages/marketplace-sdk/README.md) and [React bindings](packages/marketplace-react/README.md). Consumers use public package exports; keep protocol rules out of app components.
+- Before adding or changing UI, read [the Storybook guide](docs/STORYBOOK.md) for story authoring, fixtures and verification commands.
+- For domain terminology, consult [the glossary](CONTEXT.md). Keep it free of implementation instructions.
+- For running the app, use [README.md](README.md). Before release preparation or deployment, read [operations](docs/OPERATIONS.md) and the [on-chain sequence](docs/MAINNET-DEPLOYMENT.md); `pnpm release:verify` runs local gates, while the build plan owns outstanding launch approval.
+- Read dated assessments and the OpenSea comparison only when investigating legacy behavior or the rationale for a decision. They are evidence, not active implementation plans. Archived implementation reports live in `docs/history/`. `.context/README.md` indexes ignored local evidence and tooling; neither archive is an active specification.
 
-This repo is a production-oriented marketplace frontend for Starknet collections.
+The build plan takes precedence over supporting scope documents. Preserve unresolved fee, royalty, administration and deployment choices as explicit decisions; do not turn a proposed default into a production guarantee. Update the canonical document when a decision changes instead of creating a competing PRD.
 
-Non-negotiable constraints:
+## Implementation rules
 
-- Use only `shadcn/ui` primitives + Tailwind tokens for UI.
-- Keep business logic in `src/lib` or `src/features`, not route files.
-- Preserve strict typing; avoid `any` unless unavoidable.
-- Implement behavior changes with tests first (RED -> GREEN -> REFACTOR).
-- Keep changes focused; avoid broad refactors unless requested.
+- Preserve shadcn/ui primitives, Tailwind tokens, accessibility and URL-based discovery state. Put reusable fetching and trading rules in `packages/marketplace-sdk`, React bindings in `packages/marketplace-react`, and app presentation/adapters in `src/features` or `src/lib`; routes orchestrate them.
+- Keep strict types. New backend code uses local modules and Node built-ins, without third-party runtime packages. Existing frontend dependencies and Cairo development/security primitives have separate policies in the plan.
+- Use our contract ABI and explicit events for new-market trading. Torii, Dojo World storage and Arcade trading SDK logic belong only to explicitly scoped legacy compatibility work.
+- Implement behavior changes test-first: demonstrate the failure, implement the smallest correction, then refactor. Test public behavior and invariants rather than mirroring implementation details.
+- Keep chain values lossless and order identity deployment-aware. Derive payment bounds from contract terms; preflight is advisory, while the contract enforces authorization and settlement.
+- Preserve single-currency, maximum-25-item, all-or-nothing checkout and visible per-item errors. Distinguish submission, chain acceptance/reversion and index reflection. Migrate persisted cart identities deliberately.
+- Keep chain-derived data rebuildable and user-owned application data durable. Advance index checkpoints atomically with projections; report freshness for the sources actually used.
 
-## 2) Read Order (Required)
+## Storybook-first UI workflow
 
-Before changing code:
+For every feature that adds or changes UI, complete these steps in order. Backend-only changes follow the applicable validation rules below.
 
-1. `AGENTS.md` (this file)
-2. `README.md`
-3. `docs/SCOPE.md`
-4. `docs/TDD-PRD.md`
+1. Create or update component stories before integrating the UI into site routes. Develop the actual reusable production components in Storybook, using isolated fixtures. Cover relevant default, loading, empty, error, disabled and success states, plus wallet and transaction states where applicable.
+2. Verify the stories in a real browser at mobile, tablet and desktop sizes, including widths around relevant layout breakpoints. Check text wrapping, overflow, touch targets, navigation and any dialogs or menus. Exercise keyboard navigation and focus behavior as well as pointer interactions.
+3. Run the relevant story interaction and accessibility tests and build Storybook. Fix interaction, accessibility and responsive layout failures before site integration. Passing automated tests alone does not establish responsive visual correctness.
+4. Integrate the same verified components into the site, then check the affected routes and user journeys with their real application wiring and responsive layouts. Story fixtures do not replace application integration or real-wallet validation.
 
-## 3) Current Stack and Tooling
+Delivery reports must identify the stories and viewport sizes checked, the interactions verified and any remaining coverage gaps.
 
-- Next.js `16.1.6` + React `19`
-- TypeScript
-- Tailwind CSS v4
-- `@cartridge/arcade` SDK + `@starknet-react/*`
-- Zustand for persisted cart state
-- Vitest + React Testing Library + MSW
-- Playwright for e2e and feature screenshots
+## Validation and delivery
 
-Package manager notes:
+Use pnpm for the existing frontend; `pnpm-lock.yaml` is canonical. Check `package.json` and `.github/workflows/ci.yml` for current scripts/runtime. Pin new backend and Cairo tooling when those packages are introduced; do not report planned commands or tests as already available.
 
-- CI uses `pnpm` (`pnpm-lock.yaml` is canonical).
-- Local `npm` scripts also work, but `pnpm` is preferred for parity.
+- Frontend logic: relevant tests, typecheck and lint; rendering/routes additionally need a build and relevant browser flows.
+- Contract changes: unit/invariant tests plus appropriate adversarial, fork and resource checks from the contract scope.
+- Indexer/API changes: native Node tests, database/replay or HTTP integration checks appropriate to the changed behavior.
+- Documentation-only changes: verify links, scope consistency and `git diff --check`; application tests may be skipped with that limitation stated.
 
-## 4) Repository Map
+Report what changed, verification results and any unresolved blocker. Keep implementation status in the build plan accurate; source inspection, mocked tests, replay and production validation are distinct evidence.
 
-- `src/app/*`: App Router pages, metadata, API routes
-- `src/features/collections/*`: collection UX (grid, filters, market activity)
-- `src/features/token/*`: token detail and listing actions
-- `src/features/cart/*`: cart store/sidebar/checkout flow
-- `src/features/portfolio/*`: wallet lookup flow
-- `src/features/profile/*`: wallet profile holdings view
-- `src/features/ops/*`: client diagnostics
-- `src/components/ui/*`: shadcn primitives only
-- `src/components/providers/*`: Starknet/query/marketplace provider setup
-- `src/lib/marketplace/*`: config parsing, hooks, fee logic, token display
-- `src/test/*`: unit/integration test setup + MSW
-- `tests/e2e/*`: Playwright tests
-- `scripts/ci/*`: screenshot route detection and CI helper scripts
-- `.github/workflows/ci.yml`: CI pipeline
+## Workspace and Git
 
-## 5) Product and Domain Invariants (Do Not Break)
+Inspect the current branch and working tree before editing. Preserve unrelated work and continue a suitable active branch; use `codex/` for a new branch. Do not switch/reset the checkout merely to follow a boilerplate workflow.
 
-### Multi-collection
-
-- Collections come from `NEXT_PUBLIC_MARKETPLACE_COLLECTIONS` in `address|name|projectId` format.
-- Route and query logic must handle collection switching without stale state leakage.
-
-### Multi-currency marketplace behavior
-
-- Listings/offers are multi-currency (`STRK`, `LORDS`, `SURVIVO`).
-- Currency display is address-based via token symbol/icon resolvers.
-- Wallet dropdown displays balances across those currencies.
-- Cart checkout calldata uses each listing's currency.
-- Cart intentionally enforces one-currency-per-checkout (mixed currency is rejected).
-
-### Checkout and cart safety
-
-- Cart row identity is `orderId`.
-- Cart maximum is 25 items.
-- Checkout must pre-validate listing freshness and block if any row is stale.
-- Checkout executes as one transaction; no partial fallback path.
-- Validation failures must remain visible inline per row.
-
-## 6) Environment Contract
-
-Use `.env.local`:
-
-- `NEXT_PUBLIC_MARKETPLACE_CHAIN_ID`
-- `NEXT_PUBLIC_MARKETPLACE_DEFAULT_PROJECT`
-- `NEXT_PUBLIC_MARKETPLACE_COLLECTIONS`
-- `NEXT_PUBLIC_SITE_URL` (recommended for canonical/OG metadata)
-
-Collections format:
-
-```env
-NEXT_PUBLIC_MARKETPLACE_COLLECTIONS=address|name|projectId,address|name|projectId
-```
-
-After env edits, restart dev server.
-
-## 7) Development Workflow (Required)
-
-1. Sync branch with latest `main`.
-2. Create a focused branch for one change-set.
-3. Write/adjust failing tests first.
-4. Implement minimal code to pass tests.
-5. Refactor while preserving green tests.
-6. Run quality gates before commit.
-
-## 8) Git Workflow (Required)
-
-Branching:
-
-```bash
-git fetch origin
-git checkout main
-git pull --ff-only origin main
-git checkout -b feat/short-topic
-```
-
-During work:
-
-```bash
-git status
-git diff
-```
-
-Commit format:
-
-```text
-type(scope): concise summary
-```
-
-Allowed types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `ci`.
-
-Examples:
-
-- `feat(collections): sync trait filters with url`
-- `fix(cart): block stale rows before checkout`
-- `test(token): cover expired listing filtering`
-
-Commit/push:
-
-```bash
-git add <paths>
-git commit -m "type(scope): summary"
-git push -u origin <branch>
-```
-
-Git safety rules:
-
-- Never commit `.next`, Playwright artifacts, temp files, or secrets.
-- Never force-push shared branches.
-- Never revert unrelated changes you did not author.
-- Keep PRs small and single-purpose.
-
-## 9) Test Expectations by Change Type
-
-For logic changes:
-
-```bash
-pnpm test
-pnpm typecheck
-pnpm lint
-```
-
-For UI/route changes:
-
-```bash
-pnpm test
-pnpm test:e2e
-pnpm build
-```
-
-For CI-parity preflight:
-
-```bash
-pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build && pnpm test:e2e
-```
-
-For docs-only changes, tests may be skipped, but state that explicitly in PR notes.
-
-## 10) UI and Accessibility Standards
-
-- Maintain minimal, readable hierarchy.
-- Use semantic theme tokens (`primary`, `secondary`, `muted`, `destructive`, `chart-*`).
-- Preserve keyboard navigation and visible focus states.
-- Ensure responsive behavior on mobile and desktop.
-
-## 11) API/Data Rules
-
-- Keep query boundaries explicit: loading, empty, error, success.
-- Prefer deterministic parsing/normalization for SDK payload variance.
-- Do not hardcode fee results when SDK methods are available.
-- Preserve URL-canonical state for filters/sort/cursor where implemented.
-
-## 12) PR Requirements
-
-Each PR should include:
-
-- What changed
-- Why it changed
-- Risk/impact areas
-- Test evidence (exact commands + result)
-- Screenshots for UI changes
-
-Checklist:
-
-- [ ] Behavior change has tests
-- [ ] Lint/typecheck/build pass
-- [ ] No unrelated files modified
-- [ ] Docs updated if contracts/behavior changed
-
-## 13) Quick Commands
-
-```bash
-pnpm dev
-pnpm dev:https
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm test:coverage
-pnpm test:e2e
-pnpm test:e2e:screenshots
-pnpm ci:feature-routes
-pnpm build
-```
-
-## 14) Conductor Workspace Notes
-
-- Work inside the assigned workspace path only.
-- Use `.context/` for scratch notes shared across agents.
-- Target branch is `main` unless explicitly told otherwise.
+Use conventional commit subjects when committing. Stage explicit paths; run `pnpm release:check` before publishing. Environment files stay local; only `.env.*.example` templates belong in Git. Keep scratch sources, caches, generated artifacts and credentials out of commits. Store local investigation material in ignored `.context/`; promote only reviewed, necessary evidence into documentation. Infrastructure deployment, contract migration and user transactions must follow the applicable milestone gates and user authorization.

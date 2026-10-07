@@ -1,5 +1,6 @@
 "use client";
 
+import { GlobalSearch } from "@/features/trading/global-search";
 import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { HeroBanner } from "@/features/home/hero-banner";
@@ -16,7 +17,7 @@ export function MarketplaceHome() {
   const {
     featuredCollection,
     collectionCards,
-    isLoading,
+    isLoading,isError,refetch,
   } = useHomePageData();
 
   const filteredCollections = useMemo(
@@ -47,9 +48,12 @@ export function MarketplaceHome() {
     translateY: 10,
   });
 
+  if(isError)return <main className="market-page"><p role="alert" className="text-muted-foreground">Unable to load marketplace collections.</p><button className="mt-3 text-primary underline" onClick={()=>void refetch?.()}>Retry</button></main>;
+  if (query) return <GlobalSearch query={query} />;
+
   if (!isLoading && collectionCards.length === 0) {
     return (
-      <main data-testid="marketplace-home" className="flex-1 p-4 sm:p-6 lg:p-8">
+      <main data-testid="marketplace-home" className="market-page flex-1">
         <p className="text-sm text-muted-foreground font-mono">
           <span className="mr-1 text-primary">$</span>
           No collections configured
@@ -60,7 +64,7 @@ export function MarketplaceHome() {
 
   if (!isLoading && query && filteredCollections.length === 0) {
     return (
-      <main data-testid="marketplace-home" className="flex-1 p-4 sm:p-6 lg:p-8">
+      <main data-testid="marketplace-home" className="market-page flex-1">
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="mb-4 rounded-[8px] border border-[color:var(--realm-border-etched)] bg-muted/70 p-4">
             <SearchIcon className="h-6 w-6 text-muted-foreground" />
@@ -77,23 +81,24 @@ export function MarketplaceHome() {
   }
 
   return (
-    <main data-testid="marketplace-home" className="flex-1 p-4 sm:p-6 lg:p-8">
+    <main data-testid="marketplace-home" className="market-page flex-1">
       {/* Hero */}
       <HeroBanner
         name={featuredCollection?.name ?? "Featured Collection"}
         address={featuredCollection?.address ?? ""}
         imageUrl={featuredCollection?.imageUrl}
         floorPrice={featuredCollection?.floorPrice}
+        floorCurrency={featuredCollection?.floorCurrency}
         totalSupply={featuredCollection?.totalSupply}
         listingCount={featuredCollection?.listingCount}
         isLoading={isLoading}
       />
 
       {/* Two-column layout: Collection list + Promoted collection */}
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         {/* Left column — Collection list */}
         <div className="space-y-3">
-          <h2 className="realm-kicker text-lg">
+          <h2 id="collections" className="realm-kicker scroll-mt-52 text-lg">
             Collections
           </h2>
           <div ref={listRef} className="space-y-2">

@@ -17,7 +17,7 @@ describe("marketplace seo data server-safe imports", () => {
       }),
     }));
 
-    vi.doMock("@cartridge/arcade/marketplace", () => {
+    vi.doMock("@/lib/marketplace/api-client", () => {
       throw new TypeError("(0 , g.createContext) is not a function");
     });
 

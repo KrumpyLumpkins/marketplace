@@ -1,0 +1,30 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Foundations/Start here" />
+
+# Realms component workbench
+
+Build and verify the marketplace one interaction at a time.
+
+This Storybook renders the production components with the app's Tailwind styles, local brand assets and shared Next.js font configuration. **Dark is the marketplace default.** Use the theme and viewport controls to inspect light and mobile states.
+
+## Start with these groups
+
+- **Foundations:** the existing palette, typography and surfaces. This is an inventory of today's UI, not an approved new brand guideline.
+- **UI:** buttons, form controls, dialogs and tabs, including keyboard interactions.
+- **Wallet:** connection, rejection, missing-extension and pending states.
+- **Trading:** cart validation, offer review and transaction feedback.
+
+## Test an interaction
+
+Open a story's **Interactions** panel to inspect its `play` steps. The **Accessibility** panel runs automated checks. Run `pnpm storybook:test` for Chromium interaction and accessibility tests, or use Storybook's testing panel.
+
+## Simulation boundary
+
+Wallet connectors, transaction submission and preflight responses are replaced **only inside Storybook**. No keys, live wallet connection, RPC service or deployed marketplace is required. The actual UI, calldata helpers and cart state are still used. Mocked signing proves interface behavior; it does not prove chain settlement or wallet compatibility.
+
+Each story resets its fixture and cart state. Add new responses explicitly in `.storybook/mocks`; do not connect stories to production services.
+
+## Next: brand guidelines and coverage
+
+Use these foundations to agree typography, color roles, spacing, imagery and tone, then expand the catalog across dashboard, notification, moderation and mobile journeys. Starter stories do not yet cover every marketplace interaction. Keep contract/devnet and full-app browser tests alongside this workbench.

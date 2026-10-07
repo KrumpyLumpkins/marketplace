@@ -16,7 +16,7 @@ describe("trait summary prefetch", () => {
       errors: [],
     });
 
-    vi.doMock("@cartridge/arcade/marketplace", () => ({
+    vi.doMock("@/lib/marketplace/api-client", () => ({
       fetchTraitNamesSummary: mockFetchTraitNamesSummary,
     }));
 

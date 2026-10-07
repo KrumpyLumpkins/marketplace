@@ -1,85 +1,9 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { OpsStatusPanel } from "@/features/ops/ops-status-panel";
-
-const { mockRefresh, mockUseMarketplaceClient, mockGetMarketplaceRuntimeConfig } = vi.hoisted(() => ({
-  mockRefresh: vi.fn(async () => null),
-  mockUseMarketplaceClient: vi.fn(),
-  mockGetMarketplaceRuntimeConfig: vi.fn(),
-}));
-
-vi.mock("@cartridge/arcade/marketplace/react", () => ({
-  useMarketplaceClient: mockUseMarketplaceClient,
-}));
-
-vi.mock("@/lib/marketplace/config", () => ({
-  getMarketplaceRuntimeConfig: mockGetMarketplaceRuntimeConfig,
-}));
-
-describe("ops status panel", () => {
-  beforeEach(() => {
-    mockRefresh.mockClear();
-    mockUseMarketplaceClient.mockReset();
-    mockGetMarketplaceRuntimeConfig.mockReset();
-    mockGetMarketplaceRuntimeConfig.mockReturnValue({
-      chainLabel: "SN_MAIN",
-      sdkConfig: { chainId: "0x534e5f4d41494e", runtime: "edge" },
-      featureFlags: { enableDeferredMetadataHydration: false },
-      collections: [],
-      warnings: [],
-    });
-  });
-
-  it("provider_reports_ready_state_after_init", () => {
-    mockUseMarketplaceClient.mockReturnValue({
-      client: {},
-      status: "ready",
-      error: null,
-      refresh: mockRefresh,
-    });
-
-    render(<OpsStatusPanel />);
-
-    expect(screen.getByText(/client status/i)).toBeVisible();
-    expect(screen.getByText("ready")).toBeVisible();
-    expect(screen.getByText(/runtime: edge/i)).toBeVisible();
-    expect(screen.getByText(/deferred metadata: disabled/i)).toBeVisible();
-  });
-
-  it("provider_refresh_recovers_from_init_failure", async () => {
-    mockUseMarketplaceClient.mockReturnValue({
-      client: null,
-      status: "error",
-      error: new Error("bootstrap failed"),
-      refresh: mockRefresh,
-    });
-    const user = userEvent.setup();
-
-    render(<OpsStatusPanel />);
-    await user.click(screen.getByRole("button", { name: /retry client init/i }));
-
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/bootstrap failed/i)).toBeVisible();
-  });
-
-  it("shows_deferred_metadata_as_sdk_unsupported_when_flag_enabled_without_methods", () => {
-    mockUseMarketplaceClient.mockReturnValue({
-      client: {},
-      status: "ready",
-      error: null,
-      refresh: mockRefresh,
-    });
-    mockGetMarketplaceRuntimeConfig.mockReturnValue({
-      chainLabel: "SN_MAIN",
-      sdkConfig: { chainId: "0x534e5f4d41494e", runtime: "edge" },
-      featureFlags: { enableDeferredMetadataHydration: true },
-      collections: [],
-      warnings: [],
-    });
-
-    render(<OpsStatusPanel />);
-
-    expect(screen.getByText(/deferred metadata: unsupported by sdk/i)).toBeVisible();
-  });
-});
+import {OperatorPanel} from "./operator-panel";
+import {render,screen,fireEvent,waitFor} from '@testing-library/react';import {beforeEach,expect,it,vi} from 'vitest';import {OpsStatusPanel} from './ops-status-panel';
+const {config,refresh}=vi.hoisted(()=>({config:vi.fn(),refresh:vi.fn()}));
+vi.mock('@/lib/marketplace/react',()=>({useMarketConfig:config}));
+vi.mock('@/lib/marketplace/config',()=>({getMarketplaceRuntimeConfig:()=>({chainLabel:'LOCAL'})}));
+beforeEach(()=>{config.mockReturnValue({data:{chain:'LOCAL',demo:false,status:{safeForCheckout:false,indexedBlock:10,chainHead:15,lagBlocks:5,reasons:['INDEX_STALE']}},refetch:refresh});vi.unstubAllGlobals();});
+it('shows actual progress and disables readiness when indexing is stale',()=>{render(<OpsStatusPanel/>);expect(screen.getByText('Trading temporarily unavailable')).toBeInTheDocument();expect(screen.getByText('Marketplace data is being updated. Please check again shortly.')).toBeInTheDocument();expect(screen.getByText('5')).toBeInTheDocument();fireEvent.click(screen.getByText('Refresh status'));expect(refresh).toHaveBeenCalled();});
+it('does not expose operator queries without explicit credentials',()=>{render(<OpsStatusPanel/>);expect(screen.queryByText('Load reports')).not.toBeInTheDocument();expect(screen.queryByLabelText('Operator access token')).not.toBeInTheDocument();});
+it('sends credentials only on an explicit operator request and renders errors',async()=>{const fetch=vi.fn().mockResolvedValue({ok:false,json:async()=>({error:{message:'Invalid operator credential'}})});vi.stubGlobal('fetch',fetch);render(<OperatorPanel/>);fireEvent.change(screen.getByLabelText('Operator access token'),{target:{value:'test-secret'}});fireEvent.click(screen.getByText('Load reports'));await waitFor(()=>expect(screen.getByText('Invalid operator credential')).toBeInTheDocument());expect(fetch).toHaveBeenCalledWith('/api/marketplace/v1/chains/LOCAL/operator/reports',expect.objectContaining({headers:{authorization:'Bearer test-secret'}}));});

@@ -1,4 +1,5 @@
 "use client";
+import { MarketPrice } from "@/components/marketplace/market-price";
 
 import { useRef, useEffect } from "react";
 import Link from "next/link";
@@ -11,6 +12,7 @@ type HeroBannerProps = {
   address: string;
   imageUrl?: string | null;
   floorPrice?: string | null;
+  floorCurrency?: string | null;
   totalSupply?: string | null;
   listingCount?: string | null;
   isLoading?: boolean;
@@ -21,6 +23,7 @@ export function HeroBanner({
   address,
   imageUrl,
   floorPrice,
+  floorCurrency,
   totalSupply,
   listingCount,
   isLoading = false,
@@ -91,7 +94,7 @@ export function HeroBanner({
         <div className="flex flex-wrap gap-2">
           <div className="hero-stat realm-stat-pill px-3 py-1.5 text-xs backdrop-blur-md sm:text-sm">
             <span className="text-muted-foreground mr-1.5">Floor</span>
-            <span className="font-medium text-foreground">{floorPrice ?? "--"}</span>
+            <span className="font-medium text-foreground"><MarketPrice amount={floorPrice} currency={floorCurrency} formatted empty="No listings" /></span>
           </div>
           <div className="hero-stat realm-stat-pill px-3 py-1.5 text-xs backdrop-blur-md sm:text-sm">
             <span className="text-muted-foreground mr-1.5">Supply</span>

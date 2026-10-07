@@ -1,0 +1,9 @@
+{
+  "name": "Marketplace",
+  "version": 1,
+  "scarb": "2.15.1",
+  "classHash": "0x711fcefbfd0554c8df9de809b712732415928f0815c4a908215c22930bdd94c",
+  "compiledClassHash": "0x5a4ec705e1fe02a60c41ed6995f0a3087620a3b6014cac7a08cfb5ffae304b3",
+  "sourceSha256": "9beb648723cb312cbabe5b032bae188f8a0a38df197868a3f44df800fc90ecd5",
+  "productionDeployment": null
+}

@@ -15,6 +15,9 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    env:
+      NEXT_PUBLIC_MARKETPLACE_CHAIN_ID: SN_MAIN
+      MARKETPLACE_API_URL: http://127.0.0.1:3100
 
     steps:
       - name: Checkout
@@ -30,12 +33,24 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.22.0
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Release tree hygiene
+        run: pnpm release:check
+
+      - name: Railway environment configuration
+        run: pnpm railway:check
+
+      - name: Production dependency audit
+        run: pnpm release:audit
+
+      - name: Native backend tests
+        run: pnpm backend:test
 
       - name: Lint
         run: pnpm lint
@@ -43,14 +58,29 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Unit tests with coverage
-        run: pnpm test:coverage
-
-      - name: Build
-        run: pnpm build
+      - name: SDK interface tests and packed consumers
+        run: |
+          pnpm sdk:test
+          pnpm sdk:pack:test
 
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps chromium
+
+      - name: Unit and Storybook tests with coverage
+        run: pnpm test:coverage
+
+      - name: Build Storybook
+        run: pnpm storybook:build
+
+      - name: Upload component workbench
+        uses: actions/upload-artifact@v4
+        with:
+          name: storybook-${{ github.run_id }}
+          path: storybook-static
+          retention-days: 7
+
+      - name: Build
+        run: pnpm build
 
       - name: E2E tests
         run: pnpm test:e2e
@@ -93,3 +123,24 @@ jobs:
             playwright-report
             test-results
           if-no-files-found: ignore
+
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.0
+      - uses: software-mansion/setup-scarb@v1
+        with:
+          scarb-version: 2.15.1
+      - uses: foundry-rs/setup-snfoundry@v6.0.0
+        with:
+          starknet-foundry-version: 0.64.1
+      - uses: software-mansion/setup-universal-sierra-compiler@v1
+        with:
+          universal-sierra-compiler-version: 2.10.2
+      - run: node scripts/contracts/test.mjs
+      - run: scarb fmt --check && scarb build
+        working-directory: contracts/marketplace

@@ -1,7 +1,8 @@
 "use client";
 
 import { useDeferredValue, useMemo, useState } from "react";
-import { Copy, Check } from "lucide-react";
+import { WalletIdentity } from "./wallet-identity";
+import { useAccount } from "@starknet-react/core";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useEntrance } from "@/lib/animation";
@@ -119,14 +120,14 @@ function groupByCollection(
 export function WalletProfileView({
   address,
   title = "Wallet Profile",
-  addressLabel = "Connected wallet address:",
+  addressLabel,
   showHeader = true,
 }: WalletProfileViewProps) {
   const portfolioQuery = useWalletPortfolioQuery(address);
   const [filterInput, setFilterInput] = useState("");
   const [selectedCollection, setSelectedCollection] = useState(ALL_COLLECTIONS_VALUE);
   const [density, setDensity] = useState<GridDensityMode>("standard");
-  const [copied, setCopied] = useState(false);
+  const { address: connectedAddress } = useAccount();
 
   const holdingsRef = useEntrance<HTMLDivElement>({
     selector: '[data-holding-section]',
@@ -210,24 +211,7 @@ export function WalletProfileView({
       {showHeader ? (
         <div className="space-y-1">
           <h1 className="realm-title text-3xl">{title}</h1>
-          <p className="text-sm text-muted-foreground">{addressLabel}</p>
-          <div className="flex items-center gap-2">
-            <code className="block overflow-x-auto rounded-[6px] border border-[color:var(--realm-border-etched)] bg-muted/40 px-3 py-2 font-mono text-xs sm:text-sm">
-              {address.slice(0, 6)}...{address.slice(-4)}
-            </code>
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(address);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-              }}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] border border-[color:var(--realm-border-etched)] bg-muted/40 text-muted-foreground transition-colors hover:border-[color:var(--realm-border-strong)] hover:text-foreground"
-              aria-label="Copy address"
-            >
-              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-            </button>
-          </div>
+          <WalletIdentity address={address} label={addressLabel} connected={!!connectedAddress && connectedAddress.replace(/^0x0*/, "").toLowerCase()===address.replace(/^0x0*/, "").toLowerCase()} />
         </div>
       ) : null}
 

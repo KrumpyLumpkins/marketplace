@@ -56,7 +56,7 @@ vi.mock("@tanstack/react-query", () => ({
   },
 }));
 
-vi.mock("@cartridge/arcade/marketplace/react", () => ({
+vi.mock("@/lib/marketplace/react", () => ({
   MarketplaceClientProvider: ({
     config,
     children,
@@ -112,3 +112,5 @@ describe("marketplace provider", () => {
     expect(mockMarketplaceClientProviderConfig).toHaveBeenCalledWith(sdkConfig);
   });
 });
+
+vi.mock("@/lib/marketplace/app-client",()=>({getAppMarketplaceClient:()=>({queryClient:{query:"client"}})}));

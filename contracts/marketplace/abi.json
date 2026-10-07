@@ -1,0 +1,775 @@
+[
+  {
+    "type": "impl",
+    "name": "MarketplaceImpl",
+    "interface_name": "biblio_marketplace::IMarketplace"
+  },
+  {
+    "type": "struct",
+    "name": "core::integer::u256",
+    "members": [
+      {
+        "name": "low",
+        "type": "core::integer::u128"
+      },
+      {
+        "name": "high",
+        "type": "core::integer::u128"
+      }
+    ]
+  },
+  {
+    "type": "struct",
+    "name": "core::array::Span::<core::integer::u64>",
+    "members": [
+      {
+        "name": "snapshot",
+        "type": "@core::array::Array::<core::integer::u64>"
+      }
+    ]
+  },
+  {
+    "type": "struct",
+    "name": "biblio_marketplace::OrderKey",
+    "members": [
+      {
+        "name": "maker",
+        "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "name": "nonce",
+        "type": "core::integer::u64"
+      }
+    ]
+  },
+  {
+    "type": "struct",
+    "name": "core::array::Span::<biblio_marketplace::OrderKey>",
+    "members": [
+      {
+        "name": "snapshot",
+        "type": "@core::array::Array::<biblio_marketplace::OrderKey>"
+      }
+    ]
+  },
+  {
+    "type": "struct",
+    "name": "biblio_marketplace::Terms",
+    "members": [
+      {
+        "name": "kind",
+        "type": "core::integer::u8"
+      },
+      {
+        "name": "collection",
+        "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "name": "token_id",
+        "type": "core::integer::u256"
+      },
+      {
+        "name": "currency",
+        "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "name": "buyer_debit",
+        "type": "core::integer::u256"
+      },
+      {
+        "name": "expiry",
+        "type": "core::integer::u64"
+      },
+      {
+        "name": "royalty_cap",
+        "type": "core::integer::u256"
+      },
+      {
+        "name": "royalty_recipient",
+        "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "name": "royalty_amount",
+        "type": "core::integer::u256"
+      }
+    ]
+  },
+  {
+    "type": "struct",
+    "name": "biblio_marketplace::Order",
+    "members": [
+      {
+        "name": "terms",
+        "type": "biblio_marketplace::Terms"
+      },
+      {
+        "name": "state",
+        "type": "core::integer::u8"
+      }
+    ]
+  },
+  {
+    "type": "enum",
+    "name": "core::bool",
+    "variants": [
+      {
+        "name": "False",
+        "type": "()"
+      },
+      {
+        "name": "True",
+        "type": "()"
+      }
+    ]
+  },
+  {
+    "type": "struct",
+    "name": "biblio_marketplace::Config",
+    "members": [
+      {
+        "name": "version",
+        "type": "core::integer::u32"
+      },
+      {
+        "name": "admin",
+        "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "name": "paused",
+        "type": "core::bool"
+      },
+      {
+        "name": "fee_bps",
+        "type": "core::integer::u16"
+      },
+      {
+        "name": "fee_recipient",
+        "type": "core::starknet::contract_address::ContractAddress"
+      }
+    ]
+  },
+  {
+    "type": "interface",
+    "name": "biblio_marketplace::IMarketplace",
+    "items": [
+      {
+        "type": "function",
+        "name": "create_listing",
+        "inputs": [
+          {
+            "name": "collection",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "token_id",
+            "type": "core::integer::u256"
+          },
+          {
+            "name": "currency",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "buyer_debit",
+            "type": "core::integer::u256"
+          },
+          {
+            "name": "expiry",
+            "type": "core::integer::u64"
+          },
+          {
+            "name": "max_royalty",
+            "type": "core::integer::u256"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::integer::u64"
+          }
+        ],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "create_offer",
+        "inputs": [
+          {
+            "name": "collection",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "token_id",
+            "type": "core::integer::u256"
+          },
+          {
+            "name": "currency",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "buyer_debit",
+            "type": "core::integer::u256"
+          },
+          {
+            "name": "expiry",
+            "type": "core::integer::u64"
+          },
+          {
+            "name": "max_royalty",
+            "type": "core::integer::u256"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::integer::u64"
+          }
+        ],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "create_collection_offer",
+        "inputs": [
+          {
+            "name": "collection",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "currency",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "buyer_debit",
+            "type": "core::integer::u256"
+          },
+          {
+            "name": "expiry",
+            "type": "core::integer::u64"
+          },
+          {
+            "name": "max_royalty",
+            "type": "core::integer::u256"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::integer::u64"
+          }
+        ],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "cancel_order",
+        "inputs": [
+          {
+            "name": "nonce",
+            "type": "core::integer::u64"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "cancel_orders",
+        "inputs": [
+          {
+            "name": "nonces",
+            "type": "core::array::Span::<core::integer::u64>"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "buy_listing",
+        "inputs": [
+          {
+            "name": "key",
+            "type": "biblio_marketplace::OrderKey"
+          },
+          {
+            "name": "currency",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "max_total",
+            "type": "core::integer::u256"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "buy_many",
+        "inputs": [
+          {
+            "name": "keys",
+            "type": "core::array::Span::<biblio_marketplace::OrderKey>"
+          },
+          {
+            "name": "currency",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "max_total",
+            "type": "core::integer::u256"
+          },
+          {
+            "name": "deadline",
+            "type": "core::integer::u64"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "accept_offer",
+        "inputs": [
+          {
+            "name": "key",
+            "type": "biblio_marketplace::OrderKey"
+          },
+          {
+            "name": "currency",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "min_proceeds",
+            "type": "core::integer::u256"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "accept_collection_offer",
+        "inputs": [
+          {
+            "name": "key",
+            "type": "biblio_marketplace::OrderKey"
+          },
+          {
+            "name": "token_id",
+            "type": "core::integer::u256"
+          },
+          {
+            "name": "currency",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "min_proceeds",
+            "type": "core::integer::u256"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "get_order",
+        "inputs": [
+          {
+            "name": "key",
+            "type": "biblio_marketplace::OrderKey"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "biblio_marketplace::Order"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "get_config",
+        "inputs": [],
+        "outputs": [
+          {
+            "type": "biblio_marketplace::Config"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "quote_terms",
+        "inputs": [
+          {
+            "name": "collection",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "token_id",
+            "type": "core::integer::u256"
+          },
+          {
+            "name": "buyer_debit",
+            "type": "core::integer::u256"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "(core::integer::u256, core::starknet::contract_address::ContractAddress, core::integer::u256, core::integer::u256)"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "set_collection",
+        "inputs": [
+          {
+            "name": "collection",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "enabled",
+            "type": "core::bool"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "set_currency",
+        "inputs": [
+          {
+            "name": "currency",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "enabled",
+            "type": "core::bool"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "set_paused",
+        "inputs": [
+          {
+            "name": "paused",
+            "type": "core::bool"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "propose_admin",
+        "inputs": [
+          {
+            "name": "admin",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "accept_admin",
+        "inputs": [],
+        "outputs": [],
+        "state_mutability": "external"
+      }
+    ]
+  },
+  {
+    "type": "constructor",
+    "name": "constructor",
+    "inputs": [
+      {
+        "name": "admin",
+        "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "name": "fee_bps",
+        "type": "core::integer::u16"
+      },
+      {
+        "name": "fee_recipient",
+        "type": "core::starknet::contract_address::ContractAddress"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "biblio_marketplace::Marketplace::MarketplaceInitialized",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "version",
+        "type": "core::integer::u32",
+        "kind": "data"
+      },
+      {
+        "name": "admin",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      },
+      {
+        "name": "fee_bps",
+        "type": "core::integer::u16",
+        "kind": "data"
+      },
+      {
+        "name": "fee_recipient",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "biblio_marketplace::Marketplace::OrderCreated",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "maker",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "key"
+      },
+      {
+        "name": "nonce",
+        "type": "core::integer::u64",
+        "kind": "key"
+      },
+      {
+        "name": "terms",
+        "type": "biblio_marketplace::Terms",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "biblio_marketplace::Marketplace::OrderCancelled",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "maker",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "key"
+      },
+      {
+        "name": "nonce",
+        "type": "core::integer::u64",
+        "kind": "key"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "biblio_marketplace::Marketplace::OrderFilled",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "maker",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "key"
+      },
+      {
+        "name": "nonce",
+        "type": "core::integer::u64",
+        "kind": "key"
+      },
+      {
+        "name": "buyer",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      },
+      {
+        "name": "seller",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      },
+      {
+        "name": "collection",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      },
+      {
+        "name": "token_id",
+        "type": "core::integer::u256",
+        "kind": "data"
+      },
+      {
+        "name": "currency",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      },
+      {
+        "name": "buyer_debit",
+        "type": "core::integer::u256",
+        "kind": "data"
+      },
+      {
+        "name": "seller_proceeds",
+        "type": "core::integer::u256",
+        "kind": "data"
+      },
+      {
+        "name": "protocol_fee",
+        "type": "core::integer::u256",
+        "kind": "data"
+      },
+      {
+        "name": "fee_recipient",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      },
+      {
+        "name": "royalty_amount",
+        "type": "core::integer::u256",
+        "kind": "data"
+      },
+      {
+        "name": "royalty_recipient",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "biblio_marketplace::Marketplace::TradingChanged",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "paused",
+        "type": "core::bool",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "biblio_marketplace::Marketplace::CollectionPolicyChanged",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "collection",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "key"
+      },
+      {
+        "name": "enabled",
+        "type": "core::bool",
+        "kind": "data"
+      },
+      {
+        "name": "royalties",
+        "type": "core::bool",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "biblio_marketplace::Marketplace::CurrencyPolicyChanged",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "currency",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "key"
+      },
+      {
+        "name": "enabled",
+        "type": "core::bool",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "biblio_marketplace::Marketplace::AdminProposed",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "admin",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "biblio_marketplace::Marketplace::AdminTransferred",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "previous",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      },
+      {
+        "name": "admin",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "biblio_marketplace::Marketplace::Event",
+    "kind": "enum",
+    "variants": [
+      {
+        "name": "MarketplaceInitialized",
+        "type": "biblio_marketplace::Marketplace::MarketplaceInitialized",
+        "kind": "nested"
+      },
+      {
+        "name": "OrderCreated",
+        "type": "biblio_marketplace::Marketplace::OrderCreated",
+        "kind": "nested"
+      },
+      {
+        "name": "OrderCancelled",
+        "type": "biblio_marketplace::Marketplace::OrderCancelled",
+        "kind": "nested"
+      },
+      {
+        "name": "OrderFilled",
+        "type": "biblio_marketplace::Marketplace::OrderFilled",
+        "kind": "nested"
+      },
+      {
+        "name": "TradingChanged",
+        "type": "biblio_marketplace::Marketplace::TradingChanged",
+        "kind": "nested"
+      },
+      {
+        "name": "CollectionPolicyChanged",
+        "type": "biblio_marketplace::Marketplace::CollectionPolicyChanged",
+        "kind": "nested"
+      },
+      {
+        "name": "CurrencyPolicyChanged",
+        "type": "biblio_marketplace::Marketplace::CurrencyPolicyChanged",
+        "kind": "nested"
+      },
+      {
+        "name": "AdminProposed",
+        "type": "biblio_marketplace::Marketplace::AdminProposed",
+        "kind": "nested"
+      },
+      {
+        "name": "AdminTransferred",
+        "type": "biblio_marketplace::Marketplace::AdminTransferred",
+        "kind": "nested"
+      }
+    ]
+  }
+]

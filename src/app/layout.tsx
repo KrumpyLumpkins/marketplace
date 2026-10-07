@@ -1,21 +1,11 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Exo_2, Geist_Mono } from "next/font/google";
+import { fontClassName, fontVariables } from "@/lib/fonts";
+import { MarketToolbar } from "@/features/trading/market-toolbar";
 import { Header } from "@/components/layout/header";
-import { SidebarLayout } from "@/components/layout/sidebar-layout";
+import { MarketplaceLayout } from "@/components/layout/marketplace-layout";
 import { MarketplaceProvider } from "@/components/providers/marketplace-provider";
 import "./globals.css";
-
-const exo2 = Exo_2({
-  variable: "--font-exo-2",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Realms.market",
@@ -34,13 +24,14 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body
-        className={`${exo2.variable} ${geistMono.variable} antialiased`}
+        className={`${fontClassName} antialiased`}
+        style={fontVariables}
       >
         <MarketplaceProvider>
           <Suspense fallback={null}>
             <Header />
           </Suspense>
-          <SidebarLayout>{children}</SidebarLayout>
+          <MarketplaceLayout><MarketToolbar />{children}</MarketplaceLayout>
         </MarketplaceProvider>
       </body>
     </html>

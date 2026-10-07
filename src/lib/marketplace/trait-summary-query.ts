@@ -18,7 +18,7 @@ export function traitNamesSummaryQueryKey(options: TraitNamesSummaryQueryInput) 
 export async function fetchTraitNamesSummaryAggregate(
   options: TraitNamesSummaryQueryInput,
 ): Promise<TraitNameSummary[]> {
-  const { fetchTraitNamesSummary } = await import("@cartridge/arcade/marketplace");
+  const { fetchTraitNamesSummary } = await import("@/lib/marketplace/api-client");
   const result = await fetchTraitNamesSummary({
     address: options.address,
     defaultProjectId: options.projectId,

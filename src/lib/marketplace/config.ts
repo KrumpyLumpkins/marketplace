@@ -1,6 +1,7 @@
-import type { MarketplaceClientConfig } from "@cartridge/arcade/marketplace";
+import type { MarketplaceClientConfig } from "@/lib/marketplace/types";
 
 const CHAIN_IDS = {
+  LOCAL: "0x534e5f5345504f4c4941",
   SN_MAIN: "0x534e5f4d41494e",
   SN_SEPOLIA: "0x534e5f5345504f4c4941",
 } as const;

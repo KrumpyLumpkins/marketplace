@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Header } from "./header";
@@ -48,7 +48,8 @@ describe("Header", () => {
       address: undefined,
     });
     mockUseConnect.mockReturnValue({
-      connect: mockConnect,
+      connect: vi.fn(),
+      connectAsync: mockConnect,
       connectors: [{ id: "controller", name: "Controller" }],
       pendingConnector: undefined,
       isPending: false,
@@ -58,6 +59,11 @@ describe("Header", () => {
       isPending: false,
     });
   });
+
+  it("links collection discovery from the header without a collection list", () => {
+  render(<Header />);
+  expect(screen.getByRole("link", { name: "Browse collections" })).toHaveAttribute("href", "/#collections");
+});
 
   it("renders_realms_logo", () => {
     render(<Header />);
@@ -76,13 +82,13 @@ describe("Header", () => {
   it("renders_search_input", () => {
     render(<Header />);
 
-    expect(screen.getByPlaceholderText("Search...")).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "Search" })).toBeVisible();
   });
 
   it("search_input_has_placeholder", () => {
     render(<Header />);
 
-    expect(screen.getByPlaceholderText("Search...")).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "Search" })).toBeVisible();
   });
 
   it("search_navigates_on_enter", async () => {
@@ -90,7 +96,7 @@ describe("Header", () => {
 
     render(<Header />);
 
-    await user.type(screen.getByPlaceholderText("Search..."), "dragons{enter}");
+    await user.type(screen.getByRole("textbox", { name: "Search" }), "dragons{enter}");
 
     expect(mockPush).toHaveBeenCalledWith("/?q=dragons");
   });
@@ -100,7 +106,7 @@ describe("Header", () => {
 
     render(<Header />);
 
-    expect(screen.getByPlaceholderText("Search...")).toHaveValue("realms");
+    expect(screen.getByRole("textbox", { name: "Search" })).toHaveValue("realms");
   });
 
   it("header_is_a_nav_landmark", () => {
@@ -182,7 +188,7 @@ describe("Header", () => {
   it("sub_header_contains_retained_marketplace_actions", () => {
     render(<Header />);
 
-    expect(screen.getByPlaceholderText("Search...")).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "Search" })).toBeVisible();
     expect(screen.getByRole("button", { name: /cart \(0\)/i })).toBeVisible();
     expect(screen.getByRole("link", { name: /portfolio/i })).toHaveAttribute(
       "href",
@@ -245,7 +251,8 @@ describe("Header", () => {
     const argentConnector = { id: "argentX", name: "Argent" };
     const controllerConnector = { id: "controller", name: "Controller" };
     mockUseConnect.mockReturnValue({
-      connect: mockConnect,
+      connect: vi.fn(),
+      connectAsync: mockConnect,
       connectors: [walletConnector, argentConnector, controllerConnector],
       pendingConnector: undefined,
       isPending: false,
@@ -265,7 +272,8 @@ describe("Header", () => {
     const braavosConnector = { id: "braavos", name: "Braavos" };
     const controllerConnector = { id: "controller", name: "Controller" };
     mockUseConnect.mockReturnValue({
-      connect: mockConnect,
+      connect: vi.fn(),
+      connectAsync: mockConnect,
       connectors: [controllerConnector, braavosConnector],
       pendingConnector: undefined,
       isPending: false,
@@ -287,7 +295,8 @@ describe("Header", () => {
     };
     const controllerConnector = { id: "controller", name: "Controller" };
     mockUseConnect.mockReturnValue({
-      connect: mockConnect,
+      connect: vi.fn(),
+      connectAsync: mockConnect,
       connectors: [braavosConnector, controllerConnector],
       pendingConnector: undefined,
       isPending: false,
@@ -392,21 +401,45 @@ describe("Header", () => {
     expect(screen.queryByTestId("wallet-address")).toBeNull();
   });
 
-  it("handles_connect_errors_without_throwing", async () => {
+  it("keeps rejected connections open and shows an actionable error", async () => {
+    mockConnect.mockRejectedValueOnce(new Error("User rejected request"));
     const user = userEvent.setup();
-    const mockConsoleError = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
-    mockConnect.mockRejectedValueOnce(new Error("connect failed"));
-
     render(<Header />);
     await user.click(screen.getByRole("button", { name: /connect wallet/i }));
     await user.click(screen.getByRole("button", { name: /controller/i }));
-
-    expect(mockConsoleError).toHaveBeenCalledWith(
-      "Failed to connect wallet",
-      expect.any(Error),
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "User rejected request",
     );
-    mockConsoleError.mockRestore();
+    expect(screen.getByRole("dialog")).toBeVisible();
+    mockConnect.mockResolvedValueOnce(undefined);
+    await user.click(screen.getByRole("button", { name: /controller/i }));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
+  it("keeps a pending connection open and prevents duplicate requests", async () => {
+    let resolve!: () => void;
+    mockConnect.mockReturnValue(
+      new Promise<void>((r) => {
+        resolve = r;
+      }),
+    );
+    const user = userEvent.setup();
+    render(<Header />);
+    await user.click(screen.getByRole("button", { name: /connect wallet/i }));
+    await user.click(screen.getByRole("button", { name: /controller/i }));
+    expect(screen.getByRole("dialog")).toBeVisible();
+    expect(screen.getByRole("button", { name: /controller/i })).toBeDisabled();
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("dialog")).toBeVisible();
+    await act(async () => resolve());
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+  it("explains when a selected extension is missing",async()=>{
+    mockUseConnect.mockReturnValue({connectAsync:mockConnect,connectors:[{id:"braavos",name:"Braavos",available:()=>false}],isPending:false});
+    const user=userEvent.setup();render(<Header/>);
+    await user.click(screen.getByRole('button',{name:/connect wallet/i}));
+    await user.click(screen.getByRole('button',{name:/braavos/i}));
+    expect(screen.getByRole('alert')).toHaveTextContent('not detected');
+    expect(mockConnect).not.toHaveBeenCalled();
+  });
+
 });

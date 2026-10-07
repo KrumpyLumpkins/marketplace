@@ -47,7 +47,6 @@ describe("MarketplaceHome", () => {
         name: "Genesis",
       },
       trendingTokens: [],
-      sidebarCollections: [{ address: "0xabc", name: "Genesis" }],
       collectionCards: [
         { address: "0xabc", name: "Genesis" },
         { address: "0xdef", name: "Alpha" },
@@ -79,7 +78,6 @@ describe("MarketplaceHome", () => {
     mockUseHomePageData.mockReturnValue({
       featuredCollection: null,
       trendingTokens: [],
-      sidebarCollections: [],
       collectionCards: [],
       isLoading: false,
     });

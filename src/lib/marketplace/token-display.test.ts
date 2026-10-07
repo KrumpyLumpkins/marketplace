@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { NormalizedToken } from "@cartridge/arcade/marketplace";
+import type { NormalizedToken } from "@/lib/marketplace/types";
 import {
   displayTokenId,
   formatPriceForDisplay,

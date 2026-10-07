@@ -82,7 +82,7 @@ describe("CollectionCard", () => {
       />,
     );
 
-    expect(screen.getByText(/floor 1.8/i)).toBeVisible();
+    expect(screen.getByText("1.8")).toBeVisible();
   });
 
   it("renders_item_count", () => {

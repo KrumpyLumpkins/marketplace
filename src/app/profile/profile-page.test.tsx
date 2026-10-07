@@ -36,3 +36,5 @@ describe("profile route page", () => {
     expect(screen.getByText(/0xabc1/)).toBeVisible();
   });
 });
+
+vi.mock("@starknet-react/core",()=>({useAccount:()=>({address:undefined})}));

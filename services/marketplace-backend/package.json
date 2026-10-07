@@ -1,0 +1,13 @@
+{
+  "name": "@biblio/marketplace-backend",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.22.0" },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "start": "node src/server.mjs",
+    "index": "node src/indexer-cli.mjs",
+    "demo": "node src/demo.mjs",
+    "backup": "node src/backup.mjs"
+  }
+}

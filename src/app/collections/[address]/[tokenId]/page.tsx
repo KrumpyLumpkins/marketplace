@@ -11,7 +11,7 @@ export default async function TokenPage({ params }: TokenPageProps) {
   const { address, tokenId } = await params;
 
   return (
-    <main className="w-full px-4 py-6 sm:px-6 lg:px-8">
+    <main className="market-page w-full">
       <Suspense>
         <TokenDetailView address={address} tokenId={tokenId} />
       </Suspense>

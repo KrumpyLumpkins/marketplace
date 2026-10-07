@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
+import config from '../../.railway/railway.ts';
+import { createRailwayContext, project, validateGraph } from 'railway/iac';
+
+for (const environment of ['staging', 'production']) {
+  const definition = await config(createRailwayContext({ environment }), project);
+  const resources = definition.resources.flat();
+  assert.deepEqual(validateGraph({ version: 1, project: { name: definition.name }, environments: [{ name: environment }], resources, edges: [] }), []);
+  const backend = resources.find(r => r.address === 'service.backend');
+  const web = resources.find(r => r.address === 'service.web');
+  assert.equal(backend.variables.MARKETPLACE_CHAIN.value, environment === 'production' ? 'SN_MAIN' : 'SN_SEPOLIA');
+  assert.deepEqual(web.variables.NEXT_PUBLIC_MARKETPLACE_CHAIN_ID, backend.variables.MARKETPLACE_CHAIN);
+  assert.equal(resources.filter(r => r.type === 'volume').length, 1);
+  assert.equal(backend.volumeAttachments['marketplace-data'].mountPath, '/data');
+  assert.equal(backend.deploy.requiredMountPath, '/data');
+  assert.equal(backend.deploy.overlapSeconds, 0);
+  assert.equal(Object.values(backend.deploy.multiRegionConfig).reduce((n, r) => n + r.numReplicas, 0), 1);
+  assert.equal(backend.deploy.healthcheckPath, '/health/live');
+  assert.equal(backend.variables.MARKETPLACE_TRUSTED_PROXY_HOSTS.value, 'web.railway.internal');
+  for (const service of [backend, web]) {
+    assert.ok(existsSync(service.build.dockerfilePath));
+    assert.equal(service.kind, 'empty', 'Config must not implicitly enable GitHub deployments');
+    assert.equal(service.deploy.sleepApplication, false);
+  }
+  for (const key of Object.keys(web.variables)) assert.ok(!/OPERATOR|PRIVATE_KEY|RPC_URL|REGISTRY_JSON/.test(key));
+  console.log(`${environment}: valid Railway graph, isolated chain, one persistent backend, no frontend secrets.`);
+}
+assert.throws(() => config(createRailwayContext({ environment: 'preview' }), project), /explicitly/);
+assert.throws(() => config(createRailwayContext({ environment: 'production', projectName: 'unrelated-project' }), project), /dedicated/);

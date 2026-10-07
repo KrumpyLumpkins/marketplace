@@ -145,7 +145,7 @@ function collectionMetadata(rawCollection: unknown) {
 
 const loadMarketplaceModule = cache(async (): Promise<MarketplaceModule | null> => {
   try {
-    return (await import("@cartridge/arcade/marketplace")) as unknown as MarketplaceModule;
+    return (await import("@/lib/marketplace/api-client")) as unknown as MarketplaceModule;
   } catch {
     return null;
   }
@@ -307,7 +307,7 @@ export async function getTokenSeoData(
           })
           .catch(() => null)
       : Promise.resolve(null),
-    _fetchTokenWithFallbackUncached({
+    fetchTokenWithFallback({
       collection: address,
       tokenId,
       projectId: context.projectId,

@@ -1,983 +1,280 @@
 "use client";
-
-import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
-import { animate } from "animejs";
-import { useAccount } from "@starknet-react/core";
-import type { NormalizedToken } from "@cartridge/arcade/marketplace";
-import { useMarketplaceClient } from "@cartridge/arcade/marketplace/react";
-import {
-  useCollectionListingsQuery,
-  useTokenDetailQuery,
-} from "@/lib/marketplace/hooks";
-import { useTokenOwnership } from "@/features/token/use-token-ownership";
+import { ListingPurchase } from "./listing-purchase";
+import { TokenActivity, type TokenActivityItem } from "./token-activity";
+import { useCartStore } from "@/features/cart/store/cart-store";
 import { getMarketplaceRuntimeConfig } from "@/lib/marketplace/config";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { formatCurrencyAmount } from "@/lib/marketplace/amount-display";
+import { BestBid } from "@/features/trading/best-bid";
+import { AcceptOffer } from "@/features/trading/accept-offer";
+import { ReportToken } from "@/features/trading/report-token";
+import Image from "next/image";
+import Link from "next/link";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  useTokenDetailQuery,
+  useCollectionListingsQuery,
+} from "@/lib/marketplace/hooks";
+import { useTokenOwnership } from "./use-token-ownership";
+import { useTrade } from "@/lib/marketplace/use-trade";
 import {
-  displayTokenId,
-  formatNumberish,
-  formatPriceForDisplay,
-  buildExplorerTxUrl,
-  formatRelativeExpiry,
+  tokenName,
+  tokenImage,
   getTokenSymbol,
 } from "@/lib/marketplace/token-display";
-import { calculateMarketplaceFee, parseBigInt } from "@/lib/marketplace/fees";
-import { TOKEN_DETAIL_LISTING_LIMIT } from "@/lib/marketplace/query-limits";
-import type { CheapestListing } from "@/features/cart/listing-utils";
-import {
-  cartItemFromTokenListing,
-  cheapestListingByTokenId,
-} from "@/features/cart/listing-utils";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useAddToCartFeedback } from "@/features/cart/hooks/use-add-to-cart-feedback";
-import { TokenSymbol } from "@/components/ui/token-symbol";
-import { useEntrance } from "@/lib/animation";
-
-
-type TokenDetailViewProps = {
-  address: string;
-  tokenId: string;
-  projectId?: string;
-};
-
-type TokenAttribute = {
-  trait_type: string;
-  value: string;
-};
-
-type TokenMetadata = {
-  name?: string;
-  attributes?: TokenAttribute[];
-  image?: string;
-  image_url?: string;
-};
-
-type ListingRow = {
-  id: number;
-  tokenId?: number | string;
-  quantity?: number | string;
-  price: number | string;
-  currency?: string;
-  owner: string;
-  expiration?: number | string;
-  status?: unknown;
-  state?: unknown;
-  order?: {
-    status?: unknown;
-    state?: unknown;
-  };
-};
-
-function getTokenName(token: NormalizedToken) {
-  const meta = token.metadata as TokenMetadata | null;
-  const name = meta?.name;
-  return typeof name === "string" && name.trim()
-    ? name
-    : `Token #${String(token.token_id ?? "unknown")}`;
-}
-
-function getTokenImage(token: NormalizedToken) {
-  if (token.image) return token.image;
-  const meta = token.metadata as TokenMetadata | null;
-  const source = meta?.image ?? meta?.image_url;
-  return typeof source === "string" && source.length > 0 ? source : null;
-}
-
-function getTokenAttributes(token: NormalizedToken): TokenAttribute[] {
-  const meta = token.metadata as TokenMetadata | null;
-  return Array.isArray(meta?.attributes) ? meta.attributes : [];
-}
-
-function truncateAddress(addr: string) {
-  return addr.length > 14 ? addr.slice(0, 6) + "..." + addr.slice(-4) : addr;
-}
-
-function parseExpiration(value: ListingRow["expiration"]) {
-  const normalized = formatNumberish(value);
-  if (!normalized) {
-    return null;
-  }
-
-  try {
-    return Number(BigInt(normalized));
-  } catch {
-    return null;
-  }
-}
-
-function normalizeStatus(value: unknown): string | null {
-  if (typeof value === "string" && value.trim().length > 0) {
-    return value.trim().toLowerCase();
-  }
-
-  if (typeof value === "number" && Number.isFinite(value)) {
-    if (value === 1) return "placed";
-    if (value === 2) return "canceled";
-    if (value === 3) return "executed";
-    if (value === 0) return "none";
-    return null;
-  }
-
-  if (typeof value === "bigint") {
-    if (value === BigInt(1)) return "placed";
-    if (value === BigInt(2)) return "canceled";
-    if (value === BigInt(3)) return "executed";
-    if (value === BigInt(0)) return "none";
-    return null;
-  }
-
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    return normalizeStatus(record.value ?? record.status ?? record.state);
-  }
-
-  return null;
-}
-
-function isInactiveListing(listing: ListingRow) {
-  const status =
-    normalizeStatus(listing.status) ??
-    normalizeStatus(listing.state) ??
-    normalizeStatus(listing.order?.status) ??
-    normalizeStatus(listing.order?.state);
-
-  return Boolean(status && status !== "placed");
-}
-
-function isExpiredListing(listing: ListingRow, nowEpochSeconds: number) {
-  const expiration = parseExpiration(listing.expiration);
-  if (!expiration || expiration <= 0) {
-    return false;
-  }
-
-  return expiration <= nowEpochSeconds;
-}
-
-// Arcade Marketplace contract address (same on SN_MAIN and SN_SEPOLIA per SDK manifest)
-const MARKETPLACE_CONTRACT = "0x6bbf16b6c67b1bef27a187b499b2f3a14af31646c2c90d64f11b9087c3f527c";
-// Supported listing currencies
-const STRK_ADDRESS = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
-const LORDS_ADDRESS = "0x0124aeb495b947201f5fac96fd1138e326ad86195b98df6dec9009158a533b49";
-const SURVIVOR_ADDRESS = "0x42dd777885ad2c116be96d4d634abc90a26a790ffb5871e037dd5ae7d2ec86b";
-const DEFAULT_MARKETPLACE_FEE_NUM = 500;
-const DEFAULT_MARKETPLACE_FEE_DENOMINATOR = 10_000;
-
+import {
+  cheapestListingByTokenId,
+  cartItemFromTokenListing,
+} from "@/features/cart/listing-utils";
+import { OrderComposer } from "@/features/trading/order-composer";
+import { TradeStatus } from "@/features/trading/trade-status";
+import { marketplaceRequest } from "@/lib/marketplace/api-client";
+import { prepareCancellation } from "@biblio/marketplace";
+import type { ApiOrder, ApiPage } from "@/lib/marketplace/types";
 export function TokenDetailView({
   address,
   tokenId,
   projectId,
-}: TokenDetailViewProps) {
-  const detailLookupTokenId = tokenId.trim() || tokenId;
-  const normalizedTokenId = formatNumberish(tokenId) ?? tokenId;
-  const { addListingToCart, isRecentlyAdded } = useAddToCartFeedback();
-  const { account, address: walletAddress, isConnected } = useAccount();
-  const { client } = useMarketplaceClient();
-  const { collections, chainLabel } = getMarketplaceRuntimeConfig();
-  const collectionName =
-    collections.find((c) => c.address === address)?.name ??
-    truncateAddress(address);
-  // Human-readable price in STRK (1 STRK = 1e18 wei)
-  const [priceInput, setPriceInput] = useState("1");
-  const [quantityInput, setQuantityInput] = useState("1");
-  const [currencyInput, setCurrencyInput] = useState(LORDS_ADDRESS);
-  // Expiration as a preset duration in seconds (default: 24 hours)
-  const [expirationPreset, setExpirationPreset] = useState("86400");
-  const [txStatus, setTxStatus] = useState<{
-    tone: "idle" | "success" | "error";
-    message: string;
-    txHash?: string;
-  }>({ tone: "idle", message: "" });
-  const [pendingAction, setPendingAction] = useState<
-    "list" | "offer" | "cancel" | null
-  >(null);
-  const [feeEstimate, setFeeEstimate] = useState<{
-    status: "loading" | "empty" | "error" | "success";
-    marketplaceFee: bigint;
-    royaltyFee: bigint;
-    total: bigint;
-  }>({
-    status: "empty",
-    marketplaceFee: BigInt(0),
-    royaltyFee: BigInt(0),
-    total: BigInt(0),
-  });
-  const detailQuery = useTokenDetailQuery({
+}: {
+  address: string;
+  tokenId: string;
+  projectId?: string;
+}) {
+  const detail = useTokenDetailQuery({
     collection: address,
-    tokenId: detailLookupTokenId,
+    tokenId,
     projectId,
     fetchImages: true,
   });
-  const listingQuery = useCollectionListingsQuery({
+  const listings = useCollectionListingsQuery({
     collection: address,
-    tokenId: normalizedTokenId,
+    tokenId,
     projectId,
-    limit: TOKEN_DETAIL_LISTING_LIMIT,
-    verifyOwnership: true,
   });
-  const { holderAddress, effectiveIsOwner, ownershipQuery } = useTokenOwnership({
+  const trade = useTrade();
+  const ownership = useTokenOwnership({
     collection: address,
-    tokenId: normalizedTokenId,
-    walletAddress,
-    isConnected: isConnected ?? false,
+    tokenId,
+    walletAddress: trade.address,
+    isConnected: !!trade.address,
   });
-  const isOwnershipLoading = Boolean(
-    (ownershipQuery as { isLoading?: boolean; isFetching?: boolean; status?: string })
-      .isLoading ||
-      (ownershipQuery as { isLoading?: boolean; isFetching?: boolean; status?: string })
-        .isFetching ||
-      (ownershipQuery as { isLoading?: boolean; isFetching?: boolean; status?: string })
-        .status === "loading",
-  );
-
-  const token = detailQuery.data?.token ?? null;
-  const rawListings = useMemo(
-    () => listingQuery.data ?? detailQuery.data?.listings ?? [],
-    [detailQuery.data?.listings, listingQuery.data],
-  );
-  const listingRows = useMemo(
-    () => {
-      const now = Math.floor(Date.now() / 1000);
-      return (rawListings as ListingRow[]).filter(
-        (listing) =>
-          !isInactiveListing(listing) &&
-          !isExpiredListing(listing, now),
-      );
-    },
-    [rawListings],
-  );
-  const cheapestListings = useMemo(
-    () => cheapestListingByTokenId(listingRows as unknown[]),
-    [listingRows],
-  );
-  const cheapestListing = useMemo(() => {
-    if (!token) {
-      return null;
-    }
-
-    return cheapestListings.get(displayTokenId(token)) ?? null;
-  }, [cheapestListings, token]);
-  const ownListing = useMemo(() => {
-    if (!walletAddress) return null;
+  const cartItems = useCartStore(s=>s.items);
+  const setCartOpen = useCartStore(s=>s.setOpen);
+  const { addListingToCart } = useAddToCartFeedback();
+  const offers = useInfiniteQuery<ApiPage<ApiOrder>>({
+    initialPageParam:undefined as string|undefined,
+    getNextPageParam:page=>page.nextCursor??undefined,
+    queryKey: ["owned", "token-offers", address, tokenId],
+    queryFn: ({pageParam}) =>
+      marketplaceRequest<ApiPage<ApiOrder>>(`/collections/${address}/offers`, {
+        state: "open",
+        tokenMatch: tokenId,
+        limit: 50,cursor:pageParam,
+      }),
+  });
+  const activity = useInfiniteQuery<ApiPage<TokenActivityItem>>({
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: page => page.nextCursor ?? undefined,
+    queryKey: ["owned", "activity", address, tokenId],
+    queryFn: ({pageParam}) => marketplaceRequest<ApiPage<TokenActivityItem>>(`/tokens/${address}/${tokenId}/activity`, {limit:20,cursor:pageParam}),
+  });
+  const offerItems=offers.data?.pages.flatMap(page=>page.items)??[];
+  const activityItems=activity.data?.pages.flatMap(page=>page.items)??[];
+  if (detail.isLoading)
+    return <div className="p-8 text-muted-foreground">Loading token…</div>;
+  if (detail.isError || !detail.data?.token)
     return (
-      listingRows.find(
-        (listing) => listing.owner.toLowerCase() === walletAddress.toLowerCase(),
-      ) ?? null
-    );
-  }, [listingRows, walletAddress]);
-  const isCheapestAdded = isRecentlyAdded(cheapestListing?.orderId);
-  // True when the user's own listing happens to be the cheapest
-  const isOwnCheapest = !!(ownListing && cheapestListing?.orderId === String(ownListing.id));
-
-  // Image reveal animation ref
-  const imageRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = imageRef.current;
-    if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    animate(el, { opacity: [0, 1], scale: [0.96, 1], duration: 600, ease: "easeOutCubic" });
-  }, []);
-
-  // Listings stagger animation
-  const listingsRef = useEntrance<HTMLDivElement>({
-    selector: "[data-listing-row]",
-    staggerDelay: 50,
-    translateY: 8,
-  });
-
-  // Details section stagger animation
-  const detailsRef = useEntrance<HTMLDivElement>({
-    selector: "[data-detail-section]",
-    staggerDelay: 80,
-    translateY: 12,
-  });
-
-  // Attributes grid stagger animation
-  const attributesRef = useEntrance<HTMLDivElement>({
-    selector: "[data-attr-pill]",
-    staggerDelay: 30,
-    translateY: 8,
-  });
-
-  // Fee estimate card entrance animation
-  const feeCardRef = useEntrance<HTMLDivElement>({
-    translateY: 8,
-    duration: 400,
-  });
-
-  useEffect(() => {
-    let disposed = false;
-
-    async function loadFeeEstimate() {
-      if (!cheapestListing || !token) {
-        setFeeEstimate({
-          status: "empty",
-          marketplaceFee: BigInt(0),
-          royaltyFee: BigInt(0),
-          total: BigInt(0),
-        });
-        return;
-      }
-
-      const listingPrice = parseBigInt(cheapestListing.price);
-      if (listingPrice === null) {
-        setFeeEstimate({
-          status: "error",
-          marketplaceFee: BigInt(0),
-          royaltyFee: BigInt(0),
-          total: BigInt(0),
-        });
-        return;
-      }
-
-      setFeeEstimate((current) => ({
-        ...current,
-        status: "loading",
-      }));
-
-      try {
-        const [fees, royaltyResponse] = await Promise.all([
-          client && typeof client.getFees === "function"
-            ? client.getFees()
-            : Promise.resolve(null),
-          client && typeof client.getRoyaltyFee === "function"
-            ? client.getRoyaltyFee({
-                collection: address,
-                tokenId: formatNumberish(token.token_id) ?? String(token.token_id),
-                amount: listingPrice,
-              }).catch(() => null)
-            : Promise.resolve(null),
-        ]);
-
-        const marketplaceFee = calculateMarketplaceFee(listingPrice, {
-          feeNum: fees?.feeNum ?? DEFAULT_MARKETPLACE_FEE_NUM,
-          feeDenominator: fees?.feeDenominator ?? DEFAULT_MARKETPLACE_FEE_DENOMINATOR,
-        });
-
-        if (disposed) {
-          return;
-        }
-
-        const royaltyFee = royaltyResponse?.amount ?? BigInt(0);
-        setFeeEstimate({
-          status: "success",
-          marketplaceFee,
-          royaltyFee,
-          total: listingPrice + royaltyFee,
-        });
-      } catch {
-        if (!disposed) {
-          setFeeEstimate({
-            status: "error",
-            marketplaceFee: BigInt(0),
-            royaltyFee: BigInt(0),
-            total: BigInt(0),
-          });
-        }
-      }
-    }
-
-    void loadFeeEstimate();
-
-    return () => {
-      disposed = true;
-    };
-  }, [address, cheapestListing, client, token]);
-
-  // If existing listings use a specific currency, adopt it (otherwise keep STRK default).
-  useEffect(() => {
-    const listedCurrency = listingRows.find(
-      (listing) =>
-        typeof listing.currency === "string" &&
-        listing.currency.trim().length > 0 &&
-        listing.currency !== "0x0",
-    )?.currency;
-    if (listedCurrency) {
-      setCurrencyInput(listedCurrency);
-    }
-  }, [listingRows]);
-
-  // Convert human-readable STRK price to wei string
-  function priceToWei(humanPrice: string): string {
-    return String(BigInt(Math.round(parseFloat(humanPrice) * 1e18)));
-  }
-
-  // Compute expiration unix timestamp from preset duration
-  function computeExpiration(): string {
-    return String(Math.floor(Date.now() / 1000) + parseInt(expirationPreset));
-  }
-
-  async function runTransaction(
-    action: "list" | "offer" | "cancel",
-    executor: () => Promise<{ transaction_hash: string }>,
-  ) {
-    if (!account) {
-      setTxStatus({
-        tone: "error",
-        message: "Connect wallet before submitting transactions.",
-      });
-      return;
-    }
-
-    setPendingAction(action);
-    setTxStatus({ tone: "idle", message: "" });
-
-    try {
-      const result = await executor();
-      setTxStatus({
-        tone: "success",
-        message: `Transaction submitted`,
-        txHash: result.transaction_hash,
-      });
-      await Promise.all([listingQuery.refetch(), detailQuery.refetch()]);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Transaction failed.";
-      setTxStatus({ tone: "error", message });
-    } finally {
-      setPendingAction(null);
-    }
-  }
-
-  // Auto-clear tx status messages after 5 seconds
-  useEffect(() => {
-    if (txStatus.tone === "idle") return;
-    const id = window.setTimeout(
-      () => setTxStatus({ tone: "idle", message: "" }),
-      5000,
-    );
-    return () => window.clearTimeout(id);
-  }, [txStatus.tone, txStatus.message]);
-
-  if (detailQuery.isLoading) {
-    return (
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Skeleton
-          className="aspect-square w-full"
-          data-testid="token-detail-skeleton"
-        />
-        <div className="space-y-4">
-          <Skeleton
-            className="h-8 w-2/3"
-            data-testid="token-detail-skeleton"
-          />
-          <Skeleton
-            className="h-4 w-1/3"
-            data-testid="token-detail-skeleton"
-          />
-        </div>
-      </div>
-    );
-  }
-
-  if (!token) {
-    return (
-      <Card className="border-dashed">
-        <CardContent className="pt-6 text-sm text-muted-foreground">
-          Token not found.
+      <Card>
+        <CardContent className="p-8">
+          <p role="alert">Unable to load this token.</p>
+          <Button onClick={() => void detail.refetch()}>Retry</Button>
         </CardContent>
       </Card>
     );
-  }
-
-  const name = getTokenName(token);
-  const image = getTokenImage(token);
-  const attributes = getTokenAttributes(token);
-
+  const token = detail.data.token,
+    image = tokenImage(token);
+  const cheapest = cheapestListingByTokenId(listings.data).get(
+    BigInt(tokenId).toString(),
+  );
+  const myListing = listings.data?.find(
+    (l) => trade.address && BigInt(l.owner) === BigInt(trade.address),
+  );
+  const metadata = token.metadata as {
+    description?: string;
+    attributes?: Array<{ trait_type: string; value: unknown }>;
+  };
   return (
-    <div className="space-y-8">
-      {/* Breadcrumbs */}
-      <nav className="flex items-center gap-1.5 text-xs text-muted-foreground mb-4" aria-label="breadcrumb">
-        <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
-        <span>/</span>
-        <Link
-          href={`/collections/${address}`}
-          className="hover:text-foreground transition-colors truncate max-w-[200px]"
-        >
-          {collectionName}
-        </Link>
-        <span>/</span>
-        <span className="text-foreground font-medium">#{displayTokenId(token)}</span>
-      </nav>
-
-      <div className="lg:grid lg:grid-cols-[1fr_1fr] lg:gap-8">
-        {/* Token image — sticky on desktop */}
-        <div
-          ref={imageRef}
-          className="flex aspect-square items-center justify-center bg-muted rounded-lg overflow-hidden lg:sticky lg:top-20 lg:self-start"
-        >
+    <div
+      className="mx-auto max-w-7xl space-y-4"
+      data-testid="token-detail"
+    >
+      <Link
+        href={`/collections/${address}`}
+        className="text-sm text-muted-foreground hover:text-foreground"
+      >
+        ← Collection
+      </Link>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="relative aspect-square overflow-hidden rounded-xl border bg-muted">
           {image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              alt={name}
-              className="h-full w-full object-cover"
+            <Image
               src={image}
+              alt={tokenName(token)}
+              fill
+              unoptimized
+              className="object-contain"
             />
           ) : (
-            <span className="text-sm text-muted-foreground">No Image</span>
+            <div className="grid h-full place-items-center text-muted-foreground">
+              Image unavailable
+            </div>
           )}
         </div>
-
-        {/* Token details */}
-        <div ref={detailsRef} className="space-y-6 mt-6 lg:mt-0">
-          <div data-detail-section>
-            <h1 className="text-2xl font-bold tracking-wide">{name}</h1>
-            <p className="text-sm text-primary font-mono">
-              #{displayTokenId(token)}
+        <div className="space-y-5">
+          <Badge variant="outline">ERC-721</Badge>
+          <h1 className="text-3xl font-semibold">{tokenName(token)}</h1>
+          <p className="break-all text-xs text-muted-foreground">
+            Owner: {ownership.holderAddress ?? "Not indexed"}
+          </p>
+          {metadata?.description && (
+            <p className="text-sm text-muted-foreground">
+              {metadata.description}
             </p>
-            {isConnected && isOwnershipLoading ? (
-              <p className="mt-1 text-xs text-muted-foreground">Checking ownership...</p>
-            ) : null}
-            {isConnected && !isOwnershipLoading && effectiveIsOwner ? (
-              <p className="mt-1 text-xs text-primary">You own this token</p>
-            ) : null}
-            {holderAddress ? (
-              <Link
-                href={`/profile/${holderAddress}`}
-                aria-label="owner"
-                className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <span className="uppercase tracking-wide">Owner</span>
-                <span className="font-mono">{truncateAddress(holderAddress)}</span>
-              </Link>
-            ) : null}
-          </div>
-
-          {/* Action block — list for sale (owner) or buy (non-owner) */}
-          {listingQuery.isLoading ? (
-            <Skeleton data-detail-section className="h-16 w-full" />
-          ) : isConnected && effectiveIsOwner ? (
-            <div data-detail-section className="rounded-sm border border-border bg-muted/20 px-4 py-3 space-y-3">
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">List for sale</p>
-              {ownListing ? (
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-muted-foreground">
-                    Active: {formatPriceForDisplay(String(ownListing.price)) ?? String(ownListing.price)}{" "}
-                    {ownListing.currency ? getTokenSymbol(ownListing.currency) : ""}
-                  </span>
-                  <Button
-                    className="h-6 px-2 text-xs"
-                    disabled={pendingAction !== null}
-                    onClick={() => {
-                      void runTransaction("cancel", () => {
-                        const big = BigInt(normalizedTokenId);
-                        const low = (big & BigInt("0xffffffffffffffffffffffffffffffff")).toString();
-                        const high = (big >> BigInt(128)).toString();
-                        return account!.execute([{
-                          contractAddress: MARKETPLACE_CONTRACT,
-                          entrypoint: "cancel",
-                          calldata: [String(ownListing.id), address, low, high],
-                        }]);
-                      });
-                    }}
-                    size="sm"
-                    type="button"
-                    variant="destructive"
-                  >
-                    {pendingAction === "cancel" ? "Cancelling..." : "Cancel"}
-                  </Button>
-                </div>
-              ) : null}
-              <div className="flex gap-2">
-                <Input
-                  aria-label="Price"
-                  className="flex-1"
-                  min="0"
-                  onChange={(e) => setPriceInput(e.target.value)}
-                  placeholder="Price"
-                  step="any"
-                  type="number"
-                  value={priceInput}
-                />
-                <Select onValueChange={setCurrencyInput} value={currencyInput}>
-                  <SelectTrigger aria-label="Currency" className="w-28">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={STRK_ADDRESS}>STRK</SelectItem>
-                    <SelectItem value={LORDS_ADDRESS}>LORDS</SelectItem>
-                    <SelectItem value={SURVIVOR_ADDRESS}>SURVIVO</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Select onValueChange={setExpirationPreset} value={expirationPreset}>
-                <SelectTrigger aria-label="Expires in">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="3600">Expires in 1 hour</SelectItem>
-                  <SelectItem value="86400">Expires in 24 hours</SelectItem>
-                  <SelectItem value="604800">Expires in 7 days</SelectItem>
-                  <SelectItem value="2592000">Expires in 30 days</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                className="w-full"
-                disabled={pendingAction !== null}
-                onClick={() => {
-                  void runTransaction("list", () => {
-                    const tokenBig = BigInt(normalizedTokenId);
-                    const tokenLow = (tokenBig & BigInt("0xffffffffffffffffffffffffffffffff")).toString();
-                    const tokenHigh = (tokenBig >> BigInt(128)).toString();
-                    return account!.execute([
-                      {
-                        // Approve marketplace to transfer all tokens in this collection
-                        contractAddress: address,
-                        entrypoint: "set_approval_for_all",
-                        calldata: [MARKETPLACE_CONTRACT, "1"],
-                      },
-                      {
-                        contractAddress: MARKETPLACE_CONTRACT,
-                        entrypoint: "list",
-                        // ERC721: quantity must be 0 (contract checks value==0 for ERC721 validity)
-                        // price is u128 (1 felt), token_id is u256 (2 felts), royalties is bool
-                        calldata: [address, tokenLow, tokenHigh, "0", priceToWei(priceInput), currencyInput, computeExpiration(), "1"],
-                      },
-                    ]);
-                  });
-                }}
-                size="sm"
-                type="button"
-              >
-                {pendingAction === "list" ? "Listing..." : "List for sale"}
-              </Button>
-              {txStatus.message ? (
-                <p className={txStatus.tone === "error" ? "text-xs text-destructive" : "text-xs text-primary"}>
-                  {txStatus.message}
-                  {txStatus.txHash ? (
-                    <>{" "}<a href={buildExplorerTxUrl(chainLabel, txStatus.txHash)} target="_blank" rel="noopener noreferrer" className="underline">View on Starkscan →</a></>
-                  ) : null}
-                </p>
-              ) : null}
-            </div>
-          ) : cheapestListing ? (
-            <div data-detail-section className="realm-panel flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-              <div>
-                <p className="realm-kicker mb-0.5 text-xs">Best price</p>
-                <p className="flex items-center gap-1.5 text-xl font-bold text-primary">
-                  {formatPriceForDisplay(cheapestListing.price) ?? cheapestListing.price}
-                  <TokenSymbol address={cheapestListing.currency} className="text-sm font-normal text-muted-foreground" />
-                </p>
-              </div>
-              <Button
-                onClick={() => {
-                  if (!token || !cheapestListing) return;
-                  addListingToCart(cartItemFromTokenListing(token, address, cheapestListing, projectId));
-                }}
-                size="sm"
-                type="button"
-                variant={isCheapestAdded ? "default" : "outline"}
-              >
-                {isCheapestAdded ? "Added" : "Add to cart"}
-              </Button>
-            </div>
-          ) : null}
-
-          {/* Attributes */}
-          {attributes.length > 0 ? (
-            <div data-detail-section className="space-y-2">
-              <h2 className="realm-kicker text-lg">Attributes</h2>
-              <div ref={attributesRef} className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                {attributes.map((attr) => {
-                  const params = new URLSearchParams();
-                  params.append("trait", `${attr.trait_type}:${attr.value}`);
-                  return (
-                    <Link
-                      key={`${attr.trait_type}-${attr.value}`}
-                      data-attr-pill
-                      href={`/collections/${address}?${params.toString()}`}
-                      aria-label={`${attr.trait_type} ${attr.value}`}
-                      className="rounded-[6px] border border-[color:var(--realm-border-etched)] bg-muted/40 px-2 py-1.5 transition-colors hover:border-[color:var(--realm-border-strong)] hover:bg-muted/70"
-                    >
-                      <p className="mb-0.5 text-[10px] uppercase leading-none text-muted-foreground">
-                        {attr.trait_type}
-                      </p>
-                      <p className="text-xs font-medium text-primary truncate">{attr.value}</p>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Listings section */}
-      <div className="space-y-3">
-        {!effectiveIsOwner ? (
-        <Card ref={feeCardRef} className="border-dashed" data-testid="token-fee-card">
-          <CardContent className="space-y-2 p-3">
-            <h2 className="realm-kicker text-lg">
-              Purchase estimate
-            </h2>
-            {feeEstimate.status === "loading" ? (
-              <p className="text-xs text-muted-foreground" data-testid="token-fee-loading">
-                Loading fee estimate...
-              </p>
-            ) : null}
-            {feeEstimate.status === "empty" ? (
-              <p className="text-xs text-muted-foreground" data-testid="token-fee-empty">
-                No active listing available for estimate.
-              </p>
-            ) : null}
-            {feeEstimate.status === "error" ? (
-              <p className="text-xs text-destructive" data-testid="token-fee-error">
-                Fee estimate unavailable. Try refreshing listings.
-              </p>
-            ) : null}
-            {feeEstimate.status === "success" ? (
-              <div className="space-y-1 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Marketplace fee</span>
-                  <span data-testid="token-fee-marketplace" className="flex items-center gap-1">
-                    {formatPriceForDisplay(feeEstimate.marketplaceFee.toString()) ?? feeEstimate.marketplaceFee.toString()}
-                    <span className="text-muted-foreground">{getTokenSymbol(currencyInput)}</span>
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Royalty estimate</span>
-                  <span data-testid="token-fee-royalty" className="flex items-center gap-1">
-                    {formatPriceForDisplay(feeEstimate.royaltyFee.toString()) ?? feeEstimate.royaltyFee.toString()}
-                    <span className="text-muted-foreground">{getTokenSymbol(currencyInput)}</span>
-                  </span>
-                </div>
-                <div className="flex items-center justify-between font-medium">
-                  <span>Total estimate</span>
-                  <span data-testid="token-fee-total" className="flex items-center gap-1">
-                    {formatPriceForDisplay(feeEstimate.total.toString()) ?? feeEstimate.total.toString()}
-                    <span className="text-muted-foreground">{getTokenSymbol(currencyInput)}</span>
-                  </span>
-                </div>
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
-        ) : null}
-
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="realm-kicker text-lg">Listings</h2>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              disabled={!cheapestListing || isOwnCheapest}
-              onClick={() => {
-                if (!token || !cheapestListing || isOwnCheapest) {
-                  return;
-                }
-
-                addListingToCart(
-                  cartItemFromTokenListing(token, address, cheapestListing, projectId),
-                );
-              }}
-              size="sm"
-              type="button"
-              variant={isCheapestAdded ? "default" : "outline"}
-            >
-              {isCheapestAdded ? "Added" : "Add cheapest to cart"}
-            </Button>
-            <Button
-              disabled={listingQuery.isFetching}
-              onClick={() => {
-                void listingQuery.refetch();
-              }}
-              size="sm"
-              type="button"
-              variant="ghost"
-            >
-              Refresh listings
-            </Button>
-          </div>
-        </div>
-
-
-        {/* Offer form — shown to confirmed non-owners */}
-        {isConnected && !effectiveIsOwner && !isOwnershipLoading ? (
-          <Card className="border-dashed">
-            <CardContent className="space-y-3 p-3">
-              <h2 className="realm-kicker text-lg">Make an offer</h2>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div className="flex items-center gap-1">
-                  <Input
-                    aria-label={`Price (${getTokenSymbol(currencyInput)})`}
-                    min="0"
-                    onChange={(event) => setPriceInput(event.target.value)}
-                    placeholder="Price"
-                    step="any"
-                    type="number"
-                    value={priceInput}
-                  />
-                  <span className="text-sm text-muted-foreground shrink-0">{getTokenSymbol(currencyInput)}</span>
-                </div>
-                <Input
-                  aria-label="Quantity"
-                  onChange={(event) => setQuantityInput(event.target.value)}
-                  placeholder="Quantity"
-                  value={quantityInput}
-                />
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-muted-foreground" htmlFor="offer-expiration-preset">Expires in</label>
-                  <Select onValueChange={setExpirationPreset} value={expirationPreset}>
-                    <SelectTrigger aria-label="Expires in" id="offer-expiration-preset">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="3600">1 hour</SelectItem>
-                      <SelectItem value="86400">24 hours</SelectItem>
-                      <SelectItem value="604800">7 days</SelectItem>
-                      <SelectItem value="2592000">30 days</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  disabled={pendingAction !== null}
-                  onClick={() => {
-                    void runTransaction("offer", () => {
-                      const big = BigInt(normalizedTokenId);
-                      const low = (big & BigInt("0xffffffffffffffffffffffffffffffff")).toString();
-                      const high = (big >> BigInt(128)).toString();
-                      return account!.execute([{
-                        contractAddress: MARKETPLACE_CONTRACT,
-                        entrypoint: "offer",
-                        calldata: [address, low, high, quantityInput, priceToWei(priceInput), currencyInput, computeExpiration()],
-                      }]);
-                    });
-                  }}
-                  size="sm"
-                  type="button"
-                  variant="secondary"
-                >
-                  Make offer
-                </Button>
-              </div>
-              {txStatus.message ? (
-                <p className={txStatus.tone === "error" ? "text-xs text-destructive" : "text-xs text-primary"}>
-                  {txStatus.message}
-                  {txStatus.txHash ? (
-                    <>
-                      {" "}
-                      <a
-                        href={buildExplorerTxUrl(chainLabel, txStatus.txHash)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline"
-                      >
-                        View on Starkscan →
-                      </a>
-                    </>
-                  ) : null}
-                </p>
-              ) : null}
+          )}
+          <Card>
+            <CardHeader>
+              <CardTitle>Listings</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {listings.isError ? <p role="alert">Listing prices are unavailable. <Button variant="outline" onClick={()=>void listings.refetch()}>Retry</Button></p> : listings.isPending ? <p>Loading price…</p> : <ListingPurchase
+                price={cheapest?.price} currency={cheapest?.currency}
+                inCart={!!cheapest && cartItems.some(item=>item.orderId===cheapest.orderId)}
+                isOwner={ownership.effectiveIsOwner}
+                onViewCart={()=>setCartOpen(true)}
+                onAdd={()=>{if(cheapest) addListingToCart(cartItemFromTokenListing(token,address,cheapest));}}
+              />}
             </CardContent>
           </Card>
-        ) : null}
-
-        {/* Not connected prompt */}
-        {!isConnected ? (
-          <p className="text-xs text-muted-foreground">Connect wallet to transact.</p>
-        ) : null}
-
-        {listingQuery.isError ? (
-          <p className="text-sm text-destructive">Listings failed to load.</p>
-        ) : null}
-
-        {listingQuery.isFetching ? (
-          <Badge variant="outline">Refreshing...</Badge>
-        ) : null}
-
-        {listingRows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No listings</p>
-        ) : (
-          <div ref={listingsRef} className="rounded border border-border overflow-hidden">
-            {/* Table header */}
-            <div className="hidden grid-cols-[1fr_auto_auto_auto] items-center gap-x-4 border-b border-border bg-muted/40 px-3 py-2 sm:grid">
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Price</span>
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Seller</span>
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Expires</span>
-              <span />
-            </div>
-            {listingRows.map((listing, index) => {
-              const isCheapest = cheapestListing?.orderId === String(listing.id);
-              const rowOrderId = String(listing.id);
-              const isRowAdded = isRecentlyAdded(rowOrderId);
-              const isOwnRow = !!(walletAddress && listing.owner.toLowerCase() === walletAddress.toLowerCase());
-              const hasFullCartData =
-                listing.id !== undefined &&
-                listing.price !== undefined &&
-                listing.currency !== undefined &&
-                listing.quantity !== undefined;
-              const expiration = parseExpiration(listing.expiration);
-              return (
-                <div
-                  key={listing.id}
-                  data-listing-row
-                  className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-b border-border/50 px-3 py-2.5 transition-colors last:border-b-0 hover:bg-muted/20 sm:grid-cols-[1fr_auto_auto_auto] sm:gap-x-4 sm:gap-y-0${index % 2 === 1 ? " bg-muted/30" : ""}`}
-                >
-                  <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-2">
-                    <span className="text-sm font-medium text-primary font-mono flex items-center gap-1.5">
-                      {formatPriceForDisplay(listing.price) ?? String(listing.price)}
-                      {listing.currency ? (
-                        <span className="text-xs text-muted-foreground font-sans font-normal">
-                          {getTokenSymbol(listing.currency)}
-                        </span>
-                      ) : null}
-                    </span>
-                    {isCheapest ? (
-                      <Badge variant="secondary" className="shrink-0">Best Price</Badge>
-                    ) : null}
-                  </div>
-                  <Link
-                    href={`/profile/${listing.owner}`}
-                    className="col-start-1 row-start-2 max-w-[11rem] truncate text-xs text-muted-foreground font-mono transition-colors hover:text-foreground hover:underline sm:col-auto sm:row-auto sm:max-w-none"
+          {ownership.effectiveIsOwner ? (
+            <Card>
+              <CardContent className="space-y-4 p-5">
+                {myListing && (
+                  <Button
+                    variant="destructive"
+                    disabled={trade.busy}
+                    onClick={() =>
+                      void trade.execute(
+                        (m) => prepareCancellation({marketplace:m,chain:trade.config!.chain,account:trade.address!},[myListing.id]),
+                        "cancel",
+                      )
+                    }
                   >
-                    {isOwnRow ? "You" : truncateAddress(listing.owner)}
-                  </Link>
-                  <span className="col-start-2 row-start-2 text-right text-xs text-muted-foreground sm:col-auto sm:row-auto sm:text-left">
-                    {expiration ? formatRelativeExpiry(expiration) : "—"}
-                  </span>
-                  {isOwnRow ? (
-                    <Badge
-                      variant="outline"
-                      className="col-start-2 row-start-1 justify-self-end px-2 py-0.5 text-[10px] sm:col-auto sm:row-auto"
-                    >
-                      Your listing
-                    </Badge>
-                  ) : (
-                    <Button
-                      disabled={!hasFullCartData}
-                      onClick={() => {
-                        if (!token || !hasFullCartData) return;
-                        addListingToCart(
-                          cartItemFromTokenListing(
-                            token,
-                            address,
-                            listing as unknown as CheapestListing,
-                            projectId,
-                          ),
-                        );
-                      }}
-                      size="sm"
-                      type="button"
-                      variant={isRowAdded ? "default" : "outline"}
-                      className="col-start-2 row-start-1 h-7 justify-self-end px-2 text-xs sm:col-auto sm:row-auto sm:h-8 sm:px-3 sm:text-sm"
-                    >
-                      {isRowAdded ? "Added" : "Add to cart"}
-                    </Button>
+                    Cancel my listing
+                  </Button>
+                )}
+                <OrderComposer
+                  collection={address}
+                  tokenIds={[tokenId]}
+                  kind="listing"
+                />
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-5">
+                <OrderComposer
+                  collection={address}
+                  tokenIds={[tokenId]}
+                  kind="token_offer"
+                />
+              </CardContent>
+            </Card>
+          )}
+          <TradeStatus state={trade.state} />
+        </div>
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Traits</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-2">
+            {metadata?.attributes?.map((a, i) => (
+              <div
+                key={`${a.trait_type}-${i}`}
+                className="rounded-md border p-3"
+              >
+                <p className="text-xs text-muted-foreground">{a.trait_type}</p>
+                <p className="text-sm">{String(a.value)}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Offers</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <BestBid
+              collection={address}
+              tokenId={tokenId}
+              isOwner={ownership.effectiveIsOwner}
+            />
+            {offerItems
+              .filter(
+                (o) =>
+                  o.kind !== "listing" &&
+                  (o.tokenId == null || BigInt(o.tokenId) === BigInt(tokenId)),
+              )
+              .map((o) => (
+                <div
+                  key={o.id}
+                  className="flex items-center justify-between gap-2 border-b pb-2"
+                >
+                  <div>
+                    <p>
+                      {formatCurrencyAmount(o.buyerDebit, o.currency)}{" "}
+                      {getTokenSymbol(o.currency)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {o.kind === "collection_offer"
+                        ? "Collection offer"
+                        : "Token offer"}{" "}
+                      · funds checked on acceptance
+                    </p>
+                  </div>
+                  {ownership.effectiveIsOwner && (
+                    <AcceptOffer order={o} tokenId={tokenId} />
                   )}
                 </div>
-              );
-            })}
-          </div>
-        )}
+              ))}
+            {offers.isError&&<p role="alert">Offers are unavailable. Try again shortly.</p>}
+            {offers.hasNextPage&&<Button variant="outline" disabled={offers.isFetchingNextPage} onClick={()=>void offers.fetchNextPage()}>More offers</Button>}
+            {!offers.isPending&&!offers.isError&&!offerItems.some((o) => o.kind !== "listing") && (
+              <p className="text-sm text-muted-foreground">No offers yet.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Activity</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {activityItems.length ? (
+            <TokenActivity items={activityItems} chain={getMarketplaceRuntimeConfig().chainLabel} />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {activity.isPending?"Loading activity…":activity.isError?"Activity is unavailable. Try again shortly.":"No indexed activity yet."}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+      {activity.hasNextPage&&<Button variant="outline" disabled={activity.isFetchingNextPage} onClick={()=>void activity.fetchNextPage()}>More activity</Button>}
+      <ReportToken collection={address} tokenId={tokenId} />
     </div>
   );
 }

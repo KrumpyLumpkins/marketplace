@@ -1,3 +1,4 @@
+vi.mock("./use-sweep-candidates",()=>({useSweepCandidates:()=>({data:[]})}));
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CollectionRouteContainer } from "@/features/collections/collection-route-container";
@@ -83,3 +84,5 @@ describe("collection route container", () => {
     expect(screen.getByRole("heading", { name: "Genesis" })).toBeVisible();
   });
 });
+
+vi.mock("@/features/trading/collection-tools", () => ({ CollectionTools: () => null }));

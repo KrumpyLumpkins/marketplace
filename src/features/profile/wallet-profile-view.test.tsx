@@ -315,3 +315,5 @@ describe("WalletProfileView", () => {
     );
   });
 });
+
+vi.mock("@starknet-react/core",()=>({useAccount:()=>({address:undefined})}));

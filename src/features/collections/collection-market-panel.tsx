@@ -1,8 +1,9 @@
 "use client";
+import {formatCurrencyAmount} from "@/lib/marketplace/amount-display";
 
 import Link from "next/link";
 import { useDeferredValue, useMemo, useState } from "react";
-import type { CollectionOrdersOptions } from "@cartridge/arcade/marketplace";
+import type { CollectionOrdersOptions } from "@/lib/marketplace/types";
 import {
   useCollectionListingsQuery,
   useCollectionOrdersQuery,
@@ -272,7 +273,7 @@ function toActivityRow(
     tokenId,
     routeTokenId,
     tokenImage,
-    price: formatPriceForDisplay(rawPrice),
+    price: fields.apiOrder && rawPrice!=null ? formatCurrencyAmount(String(rawPrice),String(fields.currency)) : formatPriceForDisplay(rawPrice),
     owner: owner ? formatAddress(owner) : null,
     status,
     occurredAt,

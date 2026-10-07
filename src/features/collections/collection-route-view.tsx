@@ -1,7 +1,12 @@
 "use client";
+import { CollectionBanner } from "./collection-banner";
+import { CollectionBrowseLayout } from "./collection-browse-layout";
+import {formatCurrencyAmount} from "@/lib/marketplace/amount-display";
 
+import { useSweepCandidates } from "./use-sweep-candidates";
+import { CollectionTools } from "@/features/trading/collection-tools";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { NormalizedToken } from "@cartridge/arcade/marketplace";
+import type { NormalizedToken } from "@/lib/marketplace/types";
 import {
   useCollectionListingsQuery,
   useCollectionQuery,
@@ -41,7 +46,6 @@ import {
 } from "@/lib/marketplace/collection-filter-config";
 import { getCollectionBannerImage } from "@/lib/marketplace/collection-banners";
 import {
-  cartItemFromTokenListing,
   cheapestListingByTokenId,
 } from "@/features/cart/listing-utils";
 import { CART_MAX_ITEMS, useCartStore } from "@/features/cart/store/cart-store";
@@ -99,7 +103,7 @@ function collectionHeaderImage(metadata: unknown) {
 }
 
 function floorFromListings(
-  cheapestListings: Map<string, { price: string; currency: string }>,
+  cheapestListings: Map<string, { price: string; currency: string; orderId?:string }>,
 ): { price: string; currency: string } | null {
   let min: bigint | null = null;
   let currency = "";
@@ -120,22 +124,9 @@ function floorFromListings(
     return null;
   }
 
-  const price = formatPriceForDisplay(min.toString());
+  const owned=[...cheapestListings.values()].some(l=>l.orderId?.includes(':'));
+  const price = owned ? formatCurrencyAmount(min,currency) : formatPriceForDisplay(min.toString());
   return price ? { price, currency } : null;
-}
-
-function compareBigIntStrings(left: string, right: string) {
-  try {
-    const leftValue = BigInt(left);
-    const rightValue = BigInt(right);
-    if (leftValue === rightValue) {
-      return 0;
-    }
-
-    return leftValue < rightValue ? -1 : 1;
-  } catch {
-    return left.localeCompare(right);
-  }
 }
 
 function isSortOptionActive(
@@ -311,42 +302,16 @@ export function CollectionRouteView({
       ? `${COLLECTION_LISTING_SAMPLE_LIMIT}+`
       : String(listingCount);
 
-  const sweepCandidates = useMemo(() => {
-    if (!visibleTokens.length) return [];
-
-    const tokenByDisplayId = new Map(
-      visibleTokens.map((token) => [displayTokenId(token), token] as const),
-    );
-
-    const candidates = Array.from(cheapestListings.values())
-      .filter((listing) => !cartOrderIds.has(listing.orderId))
-      .map((listing) => {
-        const token = tokenByDisplayId.get(listing.tokenId);
-        if (!token) return null;
-        return cartItemFromTokenListing(token, address, listing, projectId);
-      })
-      .filter((item): item is NonNullable<typeof item> => item !== null)
-      .sort((left, right) => compareBigIntStrings(left.price, right.price));
-
-    return candidates.slice(0, CART_MAX_ITEMS);
-  }, [address, cartOrderIds, cheapestListings, projectId, visibleTokens]);
-
-  // Build the preview set directly from cheapestListings (same key format
-  // the grid uses for lookup) so highlighting doesn't depend on listedTokensQuery.
-  const cheapestByPrice = useMemo(() => {
-    return Array.from(cheapestListings.entries())
-      .filter(([, listing]) => !cartOrderIds.has(listing.orderId))
-      .sort(([, a], [, b]) => compareBigIntStrings(a.price, b.price));
-  }, [cartOrderIds, cheapestListings]);
-
+  const sweepQuery = useSweepCandidates(address,resolvedActiveFilters);
+  const sweepCandidates = (sweepQuery.data ?? []).filter(item=>!cartOrderIds.has(item.orderId)).slice(0,CART_MAX_ITEMS);
   const sweepMaxCount = Math.min(
-    cheapestByPrice.length,
+    sweepCandidates.length,
     Math.max(CART_MAX_ITEMS - cartItems.length, 0),
   );
   const clampedSweepCount = Math.min(sweepCount, sweepMaxCount);
   const sweepPreviewTokenIds = useMemo(
-    () => new Set(cheapestByPrice.slice(0, clampedSweepCount).map(([tokenId]) => tokenId)),
-    [cheapestByPrice, clampedSweepCount],
+    () => new Set(sweepCandidates.slice(0, clampedSweepCount).map(item => item.tokenId)),
+    [sweepCandidates, clampedSweepCount],
   );
   const handleTokensChange = useCallback((tokens: NormalizedToken[]) => {
     setVisibleTokensByScope((current) => {
@@ -428,35 +393,8 @@ export function CollectionRouteView({
   );
 
   return (
-    <section className="w-full space-y-6 pb-20">
-      {/* Collection hero banner — breaks out of parent padding for full-bleed */}
-      <div
-        ref={heroRef}
-        className="relative -mx-4 overflow-hidden border-y border-[color:var(--realm-border-etched)] bg-[color:var(--realm-surface-iron)] sm:-mx-6 lg:-mx-8"
-        data-testid="collection-header-image"
-      >
-        {headerImage ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              alt={`${displayName ?? selectedCollection?.name ?? address} banner`}
-              className="hero-image h-56 w-full object-cover object-center"
-              src={headerImage}
-            />
-            {/* Gradient overlay for text readability */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[color:var(--realm-bg-void)] via-[color:var(--realm-bg-void)]/50 to-transparent" />
-          </>
-        ) : (
-          <div className="h-56 w-full bg-[radial-gradient(circle_at_30%_20%,rgba(231,207,136,0.18),transparent_20rem),linear-gradient(145deg,#161b20,#070b0d)]" />
-        )}
-
-        {/* Overlay content */}
-        <div className="hero-content absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-3 px-4 pb-5 sm:px-6 lg:px-8">
-          {/* Collection name */}
-          <h1 className="realm-title text-4xl text-[color:var(--realm-title)] drop-shadow-[0_2px_12px_rgba(0,0,0,0.7)]">
-            {displayName ?? selectedCollection?.name ?? address}
-          </h1>
-
+    <section className="w-full space-y-4 pb-20">
+      <CollectionBanner ref={heroRef} image={headerImage} name={displayName ?? selectedCollection?.name ?? address}>
           {/* Stats */}
           <div className="flex flex-wrap items-center gap-2 text-sm">
             {listingCount > 0 && (
@@ -473,8 +411,7 @@ export function CollectionRouteView({
               </span>
             )}
           </div>
-        </div>
-      </div>
+      </CollectionBanner>
 
       {collection.isSuccess && !collection.data ? (
         <p className="text-sm text-muted-foreground font-mono">
@@ -483,11 +420,7 @@ export function CollectionRouteView({
         </p>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
-        <div
-          className="sticky top-24 self-start max-h-[calc(100vh-7rem)] overflow-y-auto"
-          data-testid="trait-sidebar-container"
-        >
+      <CollectionBrowseLayout activeCount={Object.keys(resolvedActiveFilters).length} filters={
           <TraitFilterSidebar
             collectionAddress={address}
             traitNames={traitNamesQuery.data ?? []}
@@ -499,10 +432,9 @@ export function CollectionRouteView({
             openTraitName={openTraitName}
             onOpenTraitNameChange={setOpenTraitName}
           />
-        </div>
-
-        <div className="w-full space-y-4" data-testid="collection-content-container">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      }>
+          <CollectionTools address={address} />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="flex items-center justify-between gap-3">
               <TabsList>
                 <TabsTrigger value="tokens">Tokens</TabsTrigger>
@@ -539,8 +471,7 @@ export function CollectionRouteView({
             onCountChange={handleSweepCountChange}
             onSweep={handleSweep}
           />
-        </div>
-      </div>
+      </CollectionBrowseLayout>
     </section>
   );
 }

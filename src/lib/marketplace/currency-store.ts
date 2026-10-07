@@ -1,0 +1,10 @@
+"use client";
+import { create } from "zustand";
+export const useMarketCurrency = create<{
+  currency: string;
+  setCurrency: (currency: string) => void;
+}>((set) => ({
+  currency:
+    "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+  setCurrency: (currency) => set({ currency }),
+}));
