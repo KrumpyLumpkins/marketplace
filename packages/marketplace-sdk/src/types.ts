@@ -60,7 +60,11 @@ export type IndexStatus = {
   history?: {
     mode: "event_ranges";
     state:
-      "pending" | "reconciling" | "failed" | "passed" | "invalid_checkpoint";
+      | "pending"
+      | "reconciling"
+      | "failed"
+      | "passed"
+      | "invalid_checkpoint";
     cutoff: number;
     lastRangeEnd?: number;
     checkpointBlock?: number;
@@ -81,6 +85,11 @@ export type MarketConfig = {
   paused: boolean;
   demo: boolean;
   currencies: Array<{ address: string; symbol: string; decimals: number }>;
-  collections: Array<{ address: string; name: string }>;
+  collections: Array<{
+    address: string;
+    name: string;
+    royaltyBps?: number;
+    enabled?: boolean;
+  }>;
   status: IndexStatus;
 };

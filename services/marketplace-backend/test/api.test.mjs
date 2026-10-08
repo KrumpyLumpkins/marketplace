@@ -108,7 +108,12 @@ test("transaction reflection includes canonical governance events and is invalid
     timestamp: 2,
     events: [
       { type: "trading_changed", paused: true, transactionHash: "0xb" },
-      { type: "fee_policy_changed", feeBps: 300, feeRecipient: address("6"), transactionHash: "0x10" },
+      {
+        type: "fee_policy_changed",
+        feeBps: 300,
+        feeRecipient: address("6"),
+        transactionHash: "0x10",
+      },
       {
         type: "collection_policy",
         address: address("9"),
@@ -164,15 +169,110 @@ test("transaction reflection includes canonical governance events and is invalid
   assert.equal((await get("0xa")).reflected, true);
 });
 
-test('trusted proxy visitors have independent quotas and cannot throttle health probes', async (t) => {
-  const store = new Store(':memory:');
-  const api = createApi({ store, config: { chain: 'LOCAL', chainId: '0x1', collections: [], currencies: [], trustedProxyAddresses: ['127.0.0.1'] } });
-  await new Promise(resolve => api.listen(0, '127.0.0.1', resolve));
-  t.after(() => { api.closeAllConnections(); api.close(); store.close(); });
+test("trusted proxy visitors have independent quotas and cannot throttle health probes", async (t) => {
+  const store = new Store(":memory:");
+  const api = createApi({
+    store,
+    config: {
+      chain: "LOCAL",
+      chainId: "0x1",
+      collections: [],
+      currencies: [],
+      trustedProxyAddresses: ["127.0.0.1"],
+    },
+  });
+  await new Promise((resolve) => api.listen(0, "127.0.0.1", resolve));
+  t.after(() => {
+    api.closeAllConnections();
+    api.close();
+    store.close();
+  });
   const base = `http://127.0.0.1:${api.address().port}`;
-  const visitor = ip => fetch(base + '/v1/chains/LOCAL/collections', { headers: { 'x-real-ip': ip } });
-  for (let i = 0; i < 300; i++) assert.equal((await visitor('203.0.113.1')).status, 200);
-  assert.equal((await visitor('203.0.113.1')).status, 429);
-  assert.equal((await visitor('203.0.113.2')).status, 200);
-  assert.equal((await fetch(base + '/health/live', { headers: { 'x-real-ip': '203.0.113.1' } })).status, 200);
+  const visitor = (ip) =>
+    fetch(base + "/v1/chains/LOCAL/collections", {
+      headers: { "x-real-ip": ip },
+    });
+  for (let i = 0; i < 300; i++)
+    assert.equal((await visitor("203.0.113.1")).status, 200);
+  assert.equal((await visitor("203.0.113.1")).status, 429);
+  assert.equal((await visitor("203.0.113.2")).status, 200);
+  assert.equal(
+    (
+      await fetch(base + "/health/live", {
+        headers: { "x-real-ip": "203.0.113.1" },
+      })
+    ).status,
+    200,
+  );
+});
+
+test("cached SVGs allow embedded image data while scripts and external requests stay sandboxed", async (t) => {
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "market-svg-"));
+  const name = "a".repeat(64) + ".svg";
+  await writeFile(join(dir, name), '<svg xmlns="http://www.w3.org/2000/svg"/>');
+  const store = new Store(":memory:");
+  const api = createApi({
+    store,
+    config: {
+      chain: "LOCAL",
+      chainId: "0x1",
+      marketplace: null,
+      collections: [],
+      currencies: [],
+      assetDir: dir,
+    },
+  });
+  await new Promise((r) => api.listen(0, "127.0.0.1", r));
+  t.after(async () => {
+    api.closeAllConnections();
+    api.close();
+    store.close();
+    await rm(dir, { recursive: true });
+  });
+  const response = await fetch(
+    `http://127.0.0.1:${api.address().port}/v1/chains/LOCAL/assets/${name}`,
+  );
+  assert.equal(response.status, 200);
+  assert.equal(
+    response.headers.get("content-security-policy"),
+    "sandbox; default-src 'none'; img-src data:; style-src 'unsafe-inline'",
+  );
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+});
+
+test("configuration distinguishes indexed collections from on-chain enabled collections", async (t) => {
+  const store = new Store(":memory:");
+  store.put("policy", `collection_policy:${address("9")}`, {
+    enabled: true,
+    royalties: true,
+  });
+  const api = createApi({
+    store,
+    config: {
+      chain: "LOCAL",
+      chainId: "0x1",
+      marketplace: null,
+      collections: [
+        { address: "9", name: "Enabled" },
+        { address: "10", name: "Pending" },
+      ],
+      currencies: [],
+    },
+  });
+  await new Promise((r) => api.listen(0, "127.0.0.1", r));
+  t.after(() => {
+    api.closeAllConnections();
+    api.close();
+    store.close();
+  });
+  const response = await fetch(
+    `http://127.0.0.1:${api.address().port}/v1/chains/LOCAL/marketplace/config`,
+  );
+  assert.deepEqual(
+    (await response.json()).data.collections.map((c) => c.enabled),
+    [true, false],
+  );
 });

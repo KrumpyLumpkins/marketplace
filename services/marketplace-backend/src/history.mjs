@@ -1,3 +1,4 @@
+import { readHistoryContracts } from "./history-reads.mjs";
 import { address, ApiError, fromU256, u256Felts } from "./domain.mjs";
 import { SELECTORS } from "./decode.mjs";
 import { mapConcurrent } from "./concurrency.mjs";
@@ -12,20 +13,65 @@ export const REALMS_HISTORY_PROFILE = Object.freeze({
   supplySelector:
     "0xd2e488264e384e3a8b9045fc5040cc57df6877dfd12db9b326e50500d6d090",
 });
-export function historyProfile(config) {
-  const c = config.collections?.[0];
+// Address and class pins prevent an arbitrary registry from selecting a supply proof.
+export const ADDITIONAL_HISTORY_PROFILES = Object.freeze(
+  [
+    {
+      address:
+        "0x0572fe34a769058c62a66f0c4854d08ccfd21fcbb4f0b1685a1868b84c6ee266",
+      classHash:
+        "0x181c70595dd7db697c37ceb35c74fab69a037836b99cc80c17fd92a16289e26",
+      historicalClassHashes: [
+        "0x3786852cc518b276af050047b663b7d750f697dbb9e7c0046c06521d533c047",
+      ],
+      supplySelector:
+        "0x1557182e4359a1f0c6301278e8f5b35a776ab58d39892581e357578fb287836",
+      supplyMode: "current",
+    },
+    {
+      address:
+        "0x01f36515d7d307c9d3e41df48f29e9a6b4bbc445d0fbdbbce944a4678cd52b02",
+      classHash:
+        "0x3786852cc518b276af050047b663b7d750f697dbb9e7c0046c06521d533c047",
+      supplySelector:
+        "0x1557182e4359a1f0c6301278e8f5b35a776ab58d39892581e357578fb287836",
+      supplyMode: "current",
+    },
+    {
+      address:
+        "0x027838dea749f41c6f8a44fcfa791788e6101080c1b3cd646a361f653ad10e2d",
+      classHash:
+        "0x2902aba920acb9478e9a01f46aa5adca58d4d31eba91a1bdb3b6d0020595885",
+      supplySelector:
+        "0xd2e488264e384e3a8b9045fc5040cc57df6877dfd12db9b326e50500d6d090",
+      supplyMode: "timestamp",
+    },
+  ].map((p) => Object.freeze({ ...p, address: address(p.address) })),
+);
+export function historyProfiles(config) {
+  const reviewed = [REALMS_HISTORY_PROFILE, ...ADDITIONAL_HISTORY_PROFILES];
+  const profiles = (config.collections ?? []).map((c) =>
+    reviewed.find(
+      (p) =>
+        address(c.address) === p.address &&
+        BigInt(c.classHash ?? 0) === BigInt(p.classHash),
+    ),
+  );
   if (
     config.chain !== "SN_MAIN" ||
-    config.collections.length !== 1 ||
-    address(c.address) !== REALMS_HISTORY_PROFILE.address ||
-    BigInt(c.classHash ?? 0) !== BigInt(REALMS_HISTORY_PROFILE.classHash)
+    !profiles.length ||
+    profiles.some((p) => !p) ||
+    new Set(profiles.map((p) => p.address)).size !== profiles.length
   )
     throw new ApiError(
       "HISTORY_PROFILE_REQUIRED",
-      "Fast history requires the reviewed Realms mainnet profile",
+      "Fast history requires reviewed mainnet collection profiles",
       503,
     );
-  return REALMS_HISTORY_PROFILE;
+  return profiles;
+}
+export function historyProfile(config) {
+  return historyProfiles(config)[0];
 }
 const accepted = (b) => ["ACCEPTED_ON_L1", "ACCEPTED_ON_L2"].includes(b.status);
 export async function chooseHistoryCutoff(rpc, config, latest, from) {
@@ -62,7 +108,8 @@ export async function reconcileHistory(
   history,
   { limit = 100 } = {},
 ) {
-  const profile = historyProfile(config),
+  const profiles = historyProfiles(config),
+    profile = profiles[history.collectionIndex ?? 0],
     h = history.cutoff,
     head = await store.head();
   if (head?.number !== h)
@@ -100,11 +147,15 @@ export async function reconcileHistory(
   if (BigInt(proofClass) !== BigInt(profile.classHash))
     throw new ApiError(
       "CLASS_MISMATCH",
-      "Realms supply proof class changed",
+      "Collection supply proof class changed",
       503,
     );
   if (BigInt(classHash) !== BigInt(profile.classHash))
-    throw new ApiError("CLASS_MISMATCH", "Realms history profile changed", 503);
+    throw new ApiError(
+      "CLASS_MISMATCH",
+      "Collection history profile changed",
+      503,
+    );
   let state = {
     ...history,
     state: "reconciling",
@@ -127,11 +178,13 @@ export async function reconcileHistory(
     const supply = await rpc.contract(
       profile.address,
       profile.supplySelector,
-      [String(block.timestamp)],
-      { block_hash: next.block_hash },
+      profile.supplyMode === "current" ? [] : [String(block.timestamp)],
+      profile.supplyMode === "current"
+        ? blockId
+        : { block_hash: next.block_hash },
     );
     if (supply.length !== 2)
-      throw new Error("Invalid Realms checkpoint supply");
+      throw new Error("Invalid collection checkpoint supply");
     const total = fromU256(supply[0], supply[1]);
     const count = (
       await store.query(
@@ -156,13 +209,16 @@ export async function reconcileHistory(
           [profile.address, state.lastTokenId ?? "-1", limit],
         )
       ).rows;
-      await mapConcurrent(tokens, 4, async ({ id, body }) => {
-        const owner = await rpc.contract(
-          profile.address,
-          SELECTORS.owner_of,
-          u256Felts(body.tokenId),
-          blockId,
-        );
+      const values = await readHistoryContracts(
+        rpc,
+        tokens.flatMap(({ body }) => [
+          [profile.address, SELECTORS.owner_of, u256Felts(body.tokenId)],
+          [profile.address, SELECTORS.get_approved, u256Felts(body.tokenId)],
+        ]),
+        blockId,
+      );
+      await mapConcurrent(tokens, 4, async ({ id, body }, index) => {
+        const owner = values[index * 2];
         if (owner.length !== 1 || address(owner[0]) !== body.owner)
           throw new ApiError(
             "HISTORY_OWNER_MISMATCH",
@@ -170,12 +226,7 @@ export async function reconcileHistory(
             503,
             { tokenId: body.tokenId },
           );
-        const approval = await rpc.contract(
-            profile.address,
-            SELECTORS.get_approved,
-            u256Felts(body.tokenId),
-            blockId,
-          ),
+        const approval = values[index * 2 + 1],
           indexed = await store.get("approval", id);
         if (
           approval.length !== 1 ||
@@ -196,18 +247,21 @@ export async function reconcileHistory(
     } else if (state.phase === "operators") {
       const pairs = (
         await store.query(
-          "SELECT id,body FROM market.operator_approvals WHERE id>$1 ORDER BY id LIMIT $2",
-          [state.lastOperatorId ?? "", limit],
+          "SELECT id,body FROM market.operator_approvals WHERE id>$1 AND split_part(id,':',1)=$3 ORDER BY id LIMIT $2",
+          [state.lastOperatorId ?? "", limit, profile.address],
         )
       ).rows;
-      await mapConcurrent(pairs, 4, async ({ id, body }) => {
-        const [collection, owner, operator] = id.split(":");
-        const value = await rpc.contract(
-          collection,
-          SELECTORS.is_approved_for_all,
-          [owner, operator],
-          blockId,
-        );
+      const values = await readHistoryContracts(
+        rpc,
+        pairs.map(({ id }) => {
+          const [c, o, p] = id.split(":");
+          return [c, SELECTORS.is_approved_for_all, [o, p]];
+        }),
+        blockId,
+      );
+      await mapConcurrent(pairs, 4, async ({ id, body }, index) => {
+        const [, owner, operator] = id.split(":");
+        const value = values[index];
         if (
           value.length !== 1 ||
           ![0n, 1n].includes(BigInt(value[0])) ||
@@ -236,13 +290,17 @@ export async function reconcileHistory(
           [profile.address, state.lastOwner ?? "", limit],
         )
       ).rows;
-      await mapConcurrent(owners, 4, async ({ owner }) => {
-        const v = await rpc.contract(
-            profile.address,
-            SELECTORS.is_approved_for_all,
-            [owner, config.marketplace],
-            blockId,
-          ),
+      const values = await readHistoryContracts(
+        rpc,
+        owners.map(({ owner }) => [
+          profile.address,
+          SELECTORS.is_approved_for_all,
+          [owner, config.marketplace],
+        ]),
+        blockId,
+      );
+      await mapConcurrent(owners, 4, async ({ owner }, index) => {
+        const v = values[index],
           p = await store.get(
             "operator",
             `${profile.address}:${owner}:${address(config.marketplace)}`,
@@ -272,8 +330,30 @@ export async function reconcileHistory(
             "History checkpoint changed during reconciliation",
             503,
           );
-        state.state = "passed";
-        state.completedAt = Date.now();
+        const completedCollections = [
+          ...(state.completedCollections ?? []),
+          {
+            address: profile.address,
+            supply: total,
+            checkedTokens: state.checkedTokens,
+            checkedOperators: state.checkedOperators ?? 0,
+          },
+        ];
+        if ((state.collectionIndex ?? 0) + 1 < profiles.length) {
+          state = {
+            mode: state.mode,
+            state: "reconciling",
+            cutoff: h,
+            checkpointBlock: h,
+            checkpointHash: head.hash,
+            collectionIndex: (state.collectionIndex ?? 0) + 1,
+            completedCollections,
+          };
+        } else {
+          state.completedCollections = completedCollections;
+          state.state = "passed";
+          state.completedAt = Date.now();
+        }
       }
     }
     state.error = null;

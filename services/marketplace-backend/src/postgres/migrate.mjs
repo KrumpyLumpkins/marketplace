@@ -14,6 +14,7 @@ export async function migrate(pool) {
     for (const [version, name] of [
       [1, "001-initial.sql"],
       [2, "002-history-ranges.sql"],
+      [3, "003-image-sources.sql"],
     ]) {
       const sql = readFileSync(new URL(`./${name}`, import.meta.url), "utf8");
       const checksum = createHash("sha256").update(sql).digest("hex");

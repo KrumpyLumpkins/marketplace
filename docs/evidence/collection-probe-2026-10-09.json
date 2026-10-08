@@ -1,0 +1,67 @@
+{
+  "block": 16089760,
+  "blockHash": "0x779bcd5c24f9555efb98fa18122b68be816b80c9424a2e959ba95a6e1569c57",
+  "collections": [
+    {
+      "name": "Loot Chests",
+      "address": "0x0572fe34a769058c62a66f0c4854d08ccfd21fcbb4f0b1685a1868b84c6ee266",
+      "classHash": "0x181c70595dd7db697c37ceb35c74fab69a037836b99cc80c17fd92a16289e26",
+      "startBlock": 1517708,
+      "erc721": [
+        "0x1"
+      ],
+      "erc2981": [
+        "0x1"
+      ],
+      "sampleToken": "1",
+      "samplePrice": "10000",
+      "sampleRoyalty": [
+        "0x992acf50dba66f87d8cafffbbc3cdbbec5f8f514b5014f6d4d75e6b8789153",
+        "0x1f4",
+        "0x0"
+      ],
+      "hasTransferLock": true
+    },
+    {
+      "name": "Cosmetics",
+      "address": "0x01f36515d7d307c9d3e41df48f29e9a6b4bbc445d0fbdbbce944a4678cd52b02",
+      "classHash": "0x3786852cc518b276af050047b663b7d750f697dbb9e7c0046c06521d533c047",
+      "startBlock": 1889136,
+      "erc721": [
+        "0x1"
+      ],
+      "erc2981": [
+        "0x1"
+      ],
+      "sampleToken": "1",
+      "samplePrice": "10000",
+      "sampleRoyalty": [
+        "0x992acf50dba66f87d8cafffbbc3cdbbec5f8f514b5014f6d4d75e6b8789153",
+        "0x1f4",
+        "0x0"
+      ],
+      "hasTransferLock": true
+    },
+    {
+      "name": "Golden Token",
+      "address": "0x027838dea749f41c6f8a44fcfa791788e6101080c1b3cd646a361f653ad10e2d",
+      "classHash": "0x2902aba920acb9478e9a01f46aa5adca58d4d31eba91a1bdb3b6d0020595885",
+      "startBlock": 2021283,
+      "erc721": [
+        "0x1"
+      ],
+      "erc2981": [
+        "0x1"
+      ],
+      "sampleToken": "1",
+      "samplePrice": "10000",
+      "sampleRoyalty": [
+        "0x248f76e72088853c3fe96cad8f7f075c9e514b862a6e9a3d5957ea5522ebb6d",
+        "0x1f4",
+        "0x0"
+      ],
+      "hasTransferLock": false
+    }
+  ],
+  "notice": "Pinned read-only RPC observations. Sample royalty reads do not establish every token royalty or an independent contract audit."
+}

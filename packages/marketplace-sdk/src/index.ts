@@ -17,3 +17,5 @@ export * from "./cart.js";
 export * from "./contract.js";
 export * from "./capabilities.js";
 export type { IntegerInput } from "./encoding.js";
+
+export { collectionRoyaltyLimit } from "./royalties.js";

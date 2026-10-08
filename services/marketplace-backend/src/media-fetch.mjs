@@ -8,7 +8,7 @@ export function createMediaFetcher(
   } = {},
 ) {
   const hosts = new Map();
-  return async (url, options) => {
+  const fetchOrigin = async (url, options) => {
     const host = new URL(url).host;
     let gate = hosts.get(host);
     if (!gate) {
@@ -33,5 +33,43 @@ export function createMediaFetcher(
         if (attempt >= 2) throw error;
       }
     }
+  };
+  const cache = new Map(),
+    pending = new Map();
+  let cachedBytes = 0;
+  return async (url, options) => {
+    const immutable =
+      /^https?:\/\/[^/]+\/ipfs\/(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})(\/|$)/.test(
+        url,
+      );
+    if (!immutable) return fetchOrigin(url, options);
+    const key = url + ":" + (options?.maxBytes ?? 0);
+    if (cache.has(key)) {
+      const value = cache.get(key);
+      cache.delete(key);
+      cache.set(key, value);
+      return value;
+    }
+    if (pending.has(key)) return pending.get(key);
+    const request = fetchOrigin(url, options)
+      .then((value) => {
+        const size = value.bytes.length;
+        if (size <= 32 * 1024 * 1024) {
+          while (
+            cache.size &&
+            (cachedBytes + size > 32 * 1024 * 1024 || cache.size >= 128)
+          ) {
+            const first = cache.keys().next().value;
+            cachedBytes -= cache.get(first).bytes.length;
+            cache.delete(first);
+          }
+          cache.set(key, value);
+          cachedBytes += size;
+        }
+        return value;
+      })
+      .finally(() => pending.delete(key));
+    pending.set(key, request);
+    return request;
   };
 }

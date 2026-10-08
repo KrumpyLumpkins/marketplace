@@ -267,3 +267,44 @@ test("metadata downloads overlap within a bounded pool and retain cached mutable
   assert.equal(after.image, first.image);
   assert.equal(after.metadata.imageError, "origin unavailable");
 });
+
+test("immutable image cache is reused for another NFT after a worker restart", async (t) => {
+  const db = await testDatabase(t),
+    pool = db.pool();
+  await migrate(pool);
+  const store = new PgStore(pool);
+  await store.applyBlock(block(1, "2"));
+  const image = "ipfs://QmWqqT4awbuzaHM7e5EBf9GGzNDQRz4WauUDSctVe9ZeBW";
+  let downloads = 0;
+  const rpc = {
+    contract: async () => uriFelts({ name: "Shared chest", image }),
+  };
+  const fetchResource = async () => {
+    downloads++;
+    return { contentType: "image/png", bytes: Buffer.from("shared-art") };
+  };
+  await refreshMetadata(
+    store,
+    rpc,
+    { chain: "LOCAL", collections: [] },
+    { limit: 1, fetchResource },
+  );
+  const first = await store.get("token", address("9") + ":1");
+  assert.ok(first.image);
+  await store.applyBlock({
+    ...block(2, "2"),
+    events: [{ ...block(2, "2").events[0], tokenId: "2" }],
+  });
+  const restartedStore = new PgStore(pool);
+  await refreshMetadata(
+    restartedStore,
+    rpc,
+    { chain: "LOCAL", collections: [] },
+    { limit: 1, fetchResource },
+  );
+  assert.equal(downloads, 1);
+  assert.equal(
+    (await store.get("token", address("9") + ":2")).image,
+    first.image,
+  );
+});

@@ -275,3 +275,18 @@ returned `HISTORY_RECONCILIATION_REQUIRED` and `safeForCheckout=false`; the cont
 remained paused. Backfill and pinned reconciliation were still pending at capture.
 See [production evidence](evidence/fast-history-2026-10-08.json). These early ranges
 do not establish a sustained whole-history rate or completion time.
+
+## Collection image source cache
+
+Migration 3 indexes immutable image-source URIs in cached token metadata.
+The metadata worker reuses an already stored asset for matching immutable IPFS
+URIs, including after restart, and keeps a bounded in-memory cache for concurrent
+fetches. Inline SVG/GIF artwork is stored through the same content-addressed asset
+path; SVG responses retain the sandbox and block remote/script loads while
+allowing embedded `data:` images. Golden Token alone enables the reviewed raw
+JSON control-character compatibility flag.
+
+`MARKETPLACE_IPFS_GATEWAY` is a shared Railway variable consumed by backend and
+workers. Pinata was tested as the image gateway for this expansion after the prior
+public gateway returned HTTP 429. Browser image requests still use our cached
+asset API. Apply migration 3 with the administrator role before the rollout.

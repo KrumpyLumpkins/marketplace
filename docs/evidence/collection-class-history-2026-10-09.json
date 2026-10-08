@@ -1,0 +1,871 @@
+[
+  {
+    "name": "Loot Chests",
+    "address": "0x0572fe34a769058c62a66f0c4854d08ccfd21fcbb4f0b1685a1868b84c6ee266",
+    "versions": [
+      {
+        "block": 1517708,
+        "classHash": "0x3786852cc518b276af050047b663b7d750f697dbb9e7c0046c06521d533c047",
+        "nftEvents": [
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::Transfer",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "from",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "to",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "token_id",
+                "type": "core::integer::u256",
+                "kind": "key"
+              }
+            ]
+          },
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::Approval",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "owner",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "approved",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "token_id",
+                "type": "core::integer::u256",
+                "kind": "key"
+              }
+            ]
+          },
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::ApprovalForAll",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "owner",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "operator",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "approved",
+                "type": "core::bool",
+                "kind": "data"
+              }
+            ]
+          }
+        ],
+        "functions": [
+          "upgrade",
+          "name",
+          "symbol",
+          "token_uri",
+          "transfer_amount",
+          "tokenURI",
+          "burn",
+          "safe_mint",
+          "safe_mint_many",
+          "set_default_ipfs_cid",
+          "set_attrs_raw_to_ipfs_cid",
+          "set_trait_type_name",
+          "set_trait_value_name",
+          "get_trait_type_name",
+          "get_trait_value_name",
+          "get_metadata_raw",
+          "get_metadata_json",
+          "token_lock",
+          "token_unlock",
+          "token_lock_state",
+          "token_is_locked",
+          "lock_state_update",
+          "balance_of",
+          "owner_of",
+          "safe_transfer_from",
+          "transfer_from",
+          "approve",
+          "set_approval_for_all",
+          "get_approved",
+          "is_approved_for_all",
+          "has_role",
+          "get_role_admin",
+          "grant_role",
+          "revoke_role",
+          "renounce_role",
+          "hasRole",
+          "getRoleAdmin",
+          "grantRole",
+          "revokeRole",
+          "renounceRole",
+          "supports_interface",
+          "royalty_info",
+          "default_royalty",
+          "token_royalty",
+          "set_default_royalty",
+          "delete_default_royalty",
+          "set_token_royalty",
+          "reset_token_royalty",
+          "total_supply",
+          "token_by_index",
+          "token_of_owner_by_index"
+        ]
+      },
+      {
+        "block": 5653721,
+        "classHash": "0x181c70595dd7db697c37ceb35c74fab69a037836b99cc80c17fd92a16289e26",
+        "nftEvents": [
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::Transfer",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "from",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "to",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "token_id",
+                "type": "core::integer::u256",
+                "kind": "key"
+              }
+            ]
+          },
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::Approval",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "owner",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "approved",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "token_id",
+                "type": "core::integer::u256",
+                "kind": "key"
+              }
+            ]
+          },
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::ApprovalForAll",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "owner",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "operator",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "approved",
+                "type": "core::bool",
+                "kind": "data"
+              }
+            ]
+          }
+        ],
+        "functions": [
+          "upgrade",
+          "name",
+          "symbol",
+          "token_uri",
+          "transfer_amount",
+          "tokenURI",
+          "burn",
+          "mint",
+          "mint_many",
+          "safe_mint",
+          "safe_mint_many",
+          "set_default_ipfs_cid",
+          "set_attrs_raw_to_ipfs_cid",
+          "set_trait_type_name",
+          "set_trait_value_name",
+          "get_trait_type_name",
+          "get_trait_value_name",
+          "get_metadata_raw",
+          "get_metadata_json",
+          "token_lock",
+          "token_unlock",
+          "token_lock_state",
+          "token_is_locked",
+          "lock_state_update",
+          "balance_of",
+          "owner_of",
+          "safe_transfer_from",
+          "transfer_from",
+          "approve",
+          "set_approval_for_all",
+          "get_approved",
+          "is_approved_for_all",
+          "has_role",
+          "get_role_admin",
+          "grant_role",
+          "revoke_role",
+          "renounce_role",
+          "hasRole",
+          "getRoleAdmin",
+          "grantRole",
+          "revokeRole",
+          "renounceRole",
+          "supports_interface",
+          "royalty_info",
+          "default_royalty",
+          "token_royalty",
+          "set_default_royalty",
+          "delete_default_royalty",
+          "set_token_royalty",
+          "reset_token_royalty",
+          "total_supply",
+          "token_by_index",
+          "token_of_owner_by_index"
+        ]
+      },
+      {
+        "block": 16050532,
+        "classHash": "0x181c70595dd7db697c37ceb35c74fab69a037836b99cc80c17fd92a16289e26",
+        "nftEvents": [
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::Transfer",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "from",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "to",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "token_id",
+                "type": "core::integer::u256",
+                "kind": "key"
+              }
+            ]
+          },
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::Approval",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "owner",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "approved",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "token_id",
+                "type": "core::integer::u256",
+                "kind": "key"
+              }
+            ]
+          },
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::ApprovalForAll",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "owner",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "operator",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "approved",
+                "type": "core::bool",
+                "kind": "data"
+              }
+            ]
+          }
+        ],
+        "functions": [
+          "upgrade",
+          "name",
+          "symbol",
+          "token_uri",
+          "transfer_amount",
+          "tokenURI",
+          "burn",
+          "mint",
+          "mint_many",
+          "safe_mint",
+          "safe_mint_many",
+          "set_default_ipfs_cid",
+          "set_attrs_raw_to_ipfs_cid",
+          "set_trait_type_name",
+          "set_trait_value_name",
+          "get_trait_type_name",
+          "get_trait_value_name",
+          "get_metadata_raw",
+          "get_metadata_json",
+          "token_lock",
+          "token_unlock",
+          "token_lock_state",
+          "token_is_locked",
+          "lock_state_update",
+          "balance_of",
+          "owner_of",
+          "safe_transfer_from",
+          "transfer_from",
+          "approve",
+          "set_approval_for_all",
+          "get_approved",
+          "is_approved_for_all",
+          "has_role",
+          "get_role_admin",
+          "grant_role",
+          "revoke_role",
+          "renounce_role",
+          "hasRole",
+          "getRoleAdmin",
+          "grantRole",
+          "revokeRole",
+          "renounceRole",
+          "supports_interface",
+          "royalty_info",
+          "default_royalty",
+          "token_royalty",
+          "set_default_royalty",
+          "delete_default_royalty",
+          "set_token_royalty",
+          "reset_token_royalty",
+          "total_supply",
+          "token_by_index",
+          "token_of_owner_by_index"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Cosmetics",
+    "address": "0x01f36515d7d307c9d3e41df48f29e9a6b4bbc445d0fbdbbce944a4678cd52b02",
+    "versions": [
+      {
+        "block": 1889136,
+        "classHash": "0x3786852cc518b276af050047b663b7d750f697dbb9e7c0046c06521d533c047",
+        "nftEvents": [
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::Transfer",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "from",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "to",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "token_id",
+                "type": "core::integer::u256",
+                "kind": "key"
+              }
+            ]
+          },
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::Approval",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "owner",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "approved",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "token_id",
+                "type": "core::integer::u256",
+                "kind": "key"
+              }
+            ]
+          },
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::ApprovalForAll",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "owner",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "operator",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "approved",
+                "type": "core::bool",
+                "kind": "data"
+              }
+            ]
+          }
+        ],
+        "functions": [
+          "upgrade",
+          "name",
+          "symbol",
+          "token_uri",
+          "transfer_amount",
+          "tokenURI",
+          "burn",
+          "safe_mint",
+          "safe_mint_many",
+          "set_default_ipfs_cid",
+          "set_attrs_raw_to_ipfs_cid",
+          "set_trait_type_name",
+          "set_trait_value_name",
+          "get_trait_type_name",
+          "get_trait_value_name",
+          "get_metadata_raw",
+          "get_metadata_json",
+          "token_lock",
+          "token_unlock",
+          "token_lock_state",
+          "token_is_locked",
+          "lock_state_update",
+          "balance_of",
+          "owner_of",
+          "safe_transfer_from",
+          "transfer_from",
+          "approve",
+          "set_approval_for_all",
+          "get_approved",
+          "is_approved_for_all",
+          "has_role",
+          "get_role_admin",
+          "grant_role",
+          "revoke_role",
+          "renounce_role",
+          "hasRole",
+          "getRoleAdmin",
+          "grantRole",
+          "revokeRole",
+          "renounceRole",
+          "supports_interface",
+          "royalty_info",
+          "default_royalty",
+          "token_royalty",
+          "set_default_royalty",
+          "delete_default_royalty",
+          "set_token_royalty",
+          "reset_token_royalty",
+          "total_supply",
+          "token_by_index",
+          "token_of_owner_by_index"
+        ]
+      },
+      {
+        "block": 16050532,
+        "classHash": "0x3786852cc518b276af050047b663b7d750f697dbb9e7c0046c06521d533c047",
+        "nftEvents": [
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::Transfer",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "from",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "to",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "token_id",
+                "type": "core::integer::u256",
+                "kind": "key"
+              }
+            ]
+          },
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::Approval",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "owner",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "approved",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "token_id",
+                "type": "core::integer::u256",
+                "kind": "key"
+              }
+            ]
+          },
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::ApprovalForAll",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "owner",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "operator",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "approved",
+                "type": "core::bool",
+                "kind": "data"
+              }
+            ]
+          }
+        ],
+        "functions": [
+          "upgrade",
+          "name",
+          "symbol",
+          "token_uri",
+          "transfer_amount",
+          "tokenURI",
+          "burn",
+          "safe_mint",
+          "safe_mint_many",
+          "set_default_ipfs_cid",
+          "set_attrs_raw_to_ipfs_cid",
+          "set_trait_type_name",
+          "set_trait_value_name",
+          "get_trait_type_name",
+          "get_trait_value_name",
+          "get_metadata_raw",
+          "get_metadata_json",
+          "token_lock",
+          "token_unlock",
+          "token_lock_state",
+          "token_is_locked",
+          "lock_state_update",
+          "balance_of",
+          "owner_of",
+          "safe_transfer_from",
+          "transfer_from",
+          "approve",
+          "set_approval_for_all",
+          "get_approved",
+          "is_approved_for_all",
+          "has_role",
+          "get_role_admin",
+          "grant_role",
+          "revoke_role",
+          "renounce_role",
+          "hasRole",
+          "getRoleAdmin",
+          "grantRole",
+          "revokeRole",
+          "renounceRole",
+          "supports_interface",
+          "royalty_info",
+          "default_royalty",
+          "token_royalty",
+          "set_default_royalty",
+          "delete_default_royalty",
+          "set_token_royalty",
+          "reset_token_royalty",
+          "total_supply",
+          "token_by_index",
+          "token_of_owner_by_index"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Golden Token",
+    "address": "0x027838dea749f41c6f8a44fcfa791788e6101080c1b3cd646a361f653ad10e2d",
+    "versions": [
+      {
+        "block": 2021283,
+        "classHash": "0x2902aba920acb9478e9a01f46aa5adca58d4d31eba91a1bdb3b6d0020595885",
+        "nftEvents": [
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::Transfer",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "from",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "to",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "token_id",
+                "type": "core::integer::u256",
+                "kind": "key"
+              }
+            ]
+          },
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::Approval",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "owner",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "approved",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "token_id",
+                "type": "core::integer::u256",
+                "kind": "key"
+              }
+            ]
+          },
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::ApprovalForAll",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "owner",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "operator",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "approved",
+                "type": "core::bool",
+                "kind": "data"
+              }
+            ]
+          }
+        ],
+        "functions": [
+          "name",
+          "symbol",
+          "token_uri",
+          "owner",
+          "transfer_ownership",
+          "renounce_ownership",
+          "transferOwnership",
+          "renounceOwnership",
+          "balance_of",
+          "owner_of",
+          "safe_transfer_from",
+          "transfer_from",
+          "approve",
+          "set_approval_for_all",
+          "get_approved",
+          "is_approved_for_all",
+          "balanceOf",
+          "ownerOf",
+          "safeTransferFrom",
+          "transferFrom",
+          "setApprovalForAll",
+          "getApproved",
+          "isApprovedForAll",
+          "supports_interface",
+          "get_votes",
+          "get_past_votes",
+          "get_past_total_supply",
+          "delegates",
+          "delegate",
+          "delegate_by_sig",
+          "nonces",
+          "royalty_info",
+          "set_default_royalty",
+          "delete_default_royalty",
+          "set_token_royalty",
+          "reset_token_royalty",
+          "airdrop_tokens"
+        ]
+      },
+      {
+        "block": 16050532,
+        "classHash": "0x2902aba920acb9478e9a01f46aa5adca58d4d31eba91a1bdb3b6d0020595885",
+        "nftEvents": [
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::Transfer",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "from",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "to",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "token_id",
+                "type": "core::integer::u256",
+                "kind": "key"
+              }
+            ]
+          },
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::Approval",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "owner",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "approved",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "token_id",
+                "type": "core::integer::u256",
+                "kind": "key"
+              }
+            ]
+          },
+          {
+            "type": "event",
+            "name": "openzeppelin_token::erc721::erc721::ERC721Component::ApprovalForAll",
+            "kind": "struct",
+            "members": [
+              {
+                "name": "owner",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "operator",
+                "type": "core::starknet::contract_address::ContractAddress",
+                "kind": "key"
+              },
+              {
+                "name": "approved",
+                "type": "core::bool",
+                "kind": "data"
+              }
+            ]
+          }
+        ],
+        "functions": [
+          "name",
+          "symbol",
+          "token_uri",
+          "owner",
+          "transfer_ownership",
+          "renounce_ownership",
+          "transferOwnership",
+          "renounceOwnership",
+          "balance_of",
+          "owner_of",
+          "safe_transfer_from",
+          "transfer_from",
+          "approve",
+          "set_approval_for_all",
+          "get_approved",
+          "is_approved_for_all",
+          "balanceOf",
+          "ownerOf",
+          "safeTransferFrom",
+          "transferFrom",
+          "setApprovalForAll",
+          "getApproved",
+          "isApprovedForAll",
+          "supports_interface",
+          "get_votes",
+          "get_past_votes",
+          "get_past_total_supply",
+          "delegates",
+          "delegate",
+          "delegate_by_sig",
+          "nonces",
+          "royalty_info",
+          "set_default_royalty",
+          "delete_default_royalty",
+          "set_token_royalty",
+          "reset_token_royalty",
+          "airdrop_tokens"
+        ]
+      }
+    ]
+  }
+]

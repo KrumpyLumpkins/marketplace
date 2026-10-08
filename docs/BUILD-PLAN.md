@@ -43,6 +43,19 @@ OpenSea is the NFT product benchmark, not a claim of exhaustive feature parity. 
 
 User confirmed inclusive buyer pricing, token-order royalty snapshots, capped fill-time collection royalties and a non-upgradeable contract with limited administration on 6 October 2026. The implementation caps protocol fees at 500 basis points; production economics and administration must be recorded as explicit deployment inputs. These are material decisions, not numbers to invent during deployment. On 8 October 2026 the user authorized administrator updates to fee rate and recipient. `set_fee` atomically changes the new-order rate (0–500 bps) and future-fill recipient. Orders snapshot their rate; creation binds `max_fee_bps` so signing-time increases cannot change agreed deductions. Existing orders retain their rate, while fees route to the current recipient. Contract code remains non-upgradeable. The user subsequently selected an initial 500-bps fee and the local deployer signer as its recipient; the local deployment draft records that address. STRK and LORDS are selected payment currencies. The signer was subsequently confirmed as initial administrator, with a 60 STRK per-transaction ceiling; deployment records capture the completed paused bootstrap. The broader product target does not change the user's selection of on-chain orders or ERC-721-only launch.
 
+### Collection expansion — authorized 9 October 2026
+
+The user selected Loot Chests, Cosmetics and Golden Token alongside Realms.
+The candidate `config/marketplace/registry.expansion.json` pins their contract
+classes and historical start blocks. Read-only RPC probes confirm ERC-721 and
+ERC-2981 support; sampled royalties are 500 bps. Loot Chests and Cosmetics expose
+`token_is_locked`, which preflight must check at the same pinned block as ownership.
+The UI uses reviewed royalty ceilings and displays minimum seller proceeds;
+no editable royalty field is reintroduced. Existing Realms orders retain zero
+royalties. Expansion rollout is in progress: separate backfill, multi-collection
+supply/ownership/approval reconciliation, atomic projection cutover preserving
+application data/media, then administrator allowlisting and live verification.
+
 ### PostgreSQL migration — authorized 8 October 2026
 
 Replace the production SQLite store with PostgreSQL using `pg`. Preserve the public

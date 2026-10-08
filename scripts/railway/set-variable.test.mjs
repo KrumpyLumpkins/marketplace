@@ -10,3 +10,8 @@ describe('Railway shared variable updates', () => {
     expect(()=>variableInput('p','e','MARKETPLACE_REGISTRY_JSON','broken')).toThrow();
   });
 });
+
+it('accepts a credential-free HTTPS IPFS gateway',()=>{
+  expect(variableInput('p','e','MARKETPLACE_IPFS_GATEWAY','https://gateway.pinata.cloud/ipfs').value).toBe('https://gateway.pinata.cloud/ipfs');
+  for(const value of ['http://gateway.example/ipfs','https://user:secret@gateway.example/ipfs','https://gateway.example/ipfs?token=secret'])expect(()=>variableInput('p','e','MARKETPLACE_IPFS_GATEWAY',value)).toThrow(/HTTPS/);
+});

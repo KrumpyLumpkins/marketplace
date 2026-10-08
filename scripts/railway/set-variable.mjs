@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { hiddenInput } from '../configuration/hidden-input.mjs';
 import { PROJECT_ID as PROJECT, railwayApi as api, railwayTarget } from './api.mjs';
-const KEYS = ['PUBLIC_ORIGIN','OPERATOR_TOKEN','STARKNET_RPC_URL','STARKNET_RPC_FALLBACK_URL','MARKETPLACE_REGISTRY_JSON','MARKETPLACE_BACKGROUND_ENABLED','MARKETPLACE_FAST_HISTORY_ENABLED','MARKETPLACE_ADDRESS','MARKETPLACE_COLLECTIONS'];
+const KEYS = ['PUBLIC_ORIGIN','OPERATOR_TOKEN','STARKNET_RPC_URL','STARKNET_RPC_FALLBACK_URL','MARKETPLACE_REGISTRY_JSON','MARKETPLACE_BACKGROUND_ENABLED','MARKETPLACE_FAST_HISTORY_ENABLED','MARKETPLACE_ADDRESS','MARKETPLACE_COLLECTIONS','MARKETPLACE_IPFS_GATEWAY'];
 export function variableInput(projectId, environmentId, name, value) {
   if (/PRIVATE_KEY|SIGNER/.test(name)) throw new Error('Signing keys must stay local. Use pnpm contracts:env.');
   if (!KEYS.includes(name)) throw new Error(`Choose one of: ${KEYS.join(', ')}`);
@@ -11,6 +11,10 @@ export function variableInput(projectId, environmentId, name, value) {
     if (registry.schemaVersion !== 1 || !registry.chains) throw new Error('Use a generated version-1 deployment registry.');
   }
   if (['STARKNET_RPC_URL','STARKNET_RPC_FALLBACK_URL'].includes(name) && value && !['http:','https:'].includes(new URL(value).protocol)) throw new Error('Use an HTTP(S) RPC URL.');
+  if (name === 'MARKETPLACE_IPFS_GATEWAY') {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error('Use a credential-free HTTPS IPFS gateway URL.');
+  }
   if (name === 'PUBLIC_ORIGIN' && (new URL(value).protocol !== 'https:' || new URL(value).origin !== value)) throw new Error('Use the exact HTTPS frontend origin without a trailing slash.');
   if (name === 'OPERATOR_TOKEN' && value.length < 32) throw new Error('Use a unique random operator secret of at least 32 characters.');
   return { projectId, environmentId, name, value, skipDeploys: true };

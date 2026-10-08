@@ -244,7 +244,7 @@ export function createApi({ store, config, rpc, verifySignature }) {
         );
         res.setHeader(
           "Content-Security-Policy",
-          "sandbox; default-src 'none'; style-src 'unsafe-inline'",
+          "sandbox; default-src 'none'; img-src data:; style-src 'unsafe-inline'",
         );
         res.setHeader("Cache-Control", "public,max-age=31536000,immutable");
         res.writeHead(200);
@@ -512,7 +512,17 @@ export function createApi({ store, config, rpc, verifySignature }) {
             chainId: config.chainId,
             marketplace: config.marketplace,
             currencies: config.currencies,
-            collections: config.collections,
+            collections: await Promise.all(
+              config.collections.map(async (c) => ({
+                ...c,
+                enabled: !!(
+                  await store.get(
+                    "policy",
+                    `collection_policy:${address(c.address)}`,
+                  )
+                )?.enabled,
+              })),
+            ),
             demo: !!config.demo,
             status: await catalog.status(),
           };

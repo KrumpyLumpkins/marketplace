@@ -1,6 +1,7 @@
 import {
   chooseHistoryCutoff,
   historyProfile,
+  historyProfiles,
   reconcileHistory,
 } from "./history.mjs";
 import { mapConcurrent } from "./concurrency.mjs";
@@ -181,11 +182,19 @@ async function scanRange(
   }
   if (useFast)
     for (const collection of config.collections) {
+      if (collection.startBlock > end) continue;
       const actual = await rpc.call("starknet_getClassHashAt", {
         block_id: { block_hash: anchor.block_hash },
         contract_address: collection.address,
       });
-      if (!equal(actual, collection.classHash))
+      const profile = historyProfiles(config).find((p) =>
+        equal(p.address, collection.address),
+      );
+      if (
+        ![profile.classHash, ...(profile.historicalClassHashes ?? [])].some(
+          (hash) => equal(actual, hash),
+        )
+      )
         throw new ApiError(
           "CLASS_MISMATCH",
           "Historical collection class differs from the reviewed profile",

@@ -258,3 +258,133 @@ test("disabling fast acquisition still stops at its pending reconciliation check
   assert.equal(result.indexed, 10);
   assert.equal((await store.head()).number, 10);
 });
+
+test("multi-collection history reconciles every pinned supply and owner before passing", async (t) => {
+  const { ADDITIONAL_HISTORY_PROFILES } = await import("../../src/history.mjs");
+  const profiles = [profile, ...ADDITIONAL_HISTORY_PROFILES];
+  const db = await testDatabase(t),
+    pool = db.pool();
+  await migrate(pool);
+  const store = new PgStore(pool);
+  await store.applyBlock({
+    number: 100,
+    hash: "0x64",
+    parentHash: "0x63",
+    timestamp: 100,
+    sources: profiles.map((p) => p.address),
+    sourceStarts: Object.fromEntries(profiles.map((p) => [p.address, 1])),
+    events: profiles.map((p) => ({
+      type: "transfer",
+      collection: p.address,
+      tokenId: "1",
+      from: address("0"),
+      to: address("2"),
+    })),
+  });
+  let state = { mode: "event_ranges", state: "pending", cutoff: 100 };
+  const verified = [];
+  const rpc = {
+    call: async (m, p) =>
+      m === "starknet_getClassHashAt"
+        ? profiles.find((x) => x.address === p.contract_address).classHash
+        : header(p.block_id.block_number),
+    contract: async (at, sel, args, block) => {
+      const p = profiles.find((p) => p.address === at);
+      if (sel === p.supplySelector) {
+        assert.deepEqual(args, p.supplyMode === "current" ? [] : ["100"]);
+        assert.equal(
+          block.block_hash,
+          p.supplyMode === "current" ? "0x64" : "0x65",
+        );
+        return ["1", "0"];
+      }
+      if (sel === SELECTORS.owner_of) {
+        verified.push(at);
+        return ["2"];
+      }
+      return ["0"];
+    },
+  };
+  for (let n = 0; n < 20 && state.state !== "passed"; n++) {
+    await reconcileHistory(
+      store,
+      rpc,
+      { ...config, collections: profiles },
+      state,
+    );
+    state = await store.get("status", "history");
+  }
+  assert.equal(state.state, "passed");
+  assert.equal(state.completedCollections.length, 4);
+  assert.deepEqual(new Set(verified), new Set(profiles.map((p) => p.address)));
+});
+
+test("fast ranges do not query the code of a collection before its deployment", async (t) => {
+  const { ADDITIONAL_HISTORY_PROFILES } = await import("../../src/history.mjs");
+  const db = await testDatabase(t),
+    pool = db.pool();
+  await migrate(pool);
+  const store = new PgStore(pool);
+  const later = { ...ADDITIONAL_HISTORY_PROFILES[0], startBlock: 5000 };
+  await store.applyBlock({
+    number: 1,
+    hash: "0x1",
+    parentHash: "0x0",
+    timestamp: 1,
+    events: [],
+    sources: [profile.address, later.address],
+    sourceStarts: { [profile.address]: 1, [later.address]: 5000 },
+  });
+  const rpc = rpcFixture(),
+    original = rpc.call;
+  rpc.call = async (m, p) => {
+    if (m === "starknet_getClassHashAt" && p.contract_address === later.address)
+      throw Error("Contract not deployed");
+    return original(m, p);
+  };
+  const result = await scanOnce(
+    store,
+    rpc,
+    { ...config, collections: [...config.collections, later] },
+    { fastHistory: true, historyWindow: 100 },
+  );
+  assert.equal(result.indexed, 101);
+});
+
+test("fast ranges accept only pinned historical collection classes", async (t) => {
+  const { ADDITIONAL_HISTORY_PROFILES } = await import("../../src/history.mjs");
+  const loot = ADDITIONAL_HISTORY_PROFILES[0];
+  const db = await testDatabase(t),
+    pool = db.pool();
+  await migrate(pool);
+  const store = new PgStore(pool);
+  await store.applyBlock({
+    number: 1,
+    hash: "0x1",
+    parentHash: "0x0",
+    timestamp: 1,
+    events: [],
+    sources: [loot.address],
+    sourceStarts: { [loot.address]: 1 },
+  });
+  let classHash = loot.historicalClassHashes[0];
+  const rpc = rpcFixture(),
+    original = rpc.call;
+  rpc.call = async (m, p) =>
+    m === "starknet_getClassHashAt"
+      ? classHash
+      : m === "starknet_getEvents"
+        ? { events: [] }
+        : original(m, p);
+  const cfg = { ...config, collections: [{ ...loot, startBlock: 1 }] };
+  assert.equal(
+    (await scanOnce(store, rpc, cfg, { fastHistory: true, historyWindow: 100 }))
+      .indexed,
+    101,
+  );
+  classHash = "0xbad";
+  await assert.rejects(
+    scanOnce(store, rpc, cfg, { fastHistory: true, historyWindow: 100 }),
+    { code: "CLASS_MISMATCH" },
+  );
+});

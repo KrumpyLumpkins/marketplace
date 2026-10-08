@@ -51,3 +51,26 @@ test("image retries are bounded and non-rate-limit failures retain their error",
   });
   await assert.rejects(fail("https://example.org/1"), /404/);
 });
+
+test("immutable IPFS artwork is shared across NFTs while mutable URLs remain fresh", async () => {
+  let calls = 0,
+    time = 0;
+  const raw = async () => {
+    calls++;
+    return { bytes: Buffer.from("image"), contentType: "image/png" };
+  };
+  const fetcher = createMediaFetcher(raw, {
+    sleep: async (ms) => {
+      time += ms;
+    },
+    now: () => time,
+  });
+  const url =
+    "https://ipfs.io/ipfs/QmWqqT4awbuzaHM7e5EBf9GGzNDQRz4WauUDSctVe9ZeBW";
+  await Promise.all([fetcher(url), fetcher(url)]);
+  await fetcher(url);
+  assert.equal(calls, 1);
+  await fetcher("https://one.example/image");
+  await fetcher("https://one.example/image");
+  assert.equal(calls, 3);
+});

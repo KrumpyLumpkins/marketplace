@@ -1,3 +1,4 @@
+import { checkTransferLock } from "./collection-policy.mjs";
 import { mapConcurrent } from "./concurrency.mjs";
 import {
   address,
@@ -115,6 +116,7 @@ export async function preflight(store, rpc, config, input) {
         throw new ApiError("INVALID_CART", "Accept one offer at a time.");
       const tokenId =
         order.kind === "collection_offer" ? uint(item.tokenId) : order.tokenId;
+      await checkTransferLock(rpc, config, order.collection, tokenId, blockId);
       const tokenKey = `${order.collection}:${tokenId}`;
       if (tokens.has(tokenKey))
         throw new ApiError("DUPLICATE_NFT", "NFT appears more than once.");

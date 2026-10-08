@@ -181,9 +181,11 @@ export const OfferAwaitingConfirmation: Story = {
       .getBoundingClientRect().top;
     await userEvent.click(button);
     const body = within(canvasElement.ownerDocument.body);
-    await waitFor(() => expect(
-      body.getByRole("dialog", { name: "Waiting for confirmation" }),
-    ).toBeVisible());
+    await waitFor(() =>
+      expect(
+        body.getByRole("dialog", { name: "Waiting for confirmation" }),
+      ).toBeVisible(),
+    );
     await expect(
       canvas.getByTestId("after-composer").getBoundingClientRect().top,
     ).toBe(top);
@@ -215,10 +217,51 @@ export const RejectedOffer: Story = {
 };
 
 export const OfferTerms: Story = {
-  args: {kind:'token_offer'},
-  play: async ({canvas,userEvent}) => {
-    await userEvent.type(canvas.getByLabelText('Price'),'10');
-    await expect(canvas.getByTestId('seller-proceeds')).toHaveTextContent('9.8 STRK');
-    await expect(canvas.queryByLabelText('Maximum royalty percent')).not.toBeInTheDocument();
+  args: { kind: "token_offer" },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.type(canvas.getByLabelText("Price"), "10");
+    await expect(canvas.getByTestId("seller-proceeds")).toHaveTextContent(
+      "9.8 STRK",
+    );
+    await expect(
+      canvas.queryByLabelText("Maximum royalty percent"),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const CreatorRoyalty: Story = {
+  args: { collection: "0xb", kind: "collection_offer", tokenIds: [] },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.type(canvas.getByLabelText("Price"), "10");
+    await expect(canvas.getByText("Up to 5%")).toBeVisible();
+    await expect(canvas.getByTestId("seller-proceeds")).toHaveTextContent(
+      "9.3 STRK",
+    );
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Make collection offer" }),
+    );
+    await expect(signCalls.mock.calls[0][0].at(-1)?.calldata).toContain(
+      "500000000000000000",
+    );
+  },
+};
+export const CreatorRoyaltyMobile: Story = {
+  ...CreatorRoyalty,
+  globals: { viewport: { value: "mobile", isRotated: false } },
+};
+
+export const CollectionNotEnabled: Story = {
+  args: { collection: "0xc", kind: "collection_offer", tokenIds: [] },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.type(canvas.getByLabelText("Price"), "10");
+    await expect(canvas.getByRole("alert")).toHaveTextContent(
+      "Trading is not enabled",
+    );
+    await expect(
+      canvas.getByRole("button", { name: "Make collection offer" }),
+    ).toBeDisabled();
+    await expect(canvas.getByText("Unavailable")).toBeVisible();
+    await expect(canvas.getByTestId("seller-proceeds")).toHaveTextContent("—");
+    await expect(signCalls).not.toHaveBeenCalled();
   },
 };

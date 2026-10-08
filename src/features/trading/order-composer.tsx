@@ -17,6 +17,7 @@ import {
   prepareOrder,
   estimateSellerProceeds,
   parseAmount,
+  collectionRoyaltyLimit,
 } from "@biblio/marketplace";
 
 export function OrderComposer({
@@ -38,8 +39,6 @@ export function OrderComposer({
   const [duration, setDuration] = useState("86400");
   const durationId = useId();
   const [priceTouched, setPriceTouched] = useState(false);
-  // Realms-only launch: never silently authorize a creator royalty after hiding the cap.
-  const maxRoyalty = "0";
   const currencies = trade.config?.currencies ?? [];
   const selected =
     currencies.find((c) => c.address === currency) ?? currencies[0];
@@ -47,6 +46,20 @@ export function OrderComposer({
     providedAssets ??
     (tokenIds ?? []).map((tokenId) => ({ collection, tokenId }));
   const count = kind === "collection_offer" ? 1 : assets.length;
+  let royaltyPercent = "0",
+    royaltyError = "";
+  try {
+    royaltyPercent = collectionRoyaltyLimit(
+      trade.config?.collections ?? [],
+      kind === "collection_offer"
+        ? [collection]
+        : assets.map((a) => a.collection),
+    );
+  } catch (error) {
+    royaltyError =
+      error instanceof Error ? error.message : "Royalty terms unavailable.";
+  }
+
   let priceError = "";
   let validPrice = false;
   if (selected && price) {
@@ -62,12 +75,12 @@ export function OrderComposer({
   }
   let preview: string | null = null;
   try {
-    if (selected && price) {
+    if (selected && price && !royaltyError) {
       preview = estimateSellerProceeds({
         price,
         decimals: selected.decimals,
         feeBps: trade.config?.feeBps ?? 0,
-        maxRoyalty,
+        royaltyPercent,
         count,
       });
     }
@@ -75,6 +88,7 @@ export function OrderComposer({
     /* Incomplete user input has no valid preview. */
   }
   async function submit() {
+    if (royaltyError) return;
     await trade.execute(async (marketplace) => {
       if (!selected) throw new Error("Choose a currency.");
       return prepareOrder(
@@ -90,7 +104,7 @@ export function OrderComposer({
           assets,
           currency: selected,
           price,
-          maxRoyalty,
+          royaltyPercent,
           durationSeconds: Number(duration),
           replaceIds,
         },
@@ -164,6 +178,11 @@ export function OrderComposer({
           </SelectContent>
         </Select>
       </div>
+      {royaltyError && trade.config && (
+        <p role="alert" className="text-sm text-destructive">
+          {royaltyError}
+        </p>
+      )}
       <dl className="space-y-3 rounded-xl bg-muted/20 p-4 text-sm">
         <div className="flex justify-between gap-3">
           <dt className="text-muted-foreground">Marketplace fee</dt>
@@ -171,11 +190,21 @@ export function OrderComposer({
         </div>
         <div className="flex justify-between gap-3">
           <dt className="text-muted-foreground">Creator royalty</dt>
-          <dd>0%</dd>
+          <dd>
+            {royaltyError
+              ? "Unavailable"
+              : royaltyPercent === "0"
+                ? "0%"
+                : `Up to ${royaltyPercent}%`}
+          </dd>
         </div>
         <div className="flex flex-wrap justify-between gap-2 border-t border-border/70 pt-3">
           <dt className="text-muted-foreground">
-            {count > 1 ? "Total seller proceeds" : "Seller receives"}
+            {royaltyPercent !== "0"
+              ? "Seller receives at least"
+              : count > 1
+                ? "Total seller proceeds"
+                : "Seller receives"}
           </dt>
           <dd
             data-testid="seller-proceeds"
@@ -203,6 +232,7 @@ export function OrderComposer({
           disabled={
             trade.busy ||
             !trade.address ||
+            !!royaltyError ||
             !validPrice ||
             !count ||
             !!trade.config?.demo
