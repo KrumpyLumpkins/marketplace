@@ -10,7 +10,7 @@ import {
 import {
   collectionDiscoveryStateFromSearchParams,
   collectionDiscoveryStateToSearchParams,
-  type CollectionSortMode,
+  type CollectionDiscoveryState,
 } from "@/features/collections/collection-query-params";
 
 type CollectionRouteContainerProps = {
@@ -28,29 +28,21 @@ function cloneActiveFilters(activeFilters: ActiveFilters): ActiveFilters {
   );
 }
 
-function cloneDiscoveryState(state: {
-  activeFilters: ActiveFilters;
-  sortMode: CollectionSortMode;
-}) {
+function cloneDiscoveryState(state: CollectionDiscoveryState): CollectionDiscoveryState {
   return {
+    ...state,
     activeFilters: cloneActiveFilters(state.activeFilters),
-    sortMode: state.sortMode,
   };
 }
 
-type DiscoveryState = {
-  activeFilters: ActiveFilters;
-  sortMode: CollectionSortMode;
-};
-
 type OptimisticDiscoveryState = {
   searchParamsKey: string;
-  state: DiscoveryState;
+  state: CollectionDiscoveryState;
 };
 
 type OptimisticDiscoveryAction =
-  | { type: "SYNC_FROM_URL"; searchParamsKey: string; state: DiscoveryState }
-  | { type: "APPLY"; state: DiscoveryState };
+  | { type: "SYNC_FROM_URL"; searchParamsKey: string; state: CollectionDiscoveryState }
+  | { type: "APPLY"; state: CollectionDiscoveryState };
 
 function optimisticDiscoveryReducer(
   currentState: OptimisticDiscoveryState,
@@ -106,52 +98,44 @@ export function CollectionRouteContainer({
     });
   }, [discoveryState, searchParamsKey]);
 
-  const applyDiscoveryState = useCallback((nextState: {
-    activeFilters: ActiveFilters;
-    sortMode: CollectionSortMode;
-  }) => {
+  const current = optimisticDiscoveryState.state;
+
+  const applyDiscoveryState = useCallback((nextState: CollectionDiscoveryState) => {
     const clonedState = cloneDiscoveryState(nextState);
     const nextParams = collectionDiscoveryStateToSearchParams(
       new URLSearchParams(searchParamsKey),
       clonedState,
     );
-    const query = nextParams.toString();
+    const queryString = nextParams.toString();
 
     dispatchOptimisticDiscoveryState({ type: "APPLY", state: clonedState });
     startTransition(() => {
-      router.replace(query ? `${pathname}?${query}` : pathname);
+      router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
     });
   }, [pathname, router, searchParamsKey]);
 
-  const handleActiveFiltersChange = useCallback(
-    (nextFilters: ActiveFilters) => {
-      applyDiscoveryState({
-        activeFilters: nextFilters,
-        sortMode: optimisticDiscoveryState.state.sortMode,
-      });
+  const update = useCallback(
+    (patch: Partial<CollectionDiscoveryState>) => {
+      applyDiscoveryState({ ...current, ...patch });
     },
-    [applyDiscoveryState, optimisticDiscoveryState.state.sortMode],
-  );
-
-  const handleSortModeChange = useCallback(
-    (nextSortMode: CollectionSortMode) => {
-      applyDiscoveryState({
-        activeFilters: optimisticDiscoveryState.state.activeFilters,
-        sortMode: nextSortMode,
-      });
-    },
-    [applyDiscoveryState, optimisticDiscoveryState.state.activeFilters],
+    [applyDiscoveryState, current],
   );
 
   return (
     <CollectionRouteView
-      activeFilters={optimisticDiscoveryState.state.activeFilters}
+      activeFilters={current.activeFilters}
       address={address}
       cursor={cursor}
       collections={collections}
-      onActiveFiltersChange={handleActiveFiltersChange}
-      onSortModeChange={handleSortModeChange}
-      sortMode={optimisticDiscoveryState.state.sortMode}
+      listedOnly={current.listedOnly}
+      onActiveFiltersChange={(activeFilters) => update({ activeFilters })}
+      onListedOnlyChange={(listedOnly) => update({ listedOnly })}
+      onQueryChange={(query) => update({ query })}
+      onSortModeChange={(sortMode) => update({ sortMode })}
+      onTabChange={(tab) => update({ tab })}
+      query={current.query}
+      sortMode={current.sortMode}
+      tab={current.tab}
     />
   );
 }

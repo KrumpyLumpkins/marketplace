@@ -5,11 +5,12 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAccount, useDisconnect } from "@starknet-react/core";
-import { Bell, ChevronDown, Globe2, Menu, Search } from "lucide-react";
+import { Bell, ChevronDown, Menu, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WalletConnectButton } from "./wallet-connect-button";
 import { WalletBalances } from "./wallet-balances";
+import { ECOSYSTEM_LINKS, SOCIAL_LINKS } from "./social-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +27,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { MarketStatusLink } from "@/features/trading/market-status-link";
+import { cn } from "@/lib/utils";
 
 const CartSidebar = dynamic(
   () =>
@@ -34,6 +36,7 @@ const CartSidebar = dynamic(
     })),
   { ssr: false },
 );
+
 const destinations = [
   {
     label: "Explore",
@@ -52,12 +55,12 @@ const destinations = [
     matches: (path: string) => path.startsWith("/trader"),
   },
 ];
-export const ecosystemLinks = [
-  { label: "Realms.World", href: "https://realms.world/" },
-  { label: "Games", href: "https://realms.world/games" },
-  { label: "veLORDS Account", href: "https://account.realms.world/velords" },
-  { label: "Scroll", href: "https://realms.world/scroll" },
-];
+
+/** Kept for consumers that list the ecosystem destinations (footer, docs). */
+export const ecosystemLinks = ECOSYSTEM_LINKS.filter((link) => link.external).map(
+  ({ label, href }) => ({ label, href }),
+);
+
 function WalletControl({ mobile = false, onNavigate }: { mobile?: boolean; onNavigate?: () => void }) {
   const { address, isConnected } = useAccount();
   const { disconnect, isPending } = useDisconnect();
@@ -73,11 +76,14 @@ function WalletControl({ mobile = false, onNavigate }: { mobile?: boolean; onNav
           <ChevronDown className="size-3" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" className="w-64">
         <WalletBalances walletAddress={address} />
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href={`/profile/${address}`} onClick={onNavigate}>Profile</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/trader" onClick={onNavigate}>Trading dashboard</Link>
         </DropdownMenuItem>
         <DropdownMenuItem disabled={isPending} onClick={() => disconnect()}>
           Disconnect
@@ -89,6 +95,17 @@ function WalletControl({ mobile = false, onNavigate }: { mobile?: boolean; onNav
   );
 }
 
+function ecosystemLinkClass(isCurrent: boolean) {
+  return cn(
+    "realm-nav-link inline-flex min-h-11 items-center px-1 text-[11px] uppercase tracking-[0.16em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+    isCurrent ? "realm-nav-link-active text-primary" : "text-foreground/70 hover:text-primary",
+  );
+}
+
+/**
+ * Two-tier chrome: the Realms.World ecosystem bar on top (same sections and
+ * community links as the rest of the site), then the sticky marketplace tools.
+ */
 export function MarketplaceHeader() {
   const path = usePathname() ?? "/";
   const router = useRouter();
@@ -101,6 +118,7 @@ export function MarketplaceHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const firstMobileLink = useRef<HTMLAnchorElement>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+
   function searchForm(mobile = false) {
     return (
       <form
@@ -124,7 +142,7 @@ export function MarketplaceHeader() {
           placeholder="Search collections, items…"
           value={searchInput}
           onChange={(event) => setSearchInput(event.target.value)}
-          className="h-11 pl-9"
+          className="h-10 pl-9"
         />
         {mobile && (
           <Button type="submit" className="h-11">
@@ -134,84 +152,69 @@ export function MarketplaceHeader() {
       </form>
     );
   }
+
   const linkClass =
     "inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-primary/10 aria-[current=page]:text-primary";
+
   return (
-    <header className="sticky top-0 z-40 h-16 w-full border-b border-primary/20 bg-background/95 backdrop-blur-xl">
-      <div className="flex h-full items-center gap-2 px-3 sm:gap-3 sm:px-6">
-        <Link
-          href="/"
-          aria-label="Realms Market home"
-          className="flex min-h-11 shrink-0 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/rw-logo.svg"
-            alt=""
-            data-testid="realms-logo"
-            className="w-9"
-          />
-          <span className="realm-title text-base leading-tight">
-            Realms
-            <span className="block font-sans text-[10px] tracking-[0.18em] text-muted-foreground">
-              MARKET
-            </span>
-          </span>
-        </Link>
-        <nav aria-label="Marketplace" className="hidden items-center lg:flex">
-          {destinations.map((link) => (
-            <Link
-              key={link.label}
-              href={link.href}
-              aria-current={link.matches(path) ? "page" : undefined}
-              className={linkClass}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="hidden min-w-0 flex-1 lg:block">{searchForm()}</div>
-        <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
-          <Sheet open={searchOpen} onOpenChange={setSearchOpen}>
-            <SheetTrigger asChild>
-              <Button
-                variant="ghost"
-                className="size-11 lg:hidden"
-                aria-label="Open search"
-              >
-                <Search className="size-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent
-              side="top"
-              className="gap-3 p-4 [&>button]:size-11 [&>button]:top-1 [&>button]:right-1 data-[state=open]:duration-200 data-[state=closed]:duration-150 motion-reduce:animate-none"
-              aria-describedby={undefined}
-            >
-              <SheetHeader className="p-0 pb-3">
-                <SheetTitle>Search marketplace</SheetTitle>
-              </SheetHeader>
-              {searchForm(true)}
-            </SheetContent>
-          </Sheet>
-          <div className="hidden lg:block">
-            <MarketStatusLink compact />
-          </div>
-          <Button
-            variant="ghost"
-            className="hidden size-11 lg:inline-flex"
-            asChild
+    <header className="sticky top-0 z-40 w-full">
+      {/* Realms.World ecosystem bar */}
+      <div
+        data-testid="ecosystem-bar"
+        className="realm-market-header-shell h-11 border-x-0 border-t-0 bg-black/55 backdrop-blur-xl supports-[backdrop-filter]:bg-black/45"
+      >
+        <div className="flex h-full items-center justify-between gap-3 px-3 sm:px-6">
+          <a
+            href="https://realms.world/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Realms.World home"
+            className="flex min-h-11 shrink-0 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <Link
-              href="/notifications"
-              aria-label="Notifications"
-              aria-current={path === "/notifications" ? "page" : undefined}
-            >
-              <Bell className="size-5" />
-            </Link>
-          </Button>
-          <CartSidebar />
-          <div className="hidden lg:block">
-            <WalletControl />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/rw-logo.svg" alt="" data-testid="realms-logo" className="w-8 object-contain" />
+            <span className="realm-title text-sm leading-none lg:hidden">Realms.World</span>
+          </a>
+          <nav
+            aria-label="Realms ecosystem"
+            className="hidden items-center gap-5 lg:flex xl:gap-7"
+          >
+            {ECOSYSTEM_LINKS.map((link) =>
+              link.external ? (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={ecosystemLinkClass(false)}
+                >
+                  {link.label}
+                </a>
+              ) : (
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  aria-current="page"
+                  className={ecosystemLinkClass(true)}
+                >
+                  {link.label}
+                </Link>
+              ),
+            )}
+          </nav>
+          <div className="hidden items-center gap-1 lg:flex">
+            {SOCIAL_LINKS.map(({ label, href, Icon, iconClassName }) => (
+              <a
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={label}
+                className="inline-flex size-9 items-center justify-center rounded-md text-foreground/55 transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Icon className={iconClassName} />
+              </a>
+            ))}
           </div>
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
             <SheetTrigger asChild>
@@ -228,20 +231,13 @@ export function MarketplaceHeader() {
                 event.preventDefault();
                 firstMobileLink.current?.focus();
               }}
-              className="w-full max-w-sm gap-0 [&>button]:size-11 [&>button]:top-2 [&>button]:right-2 overflow-y-auto data-[state=open]:duration-200 data-[state=closed]:duration-150 motion-reduce:animate-none"
+              className="w-full max-w-sm gap-0 overflow-y-auto [&>button]:top-2 [&>button]:right-2 [&>button]:size-11 data-[state=open]:duration-200 data-[state=closed]:duration-150 motion-reduce:animate-none"
             >
               <SheetHeader className="border-b py-6">
-                <SheetTitle className="realm-title">
-                  Marketplace menu
-                </SheetTitle>
-                <SheetDescription>
-                  Explore, collect and trade Realms.
-                </SheetDescription>
+                <SheetTitle className="realm-title">Marketplace menu</SheetTitle>
+                <SheetDescription>Explore, collect and trade Realms.</SheetDescription>
               </SheetHeader>
-              <nav
-                aria-label="Mobile marketplace"
-                className="flex flex-col gap-1 p-4"
-              >
+              <nav aria-label="Mobile marketplace" className="flex flex-col gap-1 p-4">
                 {[
                   ...destinations,
                   {
@@ -268,47 +264,123 @@ export function MarketplaceHeader() {
               <div className="p-4">
                 <MarketStatusLink onNavigate={() => setMenuOpen(false)} />
               </div>
-              <div className="mt-auto p-4">
-                <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">
-                  Realms ecosystem
-                </p>
-                <div className="grid grid-cols-2 gap-1">
-                  {ecosystemLinks.map((link) => (
+              <div className="mt-auto space-y-4 p-4">
+                <nav aria-label="Realms ecosystem (menu)" className="space-y-2">
+                  <p className="realm-kicker text-xs">Realms.World</p>
+                  <div className="grid grid-cols-2 gap-1">
+                    {ECOSYSTEM_LINKS.map((link) =>
+                      link.external ? (
+                        <a
+                          key={link.label}
+                          href={link.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={linkClass}
+                        >
+                          {link.label}
+                          <span className="sr-only"> (opens realms.world)</span>
+                        </a>
+                      ) : (
+                        <Link
+                          key={link.label}
+                          href={link.href}
+                          aria-current="page"
+                          onClick={() => setMenuOpen(false)}
+                          className={linkClass}
+                        >
+                          {link.label}
+                        </Link>
+                      ),
+                    )}
+                  </div>
+                </nav>
+                <div className="flex items-center gap-2">
+                  {SOCIAL_LINKS.map(({ label, href, Icon, iconClassName }) => (
                     <a
-                      key={link.href}
-                      href={link.href}
+                      key={label}
+                      href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={linkClass}
+                      aria-label={label}
+                      className="flex size-11 items-center justify-center rounded-md border border-[color:var(--realm-border-etched)] text-muted-foreground transition-colors hover:border-[color:var(--realm-border-strong)] hover:text-foreground"
                     >
-                      {link.label} ↗
+                      <Icon className={iconClassName} />
                     </a>
                   ))}
                 </div>
               </div>
             </SheetContent>
           </Sheet>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                aria-label="Realms ecosystem"
-                title="Realms ecosystem"
-                className="hidden size-11 lg:inline-flex"
+        </div>
+      </div>
+
+      {/* Marketplace tools */}
+      <div className="h-16 border-b border-[color:var(--realm-border-etched)] bg-background/95 backdrop-blur-xl">
+        <div className="flex h-full items-center gap-2 px-3 sm:gap-3 sm:px-6">
+          <Link
+            href="/"
+            aria-label="Realms Market home"
+            className="flex min-h-11 shrink-0 items-center gap-2 rounded-md pr-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <span className="realm-title text-base leading-tight">
+              Realms
+              <span className="block font-sans text-[10px] tracking-[0.18em] text-muted-foreground">
+                MARKET
+              </span>
+            </span>
+          </Link>
+          <nav aria-label="Marketplace" className="hidden items-center lg:flex">
+            {destinations.map((link) => (
+              <Link
+                key={link.label}
+                href={link.href}
+                aria-current={link.matches(path) ? "page" : undefined}
+                className={linkClass}
               >
-                <Globe2 className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {ecosystemLinks.map((link) => (
-                <DropdownMenuItem key={link.href} asChild>
-                  <a href={link.href} target="_blank" rel="noopener noreferrer">
-                    {link.label} ↗
-                  </a>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+          <div className="hidden min-w-0 flex-1 lg:block lg:max-w-xl">{searchForm()}</div>
+          <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
+            <Sheet open={searchOpen} onOpenChange={setSearchOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="size-11 lg:hidden"
+                  aria-label="Open search"
+                >
+                  <Search className="size-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent
+                side="top"
+                className="gap-3 p-4 [&>button]:top-1 [&>button]:right-1 [&>button]:size-11 data-[state=open]:duration-200 data-[state=closed]:duration-150 motion-reduce:animate-none"
+                aria-describedby={undefined}
+              >
+                <SheetHeader className="p-0 pb-3">
+                  <SheetTitle>Search marketplace</SheetTitle>
+                </SheetHeader>
+                {searchForm(true)}
+              </SheetContent>
+            </Sheet>
+            <div className="hidden lg:block">
+              <MarketStatusLink compact />
+            </div>
+            <Button variant="ghost" className="hidden size-11 lg:inline-flex" asChild>
+              <Link
+                href="/notifications"
+                aria-label="Notifications"
+                aria-current={path === "/notifications" ? "page" : undefined}
+              >
+                <Bell className="size-5" />
+              </Link>
+            </Button>
+            <CartSidebar />
+            <div className="hidden lg:block">
+              <WalletControl />
+            </div>
+          </div>
         </div>
       </div>
     </header>

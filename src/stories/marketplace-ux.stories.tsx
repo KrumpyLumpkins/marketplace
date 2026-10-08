@@ -7,7 +7,7 @@ import { TokenActivity } from "@/features/token/token-activity";
 import { ListingPurchase } from "@/features/token/listing-purchase";
 import { MarketStatus } from "@/features/ops/market-status";
 import { WalletIdentity } from "@/features/profile/wallet-identity";
-import { CollectionTools } from "@/features/trading/collection-tools";
+import { CollectionStatsStrip } from "@/features/collections/collection-stats-strip";
 import { NotificationsView } from "@/features/trading/notifications-view";
 import { TraderDashboard } from "@/features/trading/trader-dashboard";
 import { CURRENCY, fixtureConfig } from "../../.storybook/scenario";
@@ -207,10 +207,11 @@ export const PublicWallet: Story = {
 };
 
 export const CollectionStatistics: Story = {
-  render: () => <CollectionTools address="0xa" />,
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(canvas.getByText("Market statistics · 7 days"));
-    await expect(await canvas.findByText("42")).toBeVisible();
+  render: () => <CollectionStatsStrip address="0xa" currency={CURRENCY} />,
+  play: async ({ canvas }) => {
+    await expect(await canvas.findByText("523")).toBeVisible();
+    await expect(canvas.getByText("24")).toBeVisible();
+    await expect(canvas.getByText(/412/)).toBeVisible();
   },
 };
 export const NotificationsEntry: Story = {

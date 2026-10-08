@@ -50,6 +50,10 @@ export type FetchCollectionTokensOptions = {
   }>;
   sort?: string;
   currency?: string;
+  /** Name substring or exact token id. */
+  q?: string;
+  /** Only tokens with a live listing in `currency`. */
+  listedOnly?: boolean;
 };
 export type CollectionOrdersOptions = {
   collection: string;

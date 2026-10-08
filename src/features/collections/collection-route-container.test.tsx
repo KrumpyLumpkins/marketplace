@@ -22,10 +22,20 @@ vi.mock("@/features/collections/collection-token-grid", () => ({
   ),
 }));
 
-vi.mock("@/features/collections/collection-market-panel", () => ({
-  CollectionMarketPanel: (props: Record<string, unknown>) => (
-    <div data-testid="collection-market-panel">Market Panel: {props.address as string}</div>
-  ),
+vi.mock("@/features/collections/collection-activity-feed", () => ({
+  CollectionActivityFeed: () => <div data-testid="collection-activity-feed" />,
+}));
+vi.mock("@/features/collections/collection-offers-panel", () => ({
+  CollectionOffersPanel: () => <div data-testid="collection-offers-panel" />,
+}));
+vi.mock("@/features/collections/analytics/collection-analytics", () => ({
+  CollectionAnalytics: () => <div data-testid="collection-analytics" />,
+}));
+vi.mock("@/features/collections/collection-stats-strip", () => ({
+  CollectionStatsStrip: () => <dl data-testid="collection-stats-strip" />,
+}));
+vi.mock("@/features/trading/currency-switcher", () => ({
+  CurrencySwitcher: () => <div data-testid="currency-switcher" />,
 }));
 
 vi.mock("@/features/collections/trait-filter-sidebar", () => ({
@@ -85,4 +95,3 @@ describe("collection route container", () => {
   });
 });
 
-vi.mock("@/features/trading/collection-tools", () => ({ CollectionTools: () => null }));

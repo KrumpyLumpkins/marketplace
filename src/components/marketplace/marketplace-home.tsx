@@ -4,21 +4,27 @@ import { GlobalSearch } from "@/features/trading/global-search";
 import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { HeroBanner } from "@/features/home/hero-banner";
-import { CollectionListItem } from "@/features/home/collection-list-item";
+import { CollectionsTable } from "@/features/home/collections-table";
 import { PromotedCollection } from "@/features/home/promoted-collection";
+import { TrendingTokensSection } from "@/features/home/trending-tokens-section";
 import { useHomePageData } from "@/features/home/use-home-page-data";
+import { useRecentSales } from "@/features/home/use-recent-sales";
+import { CurrencySwitcher } from "@/features/trading/currency-switcher";
+import { useMarketCurrency } from "@/lib/marketplace/currency-store";
 import { matchesHomeSearch, normalizeHomeSearchQuery } from "@/lib/marketplace/home-search";
-import { Search as SearchIcon } from "lucide-react";
-import { useEntrance } from "@/lib/animation";
 
 export function MarketplaceHome() {
   const searchParams = useSearchParams();
   const query = normalizeHomeSearchQuery(searchParams.get("q") ?? "");
+  const currency = useMarketCurrency((state) => state.currency);
   const {
     featuredCollection,
     collectionCards,
-    isLoading,isError,refetch,
+    isLoading,
+    isError,
+    refetch,
   } = useHomePageData();
+  const recentSales = useRecentSales(featuredCollection?.address);
 
   const filteredCollections = useMemo(
     () =>
@@ -28,27 +34,23 @@ export function MarketplaceHome() {
     [collectionCards, query],
   );
 
-  // Pick a promoted collection — use a different one than the hero featured
-  // If we have more than 1 collection, pick the second one; otherwise use the first
-  const promotedCollection = useMemo(() => {
-    if (collectionCards.length === 0) return null;
-    // Find the first collection that isn't the hero featured
-    const nonFeatured = collectionCards.find(
-      (c) => c.address !== featuredCollection?.address
+  // The spotlight shows the second configured collection so the hero and the panel never repeat.
+  const promotedCollection = useMemo(
+    () => collectionCards.find((c) => c.address !== featuredCollection?.address) ?? null,
+    [collectionCards, featuredCollection],
+  );
+
+  if (isError)
+    return (
+      <main className="market-page">
+        <p role="alert" className="text-muted-foreground">
+          Unable to load marketplace collections.
+        </p>
+        <button className="mt-3 min-h-11 text-primary underline underline-offset-4" onClick={() => void refetch?.()}>
+          Retry
+        </button>
+      </main>
     );
-    // Fall back to the featured collection if there's only one
-    return nonFeatured
-      ? { ...nonFeatured, address: nonFeatured.address, name: nonFeatured.name }
-      : featuredCollection;
-  }, [collectionCards, featuredCollection]);
-
-  const listRef = useEntrance<HTMLDivElement>({
-    selector: "[data-collection-row]",
-    staggerDelay: 50,
-    translateY: 10,
-  });
-
-  if(isError)return <main className="market-page"><p role="alert" className="text-muted-foreground">Unable to load marketplace collections.</p><button className="mt-3 text-primary underline" onClick={()=>void refetch?.()}>Retry</button></main>;
   if (query) return <GlobalSearch query={query} />;
 
   if (!isLoading && collectionCards.length === 0) {
@@ -62,27 +64,8 @@ export function MarketplaceHome() {
     );
   }
 
-  if (!isLoading && query && filteredCollections.length === 0) {
-    return (
-      <main data-testid="marketplace-home" className="market-page flex-1">
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="mb-4 rounded-[8px] border border-[color:var(--realm-border-etched)] bg-muted/70 p-4">
-            <SearchIcon className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <p className="realm-title mb-1 text-xl text-foreground">
-            No results for &quot;{query}&quot;
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Try searching for a collection name or token ID
-          </p>
-        </div>
-      </main>
-    );
-  }
-
   return (
-    <main data-testid="marketplace-home" className="market-page flex-1">
-      {/* Hero */}
+    <main data-testid="marketplace-home" className="market-page flex-1 space-y-6">
       <HeroBanner
         name={featuredCollection?.name ?? "Featured Collection"}
         address={featuredCollection?.address ?? ""}
@@ -94,51 +77,34 @@ export function MarketplaceHome() {
         isLoading={isLoading}
       />
 
-      {/* Two-column layout: Collection list + Promoted collection */}
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
-        {/* Left column — Collection list */}
-        <div className="space-y-3">
-          <h2 id="collections" className="realm-kicker scroll-mt-52 text-lg">
-            Collections
-          </h2>
-          <div ref={listRef} className="space-y-2">
-            {isLoading
-              ? Array.from({ length: 6 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="realm-panel flex items-center gap-4 p-3"
-                  >
-                    <div className="h-14 w-14 shrink-0 rounded-md bg-muted animate-pulse" />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 w-32 rounded bg-muted animate-pulse" />
-                      <div className="h-3 w-48 rounded bg-muted animate-pulse" />
-                    </div>
-                  </div>
-                ))
-              : filteredCollections.map((collection) => (
-                  <div key={collection.address} data-collection-row>
-                    <CollectionListItem
-                      address={collection.address}
-                      name={collection.name}
-                      projectId={collection.projectId}
-                    />
-                  </div>
-                ))}
-          </div>
-        </div>
+      {featuredCollection && (recentSales.isPending || (recentSales.data?.length ?? 0) > 0) ? (
+        <TrendingTokensSection
+          title={`Recent sales in ${featuredCollection.name}`}
+          tokens={recentSales.data ?? []}
+          isLoading={recentSales.isPending}
+          emptyMessage="No sales yet."
+        />
+      ) : null}
 
-        {/* Right column — Promoted collection */}
-        {promotedCollection && !isLoading ? (
-          <div className="hidden lg:block">
-            <h2 className="realm-kicker mb-3 text-lg">
-              Featured
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <section className="min-w-0 space-y-3" aria-labelledby="collections-heading">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 id="collections" className="realm-kicker scroll-mt-52 text-lg">
+              Collections
             </h2>
-            <PromotedCollection
-              address={promotedCollection.address}
-              name={promotedCollection.name}
-              projectId={promotedCollection.projectId}
-            />
+            <CurrencySwitcher label="Prices in" hideHelp />
           </div>
+          <span id="collections-heading" className="sr-only">
+            Collections
+          </span>
+          <CollectionsTable collections={filteredCollections} currency={currency} isLoading={isLoading} />
+        </section>
+
+        {promotedCollection && !isLoading ? (
+          <aside className="hidden lg:block" aria-label="Spotlight">
+            <h2 className="realm-kicker mb-3 text-lg">Spotlight</h2>
+            <PromotedCollection {...promotedCollection} />
+          </aside>
         ) : null}
       </div>
     </main>

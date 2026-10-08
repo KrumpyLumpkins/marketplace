@@ -36,7 +36,7 @@ export function tokenFromApi(t: ApiToken): NormalizedToken {
     token_id: t.tokenId,
     owner: t.owner,
     total_supply: "1",
-    image: t.image ?? String(t.metadata?.image ?? ""),
+    image: t.image ?? null,
     metadata: {
       ...t.metadata,
       attributes: t.attributes.map((a) => ({
@@ -109,6 +109,8 @@ export async function fetchCollectionTokens(o: FetchCollectionTokensOptions) {
       filters,
       sort: o.sort ?? "token-asc",
       currency: o.currency ?? DEFAULT_CURRENCY,
+      q: o.q?.trim() || undefined,
+      listedOnly: o.listedOnly ? true : undefined,
     },
   );
   return {

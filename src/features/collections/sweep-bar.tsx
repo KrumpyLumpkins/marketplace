@@ -4,6 +4,7 @@ import {formatCurrencyAmount} from "@/lib/marketplace/amount-display";
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { TokenSymbol } from "@/components/ui/token-symbol"
+import { TokenMedia } from "@/components/marketplace/token-media"
 import type { CartItem } from "@/features/cart/store/cart-store"
 import { formatPriceForDisplay } from "@/lib/marketplace/token-display"
 
@@ -51,18 +52,11 @@ function SweepThumbnails({ items }: { items: CartItem[] }) {
             }}
             title={item.tokenName ?? `#${item.tokenId}`}
           >
-            {item.tokenImage ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                alt={item.tokenName ?? `#${item.tokenId}`}
-                className="h-full w-full object-cover"
-                src={item.tokenImage}
-              />
-            ) : (
-              <span className="flex h-full w-full items-center justify-center text-[8px] text-muted-foreground">
-                NFT
-              </span>
-            )}
+            <TokenMedia
+              alt={item.tokenName ?? `#${item.tokenId}`}
+              fallbackLabel="NFT"
+              sources={item.tokenImage ? [item.tokenImage] : []}
+            />
           </div>
         ))}
       </div>

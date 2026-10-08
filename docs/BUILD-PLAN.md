@@ -291,6 +291,33 @@ Keep durable application data separate from replayable chain projections, whethe
 
 Persist submitted transaction identity. Distinguish wallet rejection, submission, acceptance/reversion and index reflection. Never invite duplicate submission because indexing is slow. Migrate persisted cart identities explicitly; invalidate incompatible old rows with an explanation.
 
+### Discovery and market-information pass — 8 October 2026
+
+Implemented locally, covered by unit and Storybook browser tests, and checked
+against the fixture backend; not evidence of production validation:
+
+- Chrome: the Realms.World ecosystem bar (Home, Games, Account, Marketplace,
+  Scroll, community links) sits above the sticky marketplace toolbar, as in the
+  earlier alignment work, with the same links in the mobile menu and footer.
+- Home: collections ranked in the configured order with floor, 7-day volume,
+  listed share and supply (sortable), the featured collection's recent sales,
+  and a spotlight panel; one catalog request plus one statistics request per
+  collection.
+- Collection: market header (floor, top offer, 7-day volume and sales, listed
+  share, supply) beside a segmented market-currency control; Items, Offers,
+  Activity and Analytics tabs kept in the URL; in-collection search, listed-only
+  filter, sort select, layout toggles and removable filter chips; analytics
+  charts for floor history, volume, sales and listing depth with table twins.
+- Token: collection breadcrumb, owner link, price/top offer/last sale tiles,
+  order forms opened on demand, trait rarity and in-game resource artwork.
+- Artwork: cached assets fall back to the origin URL and alternate IPFS
+  gateways in the browser; the metadata worker keeps the origin URL on cache
+  failure, decodes inline data URIs, sniffs generic content types, paces JSON
+  fetches and backs off permanent failures.
+
+Still open from the table above: honest featured/trending labels beyond
+"recent sales", bulk portfolio actions, and notification links.
+
 ## 8. Build sequence and gates
 
 Roles below are responsibilities, not a claim that people have been assigned.

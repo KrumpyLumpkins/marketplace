@@ -20,10 +20,22 @@ vi.mock("@/features/home/hero-banner", () => ({
   HeroBanner: () => <section data-testid="hero-banner">Hero</section>,
 }));
 
-vi.mock("@/features/home/collection-list-item", () => ({
-  CollectionListItem: ({ name }: { name: string }) => (
-    <div data-testid="collection-list-item">{name}</div>
+vi.mock("@/features/home/collections-table", () => ({
+  CollectionsTable: ({ collections }: { collections: Array<{ name: string }> }) => (
+    <div data-testid="collections-table">
+      {collections.map((collection) => (
+        <div key={collection.name} data-testid="collection-list-item">
+          {collection.name}
+        </div>
+      ))}
+    </div>
   ),
+}));
+vi.mock("@/features/home/use-recent-sales", () => ({
+  useRecentSales: () => ({ data: [], isPending: false }),
+}));
+vi.mock("@/features/trading/currency-switcher", () => ({
+  CurrencySwitcher: () => <div data-testid="currency-switcher" />,
 }));
 
 vi.mock("@/features/home/promoted-collection", () => ({

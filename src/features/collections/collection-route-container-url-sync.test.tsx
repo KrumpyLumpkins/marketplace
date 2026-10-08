@@ -102,7 +102,7 @@ describe("collection route container url sync", () => {
     await user.click(screen.getByRole("button", { name: /apply-filters/i }));
 
     expect(mockReplace).toHaveBeenCalledWith(
-      "/collections/0xabc?foo=bar&trait=Background%3ABlue",
+      "/collections/0xabc?foo=bar&trait=Background%3ABlue", { scroll: false }
     );
   });
 
@@ -114,7 +114,7 @@ describe("collection route container url sync", () => {
     await user.click(screen.getByRole("button", { name: /sort-power-desc/i }));
 
     expect(mockReplace).toHaveBeenCalledWith(
-      "/collections/0xabc?foo=bar&trait=Eyes%3ABig&sort=power-desc",
+      "/collections/0xabc?foo=bar&trait=Eyes%3ABig&sort=power-desc", { scroll: false }
     );
   });
 
@@ -141,7 +141,7 @@ describe("collection route container url sync", () => {
     await user.click(screen.getByRole("button", { name: /sort-power-desc/i }));
 
     expect(mockReplace).toHaveBeenLastCalledWith(
-      "/collections/0xabc?foo=bar&trait=Background%3ABlue&sort=power-desc",
+      "/collections/0xabc?foo=bar&trait=Background%3ABlue&sort=power-desc", { scroll: false }
     );
   });
 

@@ -1,90 +1,68 @@
 "use client";
 
+import { ResourceIcon, resolveResourceIcon } from "@/components/marketplace/resource-icon";
 import { cn } from "@/lib/utils";
-
-function normalizeResourceName(value: string) {
-  return value.replace(/[\s_-]+/g, "").toLowerCase();
-}
-
-const RESOURCE_ICON_MAP: Record<string, string> = {
-  dragonhide: "/traits/dragonhide.svg",
-  mithral: "/traits/mithral.svg",
-  adamantine: "/traits/adamantine.svg",
-  alchemicalsilver: "/traits/silver.svg",
-  twilightquartz: "/traits/quartz.svg",
-  trueice: "/traits/true-ice.svg",
-  paladint2: "/traits/paladin.svg",
-  crossbowmant2: "/traits/crossbowman.svg",
-  knightt2: "/traits/knight.svg",
-  etherealsilica: "/traits/quartz.svg",
-  ignium: "/traits/ignium.svg",
-  deepcrystal: "/traits/quartz.svg",
-  ruby: "/traits/ruby.svg",
-  sapphire: "/traits/sapphire.svg",
-  diamonds: "/traits/diamonds.svg",
-  paladin: "/traits/paladin.svg",
-  crossbowman: "/traits/crossbowman.svg",
-  knight: "/traits/knight.svg",
-  hartwood: "/traits/wood.svg",
-  gold: "/traits/gold.svg",
-  coldiron: "/traits/cold-iron.svg",
-  ironwood: "/traits/wood.svg",
-  silver: "/traits/silver.svg",
-  obsidian: "/traits/obsidian.svg",
-  copper: "/traits/copper.svg",
-  labor: "/traits/labor.svg",
-  coal: "/traits/coal.svg",
-  stone: "/traits/stone.svg",
-  wood: "/traits/wood.svg",
-};
 
 type ResourceTraitIconsProps = {
   resources: string[];
+  /** Show the resource name beside each icon (list and detail layouts). */
   showLabels?: boolean;
+  /** Icon size in pixels. */
+  size?: number;
+  /** Collapse the tail into a "+N" count after this many icons. */
+  max?: number;
   className?: string;
 };
 
+/**
+ * Realm resources rendered with the in-game artwork. Icons carry their name as
+ * alt text and a native tooltip, so the list stays readable without hover.
+ */
 export function ResourceTraitIcons({
   resources,
   showLabels = false,
+  size = showLabels ? 18 : 20,
+  max,
   className,
 }: ResourceTraitIconsProps) {
   if (resources.length === 0) {
     return null;
   }
 
-  return (
-    <div
-      className={cn("flex flex-wrap items-center gap-1.5", className)}
-      data-testid="resource-trait-icons"
-    >
-      {resources.map((resource) => {
-        const iconSrc = RESOURCE_ICON_MAP[normalizeResourceName(resource)];
+  const visible = max && resources.length > max ? resources.slice(0, max) : resources;
+  const hidden = resources.length - visible.length;
 
+  return (
+    <ul
+      className={cn("flex flex-wrap items-center gap-1", className)}
+      data-testid="resource-trait-icons"
+      aria-label="Resources"
+    >
+      {visible.map((resource) => {
+        const label = resolveResourceIcon(resource)?.label ?? resource;
         return (
-          <span
+          <li
             key={resource}
+            title={label}
             className={cn(
-              "inline-flex items-center gap-1 rounded-[6px] border border-[color:var(--realm-border-etched)] bg-muted/40 px-1.5 py-0.5 text-[10px] text-muted-foreground",
-              !showLabels && "px-1 py-1",
+              "inline-flex items-center gap-1.5 rounded-[6px] border border-[color:var(--realm-border-etched)] bg-[color:var(--realm-bg-void)]/60 text-[11px] text-[color:var(--realm-text-muted)]",
+              showLabels ? "px-1.5 py-0.5" : "p-0.5",
             )}
           >
-            {iconSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                alt={resource}
-                className="size-3 shrink-0"
-                src={iconSrc}
-              />
-            ) : (
-              <span className="inline-flex size-3 items-center justify-center rounded-[4px] bg-muted text-[8px] font-semibold text-foreground">
-                {resource.slice(0, 1).toUpperCase()}
-              </span>
-            )}
-            {showLabels ? <span>{resource}</span> : <span className="sr-only">{resource}</span>}
-          </span>
+            <ResourceIcon name={resource} size={size} decorative={showLabels} />
+            {showLabels ? <span>{label}</span> : null}
+          </li>
         );
       })}
-    </div>
+      {hidden > 0 ? (
+        <li
+          className="inline-flex items-center rounded-[6px] border border-[color:var(--realm-border-etched)] px-1.5 py-0.5 text-[11px] text-muted-foreground"
+          title={resources.slice(visible.length).join(", ")}
+        >
+          +{hidden}
+          <span className="sr-only"> more: {resources.slice(visible.length).join(", ")}</span>
+        </li>
+      ) : null}
+    </ul>
   );
 }

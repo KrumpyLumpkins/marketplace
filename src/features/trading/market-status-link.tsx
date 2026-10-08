@@ -1,20 +1,28 @@
 "use client";
 import Link from "next/link";
+import { useSyncExternalStore } from "react";
 import { useTrade } from "@/lib/marketplace/use-trade";
+
+const subscribeNoop = () => () => {};
+
 /** Labelled status entry: details and block height live on the status page. */
 export function MarketStatusLink({ compact = false, onNavigate }: { compact?: boolean; onNavigate?: () => void }) {
   const { config, configError } = useTrade();
-  const label = configError
-    ? "Market data unavailable"
-    : !config
-      ? "Checking market"
-      : config.demo
-        ? "Demo mode"
-        : config.status.safeForCheckout
-          ? "Market operational"
-          : "Trading unavailable";
+  // Server markup and the first client paint must agree; the live state arrives after hydration.
+  const hydrated = useSyncExternalStore(subscribeNoop, () => true, () => false);
+  const label = !hydrated
+    ? "Checking market"
+    : configError
+      ? "Market data unavailable"
+      : !config
+        ? "Checking market"
+        : config.demo
+          ? "Demo mode"
+          : config.status.safeForCheckout
+            ? "Market operational"
+            : "Trading unavailable";
   const healthy =
-    !!config?.status.safeForCheckout && !config.demo && !configError;
+    hydrated && !!config?.status.safeForCheckout && !config.demo && !configError;
   return (
     <Link
       href="/ops"

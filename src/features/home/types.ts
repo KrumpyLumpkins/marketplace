@@ -16,6 +16,8 @@ export type TrendingToken = {
   href: string;
   price?: string | null;
   currency?: string | null;
+  /** One-line context under the price, e.g. when it sold. */
+  note?: string | null;
 };
 
 export type CollectionCardData = {
@@ -23,8 +25,12 @@ export type CollectionCardData = {
   name: string;
   projectId?: string;
   imageUrl?: string | null;
+  /** Formatted floor in the market currency. */
   floorPrice?: string | null;
+  /** Base-unit floor used for sorting. */
+  floorRaw?: string | null;
   floorCurrency?: string | null;
   totalSupply?: string | null;
   listingCount?: string | null;
+  verified?: boolean;
 };

@@ -1,23 +1,14 @@
 "use client";
 import { CollectionBanner } from "./collection-banner";
 import { CollectionBrowseLayout } from "./collection-browse-layout";
-import {formatCurrencyAmount} from "@/lib/marketplace/amount-display";
-
 import { useSweepCandidates } from "./use-sweep-candidates";
-import { CollectionTools } from "@/features/trading/collection-tools";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NormalizedToken } from "@/lib/marketplace/types";
 import {
-  useCollectionListingsQuery,
   useCollectionQuery,
   useTraitNamesSummaryQuery,
   useTraitValuesQuery,
 } from "@/lib/marketplace/hooks";
-import {
-  displayTokenId,
-  formatPriceForDisplay,
-} from "@/lib/marketplace/token-display";
-import { TokenSymbol } from "@/components/ui/token-symbol";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   type SeedCollection,
@@ -30,31 +21,56 @@ import {
 } from "@/lib/marketplace/traits";
 import { animate, stagger } from "animejs";
 import dynamic from "next/dynamic";
-
-const CollectionMarketPanel = dynamic(
-  () =>
-    import("@/features/collections/collection-market-panel").then((m) => ({
-      default: m.CollectionMarketPanel,
-    })),
-  { ssr: false },
-);
-import { CollectionTokenGrid } from "@/features/collections/collection-token-grid";
+import { CollectionTokenGrid, type GridLayoutMode } from "@/features/collections/collection-token-grid";
 import { TraitFilterSidebar } from "@/features/collections/trait-filter-sidebar";
+import { CollectionToolbar } from "@/features/collections/collection-toolbar";
+import { ActiveFilterChips } from "@/features/collections/active-filter-chips";
+import { CollectionStatsStrip } from "@/features/collections/collection-stats-strip";
+import { CurrencySwitcher } from "@/features/trading/currency-switcher";
+import { useMarketCurrency } from "@/lib/marketplace/currency-store";
 import {
   getCollectionFilterConfig,
   type CollectionSortOption,
 } from "@/lib/marketplace/collection-filter-config";
 import { getCollectionBannerImage } from "@/lib/marketplace/collection-banners";
-import {
-  cheapestListingByTokenId,
-} from "@/features/cart/listing-utils";
 import { CART_MAX_ITEMS, useCartStore } from "@/features/cart/store/cart-store";
-import { type CollectionSortMode } from "@/features/collections/collection-query-params";
+import {
+  COLLECTION_TABS,
+  type CollectionSortMode,
+  type CollectionTab,
+} from "@/features/collections/collection-query-params";
 import { SweepBar } from "@/features/collections/sweep-bar";
-import { COLLECTION_LISTING_SAMPLE_LIMIT } from "@/lib/marketplace/query-limits";
+
+const CollectionAnalytics = dynamic(
+  () =>
+    import("@/features/collections/analytics/collection-analytics").then((m) => ({
+      default: m.CollectionAnalytics,
+    })),
+  { ssr: false },
+);
+const CollectionActivityFeed = dynamic(
+  () =>
+    import("@/features/collections/collection-activity-feed").then((m) => ({
+      default: m.CollectionActivityFeed,
+    })),
+  { ssr: false },
+);
+const CollectionOffersPanel = dynamic(
+  () =>
+    import("@/features/collections/collection-offers-panel").then((m) => ({
+      default: m.CollectionOffersPanel,
+    })),
+  { ssr: false },
+);
 
 const EMPTY_ACTIVE_FILTERS: ActiveFilters = {};
 const EMPTY_VISIBLE_TOKENS: NormalizedToken[] = [];
+const TAB_LABELS: Record<CollectionTab, string> = {
+  items: "Items",
+  offers: "Offers",
+  activity: "Activity",
+  analytics: "Analytics",
+};
 
 type CollectionRouteViewProps = {
   address: string;
@@ -62,19 +78,25 @@ type CollectionRouteViewProps = {
   collections?: SeedCollection[];
   activeFilters?: ActiveFilters;
   sortMode?: CollectionSortMode;
+  query?: string;
+  listedOnly?: boolean;
+  tab?: CollectionTab;
   onActiveFiltersChange?: (filters: ActiveFilters) => void;
   onSortModeChange?: (sortMode: CollectionSortMode) => void;
+  onQueryChange?: (query: string) => void;
+  onListedOnlyChange?: (listedOnly: boolean) => void;
+  onTabChange?: (tab: CollectionTab) => void;
 };
 
 const DEFAULT_SORT_OPTIONS: CollectionSortOption[] = [
   {
-    label: "Recent",
-    values: { asc: "recent", desc: "recent" },
+    label: "Price",
+    values: { asc: "price-asc", desc: "price-desc" },
     defaultDirection: "asc",
   },
   {
-    label: "Price",
-    values: { asc: "price-asc", desc: "price-desc" },
+    label: "Recent",
+    values: { asc: "recent", desc: "recent" },
     defaultDirection: "asc",
   },
 ];
@@ -102,66 +124,19 @@ function collectionHeaderImage(metadata: unknown) {
   return null;
 }
 
-function floorFromListings(
-  cheapestListings: Map<string, { price: string; currency: string; orderId?:string }>,
-): { price: string; currency: string } | null {
-  let min: bigint | null = null;
-  let currency = "";
-
-  for (const listing of cheapestListings.values()) {
-    try {
-      const val = BigInt(listing.price);
-      if (min === null || val < min) {
-        min = val;
-        currency = listing.currency;
-      }
-    } catch {
-      // skip
-    }
-  }
-
-  if (min === null) {
-    return null;
-  }
-
-  const owned=[...cheapestListings.values()].some(l=>l.orderId?.includes(':'));
-  const price = owned ? formatCurrencyAmount(min,currency) : formatPriceForDisplay(min.toString());
-  return price ? { price, currency } : null;
-}
-
-function isSortOptionActive(
-  option: CollectionSortOption,
-  sortMode: CollectionSortMode,
-) {
-  return option.values.asc === sortMode || option.values.desc === sortMode;
-}
-
-function sortButtonLabel(
-  option: CollectionSortOption,
-  sortMode: CollectionSortMode,
-) {
-  if (option.values.asc === option.values.desc) {
-    return option.label;
-  }
-
-  if (sortMode === option.values.asc) {
-    return `${option.label} ↑`;
-  }
-
-  if (sortMode === option.values.desc) {
-    return `${option.label} ↓`;
-  }
-
-  return option.label;
-}
-
 export function CollectionRouteView({
   address,
   collections,
   activeFilters,
-  sortMode = "recent",
+  sortMode = "price-asc",
+  query = "",
+  listedOnly = false,
+  tab = "items",
   onActiveFiltersChange,
   onSortModeChange,
+  onQueryChange,
+  onListedOnlyChange,
+  onTabChange,
 }: CollectionRouteViewProps) {
   const cartItems = useCartStore((state) => state.items);
   const cartOrderIds = useMemo(
@@ -170,6 +145,7 @@ export function CollectionRouteView({
   );
   const addCandidates = useCartStore((state) => state.addCandidates);
   const setCartOpen = useCartStore((state) => state.setOpen);
+  const currency = useMarketCurrency((state) => state.currency);
   const runtimeCollections = useMemo(
     () => collections ?? getMarketplaceRuntimeConfig().collections,
     [collections],
@@ -185,6 +161,8 @@ export function CollectionRouteView({
   const projectId = selectedCollection?.projectId;
   const sweepScopeKey = `${address}-${projectId ?? "default"}`;
   const [sweepCount, setSweepCount] = useState(0);
+  const [layout, setLayout] = useState<GridLayoutMode>("compact");
+  const [canLoadMore, setCanLoadMore] = useState(false);
   const [visibleTokensByScope, setVisibleTokensByScope] = useState<
     Record<string, NormalizedToken[]>
   >({});
@@ -206,15 +184,6 @@ export function CollectionRouteView({
     projectId,
   });
 
-  const listingQuery = useCollectionListingsQuery({
-    collection: address,
-    projectId,
-    limit: COLLECTION_LISTING_SAMPLE_LIMIT,
-    verifyOwnership: false,
-  });
-
-  const cheapestListings = cheapestListingByTokenId(listingQuery.data);
-  const floor = floorFromListings(cheapestListings);
   const seedName = selectedCollection?.name?.trim() || null;
   const displayName = seedName
     ?? (collection.isSuccess && collection.data
@@ -231,8 +200,6 @@ export function CollectionRouteView({
 
   // Hero entrance animation
   const heroRef = useRef<HTMLDivElement>(null);
-  const [activeTab, setActiveTab] = useState("tokens");
-
   useEffect(() => {
     const hero = heroRef.current;
     if (!hero) return;
@@ -262,48 +229,10 @@ export function CollectionRouteView({
     }
   }, [address]);
 
-  // Tab content entrance animation
-  const tabContentRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = tabContentRef.current;
-    if (!el) return;
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reducedMotion) return;
-    animate(el, {
-      opacity: [0, 1],
-      translateY: [4, 0],
-      duration: 300,
-      ease: "easeOutCubic",
-    });
-  }, [activeTab]);
-
   const visibleTokens = visibleTokensByScope[sweepScopeKey] ?? EMPTY_VISIBLE_TOKENS;
-  const hasVisibleTokenSnapshot = Object.prototype.hasOwnProperty.call(
-    visibleTokensByScope,
-    sweepScopeKey,
-  );
-  const visibleListedTokenCount = useMemo(() => {
-    const visibleTokenIds = new Set(visibleTokens.map((token) => displayTokenId(token)));
-    let count = 0;
 
-    for (const listedTokenId of cheapestListings.keys()) {
-      if (visibleTokenIds.has(listedTokenId)) {
-        count += 1;
-      }
-    }
-
-    return count;
-  }, [cheapestListings, visibleTokens]);
-  const listingCount = hasVisibleTokenSnapshot
-    ? visibleListedTokenCount
-    : cheapestListings.size;
-  const listingCountLabel =
-    listingCount >= COLLECTION_LISTING_SAMPLE_LIMIT
-      ? `${COLLECTION_LISTING_SAMPLE_LIMIT}+`
-      : String(listingCount);
-
-  const sweepQuery = useSweepCandidates(address,resolvedActiveFilters);
-  const sweepCandidates = (sweepQuery.data ?? []).filter(item=>!cartOrderIds.has(item.orderId)).slice(0,CART_MAX_ITEMS);
+  const sweepQuery = useSweepCandidates(address, resolvedActiveFilters);
+  const sweepCandidates = (sweepQuery.data ?? []).filter(item => !cartOrderIds.has(item.orderId)).slice(0, CART_MAX_ITEMS);
   const sweepMaxCount = Math.min(
     sweepCandidates.length,
     Math.max(CART_MAX_ITEMS - cartItems.length, 0),
@@ -341,76 +270,45 @@ export function CollectionRouteView({
     setSweepCount(0);
   }, [sweepCandidates, clampedSweepCount, addCandidates, setCartOpen]);
 
-  const handleSortOptionClick = useCallback(
-    (option: CollectionSortOption) => {
-      if (!onSortModeChange) {
-        return;
-      }
-
-      const defaultDirection = option.defaultDirection ?? "asc";
-      const nextSortMode =
-        sortMode === option.values.asc
-          ? option.values.desc
-          : sortMode === option.values.desc
-            ? option.values.asc
-            : defaultDirection === "desc"
-              ? option.values.desc
-              : option.values.asc;
-
-      onSortModeChange(nextSortMode as CollectionSortMode);
+  const removeFilter = useCallback(
+    (traitName: string, traitValue: string) => {
+      const next: ActiveFilters = Object.fromEntries(
+        Object.entries(resolvedActiveFilters).map(([name, values]) => [name, new Set(values)]),
+      );
+      next[traitName]?.delete(traitValue);
+      if (next[traitName]?.size === 0) delete next[traitName];
+      onActiveFiltersChange?.(next);
     },
-    [onSortModeChange, sortMode],
+    [onActiveFiltersChange, resolvedActiveFilters],
   );
 
-  const sortControls = useMemo<ReactNode>(
-    () => (
-      <div
-        className="flex flex-wrap items-center gap-2"
-        data-testid="collection-sort-controls"
-      >
-        {sortOptions.map((option) => {
-          const isActive = isSortOptionActive(option, sortMode);
+  const resultSummary =
+    visibleTokens.length > 0
+      ? `Showing ${visibleTokens.length} item${visibleTokens.length === 1 ? "" : "s"}${canLoadMore ? ", more available" : ""}`
+      : undefined;
 
-          return (
-            <button
-              key={option.label}
-              type="button"
-              aria-pressed={isActive}
-              onClick={() => handleSortOptionClick(option)}
-              className={
-                isActive
-                  ? "inline-flex h-7 items-center rounded-[6px] border border-[color:var(--realm-border-strong)] bg-primary px-3 text-xs font-medium text-primary-foreground"
-                  : "inline-flex h-7 items-center rounded-[6px] border border-[color:var(--realm-border-etched)] bg-[color:var(--realm-surface-iron)]/70 px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-[color:var(--realm-border-strong)] hover:text-foreground"
-              }
-            >
-              {sortButtonLabel(option, sortMode)}
-            </button>
-          );
-        })}
-      </div>
-    ),
-    [handleSortOptionClick, sortMode, sortOptions],
+  const toolbar = (
+    <CollectionToolbar
+      query={query}
+      onQueryChange={(next) => onQueryChange?.(next)}
+      listedOnly={listedOnly}
+      onListedOnlyChange={(next) => onListedOnlyChange?.(next)}
+      sortMode={sortMode}
+      sortOptions={sortOptions}
+      onSortModeChange={(next) => onSortModeChange?.(next)}
+      layout={layout}
+      onLayoutChange={setLayout}
+      resultSummary={resultSummary}
+    />
   );
 
   return (
     <section className="w-full space-y-4 pb-20">
       <CollectionBanner ref={heroRef} image={headerImage} name={displayName ?? selectedCollection?.name ?? address}>
-          {/* Stats */}
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            {listingCount > 0 && (
-              <span className="realm-stat-pill px-3 py-1.5 text-[color:var(--realm-text-muted)]">
-                <span className="font-semibold text-[color:var(--realm-title)]">{listingCountLabel}</span>
-                {" "}listed
-              </span>
-            )}
-            {floor && (
-              <span className="realm-stat-pill flex items-center gap-1 px-3 py-1.5 text-[color:var(--realm-text-muted)]">
-                Floor{" "}
-                <span className="font-semibold text-[color:var(--realm-title)]">{floor.price}</span>
-                <TokenSymbol address={floor.currency} className="font-semibold text-[color:var(--realm-title)]" />
-              </span>
-            )}
-          </div>
+        <div className="flex w-full flex-col gap-3 lg:w-auto lg:items-end">
+          <CurrencySwitcher label="Browse in" showBalance />
+          <CollectionStatsStrip address={address} currency={currency} />
+        </div>
       </CollectionBanner>
 
       {collection.isSuccess && !collection.data ? (
@@ -420,58 +318,67 @@ export function CollectionRouteView({
         </p>
       ) : null}
 
-      <CollectionBrowseLayout activeCount={Object.keys(resolvedActiveFilters).length} filters={
-          <TraitFilterSidebar
-            collectionAddress={address}
-            traitNames={traitNamesQuery.data ?? []}
-            activeFilters={resolvedActiveFilters}
-            onActiveFiltersChange={onActiveFiltersChange}
-            isLoading={traitNamesQuery.isLoading}
-            traitValues={traitValuesQuery.data ?? null}
-            isLoadingValues={traitValuesQuery.isLoading}
-            openTraitName={openTraitName}
-            onOpenTraitNameChange={setOpenTraitName}
-          />
-      }>
-          <CollectionTools address={address} />
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="flex items-center justify-between gap-3">
-              <TabsList>
-                <TabsTrigger value="tokens">Tokens</TabsTrigger>
-                <TabsTrigger value="market-activity">Market Activity</TabsTrigger>
-              </TabsList>
-              {activeTab === "tokens" && visibleTokens.length > 0 && (
-                <span className="text-xs text-muted-foreground">{visibleTokens.length} items</span>
-              )}
-            </div>
-            <TabsContent value="tokens">
-              <div ref={activeTab === "tokens" ? tabContentRef : undefined} key={`tab-tokens-${activeTab}`}>
-                <CollectionTokenGrid
-                  key={sweepScopeKey}
-                  activeFilters={resolvedActiveFilters}
-                  address={address}
-                  onTokensChange={handleTokensChange}
-                  projectId={projectId}
-                  sortControls={sortControls}
-                  sortMode={sortMode}
-                  sweepPreviewTokenIds={sweepPreviewTokenIds}
-                />
-              </div>
-            </TabsContent>
-            <TabsContent value="market-activity">
-              <div ref={activeTab === "market-activity" ? tabContentRef : undefined} key={`tab-market-${activeTab}`}>
-                <CollectionMarketPanel address={address} projectId={projectId} />
-              </div>
-            </TabsContent>
-          </Tabs>
-          <SweepBar
-            candidates={sweepCandidates}
-            count={sweepCount}
-            maxCount={sweepMaxCount}
-            onCountChange={handleSweepCountChange}
-            onSweep={handleSweep}
-          />
-      </CollectionBrowseLayout>
+      <Tabs value={tab} onValueChange={(value) => onTabChange?.(value as CollectionTab)} className="w-full gap-4">
+        <TabsList className="h-11 max-w-full self-start overflow-x-auto">
+          {COLLECTION_TABS.map((value) => (
+            <TabsTrigger key={value} value={value} className="min-w-20 px-4 text-sm">
+              {TAB_LABELS[value]}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        <TabsContent value="items">
+          <CollectionBrowseLayout activeCount={Object.keys(resolvedActiveFilters).length} filters={
+              <TraitFilterSidebar
+                collectionAddress={address}
+                traitNames={traitNamesQuery.data ?? []}
+                activeFilters={resolvedActiveFilters}
+                onActiveFiltersChange={onActiveFiltersChange}
+                isLoading={traitNamesQuery.isLoading}
+                traitValues={traitValuesQuery.data ?? null}
+                isLoadingValues={traitValuesQuery.isLoading}
+                openTraitName={openTraitName}
+                onOpenTraitNameChange={setOpenTraitName}
+              />
+          }>
+            <ActiveFilterChips
+              activeFilters={resolvedActiveFilters}
+              onRemove={removeFilter}
+              onClear={() => onActiveFiltersChange?.({})}
+            />
+            <CollectionTokenGrid
+              key={sweepScopeKey}
+              activeFilters={resolvedActiveFilters}
+              address={address}
+              layout={layout}
+              listedOnly={listedOnly}
+              onCanLoadMoreChange={setCanLoadMore}
+              onTokensChange={handleTokensChange}
+              projectId={projectId}
+              query={query}
+              sortMode={sortMode}
+              sweepPreviewTokenIds={sweepPreviewTokenIds}
+              toolbar={toolbar}
+            />
+            <SweepBar
+              candidates={sweepCandidates}
+              count={sweepCount}
+              maxCount={sweepMaxCount}
+              onCountChange={handleSweepCountChange}
+              onSweep={handleSweep}
+            />
+          </CollectionBrowseLayout>
+        </TabsContent>
+        <TabsContent value="offers">
+          {tab === "offers" ? <CollectionOffersPanel address={address} currency={currency} /> : null}
+        </TabsContent>
+        <TabsContent value="activity">
+          {tab === "activity" ? <CollectionActivityFeed address={address} /> : null}
+        </TabsContent>
+        <TabsContent value="analytics">
+          {tab === "analytics" ? <CollectionAnalytics address={address} currency={currency} /> : null}
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }
