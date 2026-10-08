@@ -35,7 +35,7 @@ export const Desktop: Story = {
       canvas.getByRole("link", { name: "Realms Market home" }),
     ).toHaveAttribute("href", "/");
     await expect(
-      canvas.getByRole("navigation", { name: "Marketplace tools" }),
+      canvas.getByRole("navigation", { name: "Marketplace" }),
     ).toBeVisible();
     await expect(
       canvas.getByRole("navigation", { name: "Realms ecosystem" }),

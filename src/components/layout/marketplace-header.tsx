@@ -329,7 +329,7 @@ export function MarketplaceHeader() {
               </span>
             </span>
           </Link>
-          <nav aria-label="Marketplace tools" className="hidden items-center lg:flex">
+          <nav aria-label="Marketplace" className="hidden items-center lg:flex">
             {destinations.map((link) => (
               <Link
                 key={link.label}

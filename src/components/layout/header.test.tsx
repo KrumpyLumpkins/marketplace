@@ -79,7 +79,7 @@ describe("Header", () => {
       screen.getByRole("link", { name: "Realms Market home" }),
     ).toHaveAttribute("href", "/");
     const nav = within(
-      screen.getByRole("navigation", { name: "Marketplace tools" }),
+      screen.getByRole("navigation", { name: "Marketplace" }),
     );
     expect(nav.getByRole("link", { name: "Explore" })).toHaveAttribute(
       "href",
