@@ -112,8 +112,8 @@ and unlisted assets. The spacing pass checked 320, 390, 639, 640, 768, 1024,
 
 `Marketplace/Full width navigation` → `Collection` and `Mobile` compose the
 production header, server-renderable page shell, trait filters and asset cards.
-The header's Collections link goes to `/#collections`; global search remains
-available beside it. Collection-specific traits remain in the browsing view.
+The header's Explore link goes to `/`; global search remains
+available beside it on desktop and in a focused panel on mobile. Collection-specific traits remain in the browsing view.
 The global shell must not mount collection-list queries or thumbnail fallbacks.
 The removed desktop collection rail and mobile collection drawer should not be
 reintroduced as a second navigation system.
@@ -167,3 +167,19 @@ This removes the Google font-service dependency from production builds. The prev
 uses the same font files through public URLs because its local-font adapter emits
 invalid unquoted filesystem URLs when the workspace path contains spaces. Font
 stories verify that the declared faces load rather than silently using a fallback.
+
+## Marketplace navigation
+
+`Marketplace/Navigation` develops the same header used by the app. The 64px
+header links Explore, Portfolio and Trading on desktop; below 1024px these
+appear in the mobile menu with notifications and wallet controls. Search opens
+in a focused sheet on mobile. The logo always links to marketplace home;
+ecosystem links live in a separate menu, and community links live in the footer.
+No unread notification count is shown without authenticated unread data.
+
+`MarketToolbar` remains the single transaction-feedback host. It renders an
+alert only for unavailable trading or demo data, with transaction recovery in
+a fixed control that does not shift page content. The header's market-status
+indicator links to `/ops` for detailed freshness. Checkout gating is unchanged.
+Navigation stories cover wallet connection/disconnection, search focus/escape,
+active routes, populated cart, market errors, demo mode and pending transactions.

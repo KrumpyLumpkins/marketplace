@@ -31,6 +31,7 @@ export const fixtureConfig: MarketConfig = {
   },
 };
 type Scenario = {
+  marketStatus: "ready" | "paused" | "error";
   apiState: "ready" | "empty" | "error" | "pending";
   bidComplete: boolean;
   connected: boolean;
@@ -42,6 +43,7 @@ type Scenario = {
   demo: boolean;
 };
 const initial: Scenario = {
+  marketStatus: "ready",
   apiState: "ready",
   bidComplete: true,
   connected: false,

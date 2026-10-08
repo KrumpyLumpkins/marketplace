@@ -2,35 +2,35 @@
 import { useTrade } from "@/lib/marketplace/use-trade";
 import { TransactionFeedback } from "./transaction-feedback";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
+/** One global feedback host. Healthy trading no longer needs a navigation band. */
 export function MarketToolbar() {
   const trade = useTrade();
-  const config = { data: trade.config, isError: trade.configError };
+  const warning = trade.configError
+    ? "Market data unavailable"
+    : trade.config?.demo
+      ? "Demo data · trading disabled"
+      : trade.config && !trade.config.status.safeForCheckout
+        ? "Trading unavailable"
+        : null;
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2 text-xs">
-      <nav className="flex flex-wrap gap-4" aria-label="Marketplace tools">
-        <Link href="/trader" className="hover:text-primary">
-          Trading dashboard
-        </Link>
-        <Link href="/notifications" className="hover:text-primary">
-          Notifications
-        </Link>
-        <Link href="/ops" className="hover:text-primary">
-          Market status
-        </Link>
-      </nav>
-      {config.data?.demo ? (
-        <Badge variant="outline">Demo data · trading disabled</Badge>
-      ) : config.data?.status.safeForCheckout ? (
-        <span className="text-muted-foreground">
-          Indexed block {config.data.status.indexedBlock}
-        </span>
-      ) : (
-        <Badge variant="outline">
-          {config.isError ? "Market data unavailable" : "Trading unavailable"}
-        </Badge>
+    <>
+      {warning && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-primary/20 bg-primary/5 px-4 py-2 text-sm"
+        >
+          <span>{warning}</span>
+          <Link
+            href="/ops"
+            className="inline-flex min-h-8 items-center underline underline-offset-4"
+          >
+            View market status
+          </Link>
+        </div>
       )}
-      <TransactionFeedback />
-    </div>
+      <div className="fixed right-4 bottom-4 z-30 rounded-lg border border-border bg-background shadow-lg empty:hidden">
+        <TransactionFeedback />
+      </div>
+    </>
   );
 }

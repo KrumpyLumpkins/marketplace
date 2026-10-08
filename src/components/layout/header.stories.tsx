@@ -100,12 +100,19 @@ export const AwaitingApproval: Story = {
 
 export const MobileNavigation: Story = {
   globals: { viewport: { value: "mobile", isRotated: false } },
-  play: async ({ canvas, canvasElement }) => {
-    const wallet = canvas.getByRole("button", { name: "Connect Wallet" });
-    const search = canvas.getByRole("textbox", { name: "Search" });
-    const width = canvasElement.ownerDocument.documentElement.clientWidth;
-    expect(wallet.getBoundingClientRect().right).toBeLessThanOrEqual(width);
-    expect(search.getBoundingClientRect().right).toBeLessThanOrEqual(width);
-    expect(canvas.getByRole("link", { name: "Portfolio" }).getBoundingClientRect().right).toBeLessThanOrEqual(width);
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Open navigation menu" }),
+    );
+    const menu = await body.findByRole("dialog", { name: "Marketplace menu" });
+    await waitFor(() => expect(menu).toBeVisible());
+    expect(within(menu).getByRole("link", { name: "Portfolio" })).toBeVisible();
+    expect(
+      within(menu).getByRole("button", { name: "Connect Wallet" }),
+    ).toBeVisible();
+    await waitFor(() => expect(menu.getBoundingClientRect().right).toBeLessThanOrEqual(
+      canvasElement.ownerDocument.documentElement.clientWidth,
+    ));
   },
 };

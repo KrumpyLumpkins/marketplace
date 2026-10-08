@@ -56,11 +56,22 @@ export function useTrade() {
       state.tradeState.stage,
     ),
     address: state.connected ? ADDRESS : undefined,
-    config: { ...fixtureConfig, demo: state.demo },
-    configError: false,
+    config: {
+      ...fixtureConfig,
+      demo: state.demo,
+      status: {
+        ...fixtureConfig.status,
+        safeForCheckout: state.marketStatus === "ready",
+      },
+    },
+    configError: state.marketStatus === "error",
   };
 }
 
-export const reconcileUnknown = fn(async (_result: { transactionHash: string } | { confirmedNotSubmitted: true }) => {
-  useScenario.setState({ tradeState: { stage: "idle", message: "" } });
-});
+export const reconcileUnknown = fn(
+  async (
+    _result: { transactionHash: string } | { confirmedNotSubmitted: true },
+  ) => {
+    useScenario.setState({ tradeState: { stage: "idle", message: "" } });
+  },
+);

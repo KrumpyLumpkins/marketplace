@@ -3,15 +3,21 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Header } from "./header";
 
-const { mockUseAccount, mockUseConnect, mockUseDisconnect, mockConnect, mockDisconnect, mockUseBalance } =
-  vi.hoisted(() => ({
-    mockUseAccount: vi.fn(),
-    mockUseConnect: vi.fn(),
-    mockUseDisconnect: vi.fn(),
-    mockConnect: vi.fn(),
-    mockDisconnect: vi.fn(),
-    mockUseBalance: vi.fn(),
-  }));
+const {
+  mockUseAccount,
+  mockUseConnect,
+  mockUseDisconnect,
+  mockConnect,
+  mockDisconnect,
+  mockUseBalance,
+} = vi.hoisted(() => ({
+  mockUseAccount: vi.fn(),
+  mockUseConnect: vi.fn(),
+  mockUseDisconnect: vi.fn(),
+  mockConnect: vi.fn(),
+  mockDisconnect: vi.fn(),
+  mockUseBalance: vi.fn(),
+}));
 const { mockPush, mockSearchParams } = vi.hoisted(() => ({
   mockPush: vi.fn(),
   mockSearchParams: vi.fn(),
@@ -25,7 +31,14 @@ vi.mock("@starknet-react/core", () => ({
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
+  usePathname: () => "/trader",
   useSearchParams: () => mockSearchParams(),
+}));
+
+vi.mock("@/lib/marketplace/use-trade", () => ({
+  useTrade: () => ({
+    config: { demo: false, status: { safeForCheckout: true } },
+  }),
 }));
 
 vi.mock("@/features/cart/components/cart-sidebar", () => ({
@@ -60,189 +73,72 @@ describe("Header", () => {
     });
   });
 
-  it("links collection discovery from the header without a collection list", () => {
-  render(<Header />);
-  expect(screen.getByRole("link", { name: "Browse collections" })).toHaveAttribute("href", "/#collections");
-});
-
-  it("renders_realms_logo", () => {
+  it("prioritises marketplace destinations and highlights the current route", () => {
     render(<Header />);
-
-    const logo = screen.getByTestId("realms-logo");
-    expect(logo).toBeVisible();
-    expect(logo).toHaveAttribute("src", "/rw-logo.svg");
-  });
-
-  it("does_not_render_marketplace_title_in_top_header", () => {
-    render(<Header />);
-
-    expect(screen.queryByText(/realms\.market/i)).toBeNull();
-  });
-
-  it("renders_search_input", () => {
-    render(<Header />);
-
-    expect(screen.getByRole("textbox", { name: "Search" })).toBeVisible();
-  });
-
-  it("search_input_has_placeholder", () => {
-    render(<Header />);
-
-    expect(screen.getByRole("textbox", { name: "Search" })).toBeVisible();
-  });
-
-  it("search_navigates_on_enter", async () => {
-    const user = userEvent.setup();
-
-    render(<Header />);
-
-    await user.type(screen.getByRole("textbox", { name: "Search" }), "dragons{enter}");
-
-    expect(mockPush).toHaveBeenCalledWith("/?q=dragons");
-  });
-
-  it("search_reads_initial_value_from_params", () => {
-    mockSearchParams.mockReturnValue(new URLSearchParams("q=realms"));
-
-    render(<Header />);
-
-    expect(screen.getByRole("textbox", { name: "Search" })).toHaveValue("realms");
-  });
-
-  it("header_is_a_nav_landmark", () => {
-    render(<Header />);
-
-    const header = screen.getByRole("banner");
-    expect(header).toBeVisible();
-  });
-
-  it("links_logo_to_realms_world_home", () => {
-    render(<Header />);
-
-    const homeLink = screen.getByRole("link", { name: /realms\.world home/i });
-    expect(homeLink).toBeVisible();
-    expect(homeLink).toHaveAttribute("href", "https://realms.world/");
-  });
-
-  it("renders_centered_ecosystem_nav_links", () => {
-    render(<Header />);
-
-    const nav = screen.getByRole("navigation", { name: /primary ecosystem navigation/i });
-    expect(within(nav).getByRole("link", { name: /^home$/i })).toHaveAttribute(
-      "href",
-      "https://realms.world/",
-    );
-    expect(within(nav).getByRole("link", { name: /^games$/i })).toHaveAttribute(
-      "href",
-      "https://realms.world/games",
-    );
-    expect(within(nav).getByRole("link", { name: /^account$/i })).toHaveAttribute(
-      "href",
-      "https://account.realms.world/velords",
-    );
-    expect(within(nav).getByRole("link", { name: /^marketplace$/i })).toHaveAttribute(
+    expect(
+      screen.getByRole("link", { name: "Realms Market home" }),
+    ).toHaveAttribute("href", "/");
+    const nav = within(screen.getByRole("navigation", { name: "Marketplace" }));
+    expect(nav.getByRole("link", { name: "Explore" })).toHaveAttribute(
       "href",
       "/",
     );
-    expect(within(nav).getByRole("link", { name: /^scroll$/i })).toHaveAttribute(
-      "href",
-      "https://realms.world/scroll",
-    );
-  });
-
-  it("renders_social_icon_links", () => {
-    render(<Header />);
-
-    const twitterLink = screen.getByRole("link", { name: /x \/ twitter/i });
-    expect(twitterLink).toHaveAttribute("href", "https://x.com/LootRealms");
-    expect(within(twitterLink).getByTestId("x-icon")).toBeVisible();
-
-    const discordLink = screen.getByRole("link", { name: /discord/i });
-    expect(discordLink).toHaveAttribute("href", "https://discord.gg/realmsworld");
-    expect(within(discordLink).getByTestId("discord-icon")).toBeVisible();
-
-    const githubLink = screen.getByRole("link", { name: /github/i });
-    expect(githubLink).toHaveAttribute("href", "https://github.com/BibliothecaDAO");
-  });
-
-  it("shows_login_button_when_disconnected", () => {
-    render(<Header />);
-
-    expect(screen.getByRole("button", { name: /connect wallet/i })).toBeVisible();
-  });
-
-  it("shows_cart_trigger_button", () => {
-    render(<Header />);
-
-    expect(screen.getByRole("button", { name: /cart \(0\)/i })).toBeVisible();
-  });
-
-  it("shows_portfolio_link_for_address_lookup", () => {
-    render(<Header />);
-
-    const portfolioLinks = screen.getAllByRole("link", { name: /portfolio/i });
-    expect(portfolioLinks.length).toBeGreaterThan(0);
-    expect(portfolioLinks[0]).toHaveAttribute("href", "/portfolio");
-  });
-
-  it("sub_header_contains_retained_marketplace_actions", () => {
-    render(<Header />);
-
-    expect(screen.getByRole("textbox", { name: "Search" })).toBeVisible();
-    expect(screen.getByRole("button", { name: /cart \(0\)/i })).toBeVisible();
-    expect(screen.getByRole("link", { name: /portfolio/i })).toHaveAttribute(
+    expect(nav.getByRole("link", { name: "Portfolio" })).toHaveAttribute(
       "href",
       "/portfolio",
     );
-    expect(screen.getByRole("button", { name: /connect wallet/i })).toBeVisible();
+    expect(nav.getByRole("link", { name: "Trading" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(nav.getByRole("link", { name: "Explore" })).not.toHaveAttribute(
+      "aria-current",
+    );
+    expect(
+      screen.queryByRole("link", { name: "Games" }),
+    ).not.toBeInTheDocument();
   });
-
-  it("mobile_menu_contains_ecosystem_navigation", async () => {
+  it("search normalises text and encodes the URL", async () => {
     const user = userEvent.setup();
     render(<Header />);
-
-    await user.click(screen.getByRole("button", { name: /open navigation menu/i }));
-
-    const mobileMenuDialog = await screen.findByRole("dialog");
-    expect(within(mobileMenuDialog).getByRole("link", { name: /^home$/i })).toHaveAttribute(
-      "href",
-      "https://realms.world/",
+    await user.type(
+      screen.getByRole("textbox", { name: "Search" }),
+      "  Realms   & gold  {enter}",
     );
-    expect(within(mobileMenuDialog).getByRole("link", { name: /^games$/i })).toHaveAttribute(
+    expect(mockPush).toHaveBeenCalledWith("/?q=Realms%20%26%20gold");
+  });
+  it("search follows back/forward URL query changes", () => {
+    mockSearchParams.mockReturnValue(new URLSearchParams("q=first"));
+    const { rerender } = render(<Header />);
+    expect(screen.getByRole("textbox", { name: "Search" })).toHaveValue(
+      "first",
+    );
+    mockSearchParams.mockReturnValue(new URLSearchParams("q=second"));
+    rerender(<Header />);
+    expect(screen.getByRole("textbox", { name: "Search" })).toHaveValue(
+      "second",
+    );
+  });
+  it("mobile menu includes trading, wallet and ecosystem destinations", async () => {
+    const user = userEvent.setup();
+    render(<Header />);
+    await user.click(
+      screen.getByRole("button", { name: "Open navigation menu" }),
+    );
+    const menu = within(
+      screen.getByRole("dialog", { name: "Marketplace menu" }),
+    );
+    expect(
+      menu.getByRole("link", { name: "Trading" }),
+    ).toHaveAttribute("href", "/trader");
+    expect(menu.getByRole("link", { name: "Notifications" })).toHaveAttribute(
+      "href",
+      "/notifications",
+    );
+    expect(menu.getByRole("button", { name: "Connect Wallet" })).toBeVisible();
+    expect(menu.getByRole("link", { name: /Games/ })).toHaveAttribute(
       "href",
       "https://realms.world/games",
-    );
-    expect(within(mobileMenuDialog).getByRole("link", { name: /^account$/i })).toHaveAttribute(
-      "href",
-      "https://account.realms.world/velords",
-    );
-    expect(within(mobileMenuDialog).getByRole("link", { name: /^marketplace$/i })).toHaveAttribute(
-      "href",
-      "/",
-    );
-    expect(within(mobileMenuDialog).getByRole("link", { name: /^scroll$/i })).toHaveAttribute(
-      "href",
-      "https://realms.world/scroll",
-    );
-  });
-
-  it("mobile_menu_contains_updated_social_links", async () => {
-    const user = userEvent.setup();
-    render(<Header />);
-
-    await user.click(screen.getByRole("button", { name: /open navigation menu/i }));
-
-    const mobileMenuDialog = await screen.findByRole("dialog");
-    const twitterLink = within(mobileMenuDialog).getByRole("link", { name: /x \/ twitter/i });
-    const discordLink = within(mobileMenuDialog).getByRole("link", { name: /discord/i });
-
-    expect(twitterLink).toHaveAttribute("href", "https://x.com/LootRealms");
-    expect(within(twitterLink).getByTestId("x-icon")).toBeVisible();
-    expect(discordLink).toHaveAttribute("href", "https://discord.gg/realmsworld");
-    expect(within(discordLink).getByTestId("discord-icon")).toBeVisible();
-    expect(within(mobileMenuDialog).getByRole("link", { name: /github/i })).toHaveAttribute(
-      "href",
-      "https://github.com/BibliothecaDAO",
     );
   });
 
@@ -262,7 +158,9 @@ describe("Header", () => {
     render(<Header />);
     await user.click(screen.getByRole("button", { name: /connect wallet/i }));
 
-    expect(screen.getByRole("heading", { name: /select wallet/i })).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: /select wallet/i }),
+    ).toBeVisible();
     expect(screen.getByRole("button", { name: /braavos/i })).toBeVisible();
     expect(screen.getByRole("button", { name: /argent/i })).toBeVisible();
     expect(screen.getByRole("button", { name: /controller/i })).toBeVisible();
@@ -311,9 +209,14 @@ describe("Header", () => {
       "src",
       "https://cdn.example/braavos.png",
     );
-    expect(within(braavosButton).getByAltText("Braavos icon")).toHaveClass("h-5", "w-5");
+    expect(within(braavosButton).getByAltText("Braavos icon")).toHaveClass(
+      "h-5",
+      "w-5",
+    );
 
-    const controllerButton = screen.getByRole("button", { name: /controller/i });
+    const controllerButton = screen.getByRole("button", {
+      name: /controller/i,
+    });
     expect(within(controllerButton).queryByRole("img")).toBeNull();
   });
 
@@ -327,7 +230,9 @@ describe("Header", () => {
 
     render(<Header />);
 
-    expect(screen.getByTestId("wallet-address")).toHaveTextContent("0x1234...cdef");
+    expect(screen.getByTestId("wallet-address")).toHaveTextContent(
+      "0x1234...cdef",
+    );
   });
 
   it("no_top_level_disconnect_button_when_connected", () => {
@@ -433,13 +338,17 @@ describe("Header", () => {
     await act(async () => resolve());
     expect(screen.queryByRole("dialog")).toBeNull();
   });
-  it("explains when a selected extension is missing",async()=>{
-    mockUseConnect.mockReturnValue({connectAsync:mockConnect,connectors:[{id:"braavos",name:"Braavos",available:()=>false}],isPending:false});
-    const user=userEvent.setup();render(<Header/>);
-    await user.click(screen.getByRole('button',{name:/connect wallet/i}));
-    await user.click(screen.getByRole('button',{name:/braavos/i}));
-    expect(screen.getByRole('alert')).toHaveTextContent('not detected');
+  it("explains when a selected extension is missing", async () => {
+    mockUseConnect.mockReturnValue({
+      connectAsync: mockConnect,
+      connectors: [{ id: "braavos", name: "Braavos", available: () => false }],
+      isPending: false,
+    });
+    const user = userEvent.setup();
+    render(<Header />);
+    await user.click(screen.getByRole("button", { name: /connect wallet/i }));
+    await user.click(screen.getByRole("button", { name: /braavos/i }));
+    expect(screen.getByRole("alert")).toHaveTextContent("not detected");
     expect(mockConnect).not.toHaveBeenCalled();
   });
-
 });

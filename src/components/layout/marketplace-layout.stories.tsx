@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect } from "storybook/test";
+import { expect, within, waitFor } from "storybook/test";
 import { MarketplaceLayout } from "./marketplace-layout";
 import { Header } from "./header";
 import { CollectionBrowseLayout } from "@/features/collections/collection-browse-layout";
@@ -21,7 +21,12 @@ const meta = {
               {Array.from({ length: 12 }, (_, i) => (
                 <MarketplaceTokenCard
                   key={i}
-                  token={{ contract_address: "0xa", token_id: String(i), metadata: { name: `Realm #${i}` }, image: "/banners/realms.png" }}
+                  token={{
+                    contract_address: "0xa",
+                    token_id: String(i),
+                    metadata: { name: `Realm #${i}` },
+                    image: "/banners/realms.png",
+                  }}
                   href={`/collections/0xa/${i}`}
                 />
               ))}
@@ -37,13 +42,34 @@ type Story = StoryObj<typeof meta>;
 
 export const Collection: Story = {
   play: async ({ canvas, userEvent }) => {
-    const browse = canvas.getByRole("link", { name: "Browse collections" });
-    await expect(browse).toHaveAttribute("href", "/#collections");
+    const browse = canvas.getByRole("link", { name: "Explore" });
+    await expect(browse).toHaveAttribute("href", "/");
     browse.focus();
     await userEvent.tab();
+    await userEvent.tab();
+    await userEvent.tab();
     await expect(canvas.getByRole("textbox", { name: "Search" })).toHaveFocus();
-    await expect(canvas.queryByRole("button", { name: "Collapse sidebar" })).not.toBeInTheDocument();
-    await expect(canvas.queryByRole("navigation", { name: "Collections" })).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "Collapse sidebar" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("navigation", { name: "Collections" }),
+    ).not.toBeInTheDocument();
   },
 };
-export const Mobile: Story = { ...Collection, globals: { viewport: { value: "mobile", isRotated: false } } };
+export const Mobile: Story = {
+  globals: { viewport: { value: "mobile", isRotated: false } },
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Open navigation menu" }),
+    );
+    const menu = await within(canvasElement.ownerDocument.body).findByRole(
+      "dialog",
+      { name: "Marketplace menu" },
+    );
+    await waitFor(() => expect(menu).toBeVisible());
+    await expect(
+      within(menu).getByRole("link", { name: "Explore" }),
+    ).toHaveAttribute("href", "/");
+  },
+};

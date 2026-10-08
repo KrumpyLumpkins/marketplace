@@ -59,6 +59,7 @@ export function CartSidebar() {
     <>
       <Button
         aria-label={`Cart (${items.length})`}
+        className="min-h-11 min-w-11"
         variant="outline"
         size="sm"
         onClick={() => setOpen(true)}
