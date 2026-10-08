@@ -344,6 +344,11 @@ export async function runSdkDevnetJourney({
       await client.contract.admin.prepareAcceptAdmin(admin.address),
       admin,
     );
+    await govern(await client.contract.admin.prepareSetFee(admin.address, 300, seller.address), admin);
+    assert.equal((await client.contract.getConfig()).feeBps, 300);
+    assert.equal(store.get("config", "marketplace").feeBps, 300);
+    assert.equal(BigInt(store.get("config", "marketplace").feeRecipient), BigInt(seller.address));
+    await govern(await client.contract.admin.prepareSetFee(admin.address, 200, admin.address), admin);
     const path = `/tokens/${nft.address}/301`;
     await reactClient.request(path);
     function Consumer() {
@@ -373,6 +378,7 @@ export async function runSdkDevnetJourney({
       idempotentCancelWithoutEvents: true,
       directOrderConfigAndRoyaltyReads: true,
       governanceAndAdminTransfer: true,
+      feeAdministration: true,
     };
   } finally {
     client.dispose();

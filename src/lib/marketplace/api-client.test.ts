@@ -26,6 +26,7 @@ describe("owned marketplace interface", () => {
         state: "open",
         royaltyAmount: "0",
         royaltyCap: "0",
+        feeBps: 200,
         royaltyRecipient: "0x0",
       }).price,
     ).toBe("9007199254740993");

@@ -227,7 +227,7 @@ Use the draft's `/v1/chains/{chain}` prefix where practical. An owned OpenAPI do
 | GET `/search` | Collection/NFT/address discovery |
 | GET `/collections/{collection}/stats` | Currency-specific summaries and bounded history queries |
 | GET `/collections/{collection}/offers` | Token/collection bids with validity freshness |
-| GET `/marketplace/config` | Deployment identity, current trading policy and immutable fee settings |
+| GET `/marketplace/config` | Deployment identity, current trading and fee policy |
 | POST `/orders/lookup` | Up to 25 full order keys; explicit result for each missing key |
 | POST `/checkout/preflight` | Buyer/cart evaluation and itemized fee result; no submission |
 | GET `/indexer/status` | Relevant progress and public readiness reasons |

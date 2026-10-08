@@ -35,6 +35,7 @@ export const Listing: Story = {
     await expect(
       signCalls.mock.calls[0][0].map((call) => call.entrypoint),
     ).toEqual(["approve", "create_listing"]);
+    await expect(signCalls.mock.calls[0][0].at(-1)?.calldata.at(-1)).toBe("200");
   },
 };
 export const TokenOffer: Story = {

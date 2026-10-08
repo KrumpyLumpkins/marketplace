@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { hash } from "starknet-devnet-sdk";
 const root = new URL("../../contracts/marketplace/", import.meta.url);
@@ -18,6 +18,11 @@ const casm = JSON.parse(
     ),
   ),
 );
+const manifestPath = new URL("artifact-manifest.json", root);
+const previous = existsSync(manifestPath)
+  ? JSON.parse(readFileSync(manifestPath, "utf8"))
+  : null;
+const classHash = hash.computeContractClassHash(contract);
 writeFileSync(
   new URL("abi.json", root),
   JSON.stringify(contract.abi, null, 2) + "\n",
@@ -29,12 +34,15 @@ writeFileSync(
       name: "Marketplace",
       version: 1,
       scarb: "2.15.1",
-      classHash: hash.computeContractClassHash(contract),
+      classHash,
       compiledClassHash: hash.computeCompiledClassHash(casm),
       sourceSha256: createHash("sha256")
         .update(readFileSync(new URL("src/lib.cairo", root)))
         .digest("hex"),
-      productionDeployment: null,
+      // Regenerating the same artifact must not erase its deployment record.
+      productionDeployment: previous?.classHash === classHash
+        ? (previous.productionDeployment ?? null)
+        : null,
     },
     null,
     2,

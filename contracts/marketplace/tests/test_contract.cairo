@@ -72,7 +72,7 @@ fn setup() -> (IMarketplaceDispatcher, IMockDispatcher, IMockDispatcher) {
 fn listing_settles_exactly_and_snapshots_royalty() {
     let (m, c, n) = setup();
     start_cheat_caller_address(m.contract_address, addr(20));
-    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5);
+    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
     n.set_royalty(addr(50), 99);
     start_cheat_caller_address(m.contract_address, addr(30));
     m.buy_listing(OrderKey { maker: addr(20), nonce }, c.contract_address, 100);
@@ -87,8 +87,8 @@ fn listing_settles_exactly_and_snapshots_royalty() {
 fn token_and_collection_offers_cannot_charge_more_than_maker_price() {
     let (m, c, n) = setup();
     start_cheat_caller_address(m.contract_address, addr(30));
-    let a = m.create_offer(n.contract_address, 1, c.contract_address, 100, 200, 5);
-    let b = m.create_collection_offer(n.contract_address, c.contract_address, 100, 200, 10);
+    let a = m.create_offer(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
+    let b = m.create_collection_offer(n.contract_address, c.contract_address, 100, 200, 10, 500);
     start_cheat_caller_address(m.contract_address, addr(20));
     m.accept_offer(OrderKey { maker: addr(30), nonce: a }, c.contract_address, 93);
     n.set_royalty(addr(50), 10);
@@ -102,7 +102,7 @@ fn token_and_collection_offers_cannot_charge_more_than_maker_price() {
 fn cancelled_orders_stay_cancelled_and_pause_does_not_trap_makers() {
     let (m, c, n) = setup();
     start_cheat_caller_address(m.contract_address, addr(20));
-    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5);
+    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
     start_cheat_caller_address(m.contract_address, addr(10));
     m.set_paused(true);
     start_cheat_caller_address(m.contract_address, addr(20));
@@ -115,7 +115,7 @@ fn cancelled_orders_stay_cancelled_and_pause_does_not_trap_makers() {
 fn failed_payment_rolls_back_order_and_nft() {
     let (m, c, n) = setup();
     start_cheat_caller_address(m.contract_address, addr(20));
-    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5);
+    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
     c.set_failure(true);
     start_cheat_caller_address(m.contract_address, addr(30));
     let safe = IMarketplaceSafeDispatcher { contract_address: m.contract_address };
@@ -131,8 +131,8 @@ fn failed_payment_rolls_back_order_and_nft() {
 fn cart_is_atomic_and_rejects_duplicate_tokens() {
     let (m, c, n) = setup();
     start_cheat_caller_address(m.contract_address, addr(20));
-    let a = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5);
-    let b = m.create_listing(n.contract_address, 2, c.contract_address, 100, 200, 5);
+    let a = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
+    let b = m.create_listing(n.contract_address, 2, c.contract_address, 100, 200, 5, 500);
     let keys = array![
         OrderKey { maker: addr(20), nonce: a }, OrderKey { maker: addr(20), nonce: b },
     ];
@@ -154,8 +154,8 @@ fn cart_is_atomic_and_rejects_duplicate_tokens() {
 fn late_nft_failure_reverts_every_payment_transfer_and_order() {
     let (m, c, n) = setup();
     start_cheat_caller_address(m.contract_address, addr(20));
-    let a = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5);
-    let b = m.create_listing(n.contract_address, 2, c.contract_address, 100, 200, 5);
+    let a = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
+    let b = m.create_listing(n.contract_address, 2, c.contract_address, 100, 200, 5, 500);
     let keys = array![
         OrderKey { maker: addr(20), nonce: a }, OrderKey { maker: addr(20), nonce: b },
     ];
@@ -184,7 +184,7 @@ fn maximum_cart_settles_twenty_five_nfts() {
         n.set_approval(id.into(), m.contract_address);
         stop_cheat_caller_address(n.contract_address);
         let nonce = m
-            .create_listing(n.contract_address, id.into(), c.contract_address, 100, 200, 5);
+            .create_listing(n.contract_address, id.into(), c.contract_address, 100, 200, 5, 500);
         keys.append(OrderKey { maker: addr(20), nonce });
     }
     start_cheat_caller_address(m.contract_address, addr(30));
@@ -204,10 +204,12 @@ fn expiry_authorization_and_admin_handoff_are_enforced() {
     let (m, c, n) = setup();
     let safe = IMarketplaceSafeDispatcher { contract_address: m.contract_address };
     start_cheat_caller_address(m.contract_address, addr(30));
-    assert!(safe.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5).is_err());
+    assert!(
+        safe.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500).is_err(),
+    );
     assert!(safe.set_paused(true).is_err());
     start_cheat_caller_address(m.contract_address, addr(20));
-    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5);
+    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
     start_cheat_caller_address(m.contract_address, addr(30));
     assert!(safe.cancel_order(nonce).is_err());
     start_cheat_block_timestamp(m.contract_address, 200);
@@ -230,7 +232,8 @@ fn collection_offer_caps_and_seller_minimum_are_binding() {
     let (m, c, n) = setup();
     let safe = IMarketplaceSafeDispatcher { contract_address: m.contract_address };
     start_cheat_caller_address(m.contract_address, addr(30));
-    let nonce = m.create_collection_offer(n.contract_address, c.contract_address, 100, 200, 10);
+    let nonce = m
+        .create_collection_offer(n.contract_address, c.contract_address, 100, 200, 10, 500);
     let key = OrderKey { maker: addr(30), nonce };
     start_cheat_caller_address(m.contract_address, addr(20));
     n.set_royalty(addr(50), 11);
@@ -249,7 +252,7 @@ fn collection_offer_caps_and_seller_minimum_are_binding() {
 fn malicious_asset_callback_cannot_create_orders_during_settlement() {
     let (m, c, n) = setup();
     start_cheat_caller_address(m.contract_address, addr(20));
-    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5);
+    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
     n.set_reentry(m.contract_address, c.contract_address);
     start_cheat_caller_address(m.contract_address, addr(30));
     let safe = IMarketplaceSafeDispatcher { contract_address: m.contract_address };
@@ -281,4 +284,101 @@ fn fuzz_allocations_conserve_buyer_price(price: u128, raw_bps: u16, raw_royalty:
     let (protocol, seller) = payouts(p, bps, royalty);
     assert!(seller > 0);
     assert_eq!(protocol + seller + royalty, p);
+}
+
+#[test]
+#[feature("safe_dispatcher")]
+fn fee_updates_are_admin_only_bounded_and_atomic() {
+    let (m, _, _) = setup();
+    let safe = IMarketplaceSafeDispatcher { contract_address: m.contract_address };
+    start_cheat_caller_address(m.contract_address, addr(20));
+    assert!(safe.set_fee(300, addr(60)).is_err());
+    start_cheat_caller_address(m.contract_address, addr(10));
+    assert!(safe.set_fee(501, addr(60)).is_err());
+    assert!(safe.set_fee(300, addr(0)).is_err());
+    assert_eq!(m.get_config().fee_bps, 200);
+    assert_eq!(m.get_config().fee_recipient, addr(40));
+    m.set_paused(true);
+    m.set_fee(0, addr(60));
+    assert_eq!(m.get_config().fee_bps, 0);
+    m.set_fee(500, addr(70));
+    assert_eq!(m.get_config().fee_bps, 500);
+    assert_eq!(m.get_config().fee_recipient, addr(70));
+    m.propose_admin(addr(20));
+    start_cheat_caller_address(m.contract_address, addr(20));
+    m.accept_admin();
+    m.set_fee(300, addr(60));
+    start_cheat_caller_address(m.contract_address, addr(10));
+    assert!(safe.set_fee(200, addr(40)).is_err());
+}
+
+#[test]
+fn existing_orders_keep_fee_rates_and_fills_use_current_recipient() {
+    let (m, c, n) = setup();
+    start_cheat_caller_address(m.contract_address, addr(20));
+    let old = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
+    start_cheat_caller_address(m.contract_address, addr(10));
+    m.set_fee(500, addr(60));
+    start_cheat_caller_address(m.contract_address, addr(20));
+    let new = m.create_listing(n.contract_address, 2, c.contract_address, 100, 200, 5, 500);
+    start_cheat_caller_address(m.contract_address, addr(30));
+    m
+        .buy_many(
+            array![
+                OrderKey { maker: addr(20), nonce: old }, OrderKey { maker: addr(20), nonce: new },
+            ]
+                .span(),
+            c.contract_address,
+            200,
+            200,
+        );
+    assert_eq!(c.balance_of(addr(20)), 183);
+    assert_eq!(c.balance_of(addr(60)), 7);
+    assert_eq!(c.balance_of(addr(40)), 0);
+    assert_eq!(c.balance_of(addr(30)), 9800);
+}
+
+#[test]
+#[feature("safe_dispatcher")]
+fn fee_increase_cannot_silently_change_creation_consent() {
+    let (m, c, n) = setup();
+    m.set_fee(300, addr(60));
+    start_cheat_caller_address(m.contract_address, addr(20));
+    let safe = IMarketplaceSafeDispatcher { contract_address: m.contract_address };
+    assert!(
+        safe.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 200).is_err(),
+    );
+    assert!(
+        safe.create_offer(n.contract_address, 1, c.contract_address, 100, 200, 5, 200).is_err(),
+    );
+    assert!(
+        safe
+            .create_collection_offer(n.contract_address, c.contract_address, 100, 200, 5, 200)
+            .is_err(),
+    );
+    assert!(
+        safe.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 501).is_err(),
+    );
+    start_cheat_caller_address(m.contract_address, addr(10));
+    m.set_fee(100, addr(60));
+    start_cheat_caller_address(m.contract_address, addr(20));
+    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 200);
+    assert_eq!(nonce, 1);
+    assert_eq!(m.get_order(OrderKey { maker: addr(20), nonce }).terms.fee_bps, 100);
+}
+
+#[test]
+fn existing_token_and_collection_offers_keep_fee_snapshots() {
+    let (m, c, n) = setup();
+    start_cheat_caller_address(m.contract_address, addr(30));
+    let a = m.create_offer(n.contract_address, 1, c.contract_address, 100, 200, 5, 200);
+    let b = m.create_collection_offer(n.contract_address, c.contract_address, 100, 200, 5, 200);
+    start_cheat_caller_address(m.contract_address, addr(10));
+    m.set_fee(500, addr(60));
+    start_cheat_caller_address(m.contract_address, addr(20));
+    m.accept_offer(OrderKey { maker: addr(30), nonce: a }, c.contract_address, 93);
+    m.accept_collection_offer(OrderKey { maker: addr(30), nonce: b }, 2, c.contract_address, 93);
+    assert_eq!(c.balance_of(addr(20)), 186);
+    assert_eq!(c.balance_of(addr(60)), 4);
+    assert_eq!(c.balance_of(addr(30)), 9800);
 }

@@ -108,6 +108,7 @@ test("transaction reflection includes canonical governance events and is invalid
     timestamp: 2,
     events: [
       { type: "trading_changed", paused: true, transactionHash: "0xb" },
+      { type: "fee_policy_changed", feeBps: 300, feeRecipient: address("6"), transactionHash: "0x10" },
       {
         type: "collection_policy",
         address: address("9"),
@@ -154,11 +155,12 @@ test("transaction reflection includes canonical governance events and is invalid
         )
       ).json()
     ).data;
-  for (const hash of ["0xa", "0xb", "0xc", "0xd", "0xe", "0xf"])
+  for (const hash of ["0xa", "0xb", "0xc", "0xd", "0xe", "0xf", "0x10"])
     assert.equal((await get(hash)).reflected, true, hash);
   assert.equal((await get("0x999?block=2")).reflected, false);
   s.rewind(1);
   assert.equal((await get("0xb")).reflected, false);
+  assert.equal((await get("0x10")).reflected, false);
   assert.equal((await get("0xa")).reflected, true);
 });
 

@@ -110,6 +110,7 @@ await execute(seller, [
     expiry,
     5,
     0,
+    200,
   ]),
   call(market.address, "create_listing", [
     nft.address,
@@ -121,9 +122,14 @@ await execute(seller, [
     expiry,
     5,
     0,
+    200,
   ]),
 ]);
+// Existing listings retain 200 bps while the new-order rate becomes 500 bps.
+// Route fees to the buyer to verify live-recipient alias accounting in preflight.
+await execute(admin, [call(market.address, "set_fee", [500, buyer.address])]);
 await scanOnce(store, rpc, config, { window: 1000 });
+assert.equal(store.get("config", "marketplace").feeBps, 500);
 const quote = await preflight(store, rpc, config, {
   account: buyer.address,
   items: [
@@ -143,7 +149,10 @@ const quote = await preflight(store, rpc, config, {
 });
 assert.equal(quote.canSubmit, true);
 assert.equal(quote.total, "200");
+// Approval remains bounded by gross debit; recipient aliases can reduce actual spend.
 assert.equal(quote.approvalAmount, "200");
+assert.ok(quote.rows.every(row => row.protocolFee === "2" && row.sellerProceeds === "93"));
+assert.ok(quote.rows.every(row => BigInt(row.feeRecipient) === BigInt(buyer.address)));
 const cart = await execute(buyer, [
   call(currency.address, "approve", [market.address, 10000, 0]),
   call(market.address, "buy_many", [
@@ -158,6 +167,7 @@ const cart = await execute(buyer, [
     expiry,
   ]),
 ]);
+await execute(admin, [call(market.address, "set_fee", [200, admin.address])]);
 await execute(buyer, [
   call(market.address, "create_offer", [
     nft.address,
@@ -169,6 +179,7 @@ await execute(buyer, [
     expiry,
     5,
     0,
+    200,
   ]),
   call(market.address, "create_collection_offer", [
     nft.address,
@@ -178,6 +189,7 @@ await execute(buyer, [
     expiry,
     10,
     0,
+    200,
   ]),
 ]);
 await execute(seller, [
@@ -209,6 +221,7 @@ await execute(buyer, [
     expiry,
     5,
     0,
+    200,
   ]),
   call(market.address, "cancel_order", [3]),
 ]);
@@ -277,7 +290,8 @@ await execute(
       expiry,
       5,
       0,
-    ]),
+    200,
+  ]),
   ]).flat(),
 );
 const maximumCart = await execute(buyer, [
@@ -315,7 +329,8 @@ await execute(
       expiry,
       5,
       0,
-    ]),
+    200,
+  ]),
   ]).flat(),
 );
 const repeatedFills = await execute(

@@ -23,7 +23,7 @@ const cfg = {
   collections: [],
   status: { safeForCheckout: true, reasons: [] },
 };
-const context = { marketplace: "0x9", chain: "LOCAL", account: "0x2" };
+const context = { marketplace: "0x9", chain: "LOCAL", account: "0x2", feeBps: 200 };
 const item = {
   orderId: "LOCAL:0x9:0x3:1",
   collection: "0xa",

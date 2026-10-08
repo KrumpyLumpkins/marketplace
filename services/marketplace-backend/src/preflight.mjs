@@ -53,8 +53,7 @@ export async function preflight(store, rpc, config, input) {
   );
   if (cfg.length !== 5 || BigInt(cfg[0]) !== 1n || BigInt(cfg[2]) !== 0n)
     throw new ApiError("PAUSED", "Marketplace is paused or unsupported.", 409);
-  const bps = Number(BigInt(cfg[3])),
-    rows = [];
+  const rows = [];
   let total = 0n,
     currency = null;
   const tokens = new Set();
@@ -70,9 +69,9 @@ export async function preflight(store, rpc, config, input) {
         [address(item.maker), uint(item.nonce, 64)],
         blockId,
       );
-      if (values.length !== 14 || BigInt(values[13]) !== 1n)
+      if (values.length !== 15 || BigInt(values[14]) !== 1n)
         throw new ApiError("NOT_OPEN", "Order is not open.");
-      const order = readTerms(values.slice(0, 13));
+      const order = readTerms(values.slice(0, 14));
       if (BigInt(order.expiry) <= BigInt(block.timestamp))
         throw new ApiError("EXPIRED", "Order expired.");
       for (const field of [
@@ -83,6 +82,7 @@ export async function preflight(store, rpc, config, input) {
         "buyerDebit",
         "expiry",
         "royaltyCap",
+        "feeBps",
         "royaltyAmount",
         "royaltyRecipient",
       ])
@@ -196,7 +196,7 @@ export async function preflight(store, rpc, config, input) {
       const sourceProgress = store.get("progress", order.collection);
       if (!sourceProgress || block.block_number - sourceProgress.block > 2)
         throw new ApiError("INDEX_STALE", "Collection index is behind.");
-      const amounts = allocations(order.buyerDebit, bps, royalty);
+      const amounts = allocations(order.buyerDebit, order.feeBps, royalty);
       if (currency && currency !== order.currency)
         throw new ApiError("MIXED_CURRENCY", "Use one currency per checkout.");
       currency = order.currency;

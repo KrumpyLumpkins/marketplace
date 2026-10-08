@@ -32,6 +32,7 @@ export type ApiOrder = {
   royaltyAmount: string;
   royaltyCap: string;
   royaltyRecipient: string;
+  feeBps: number;
   createdAt?: ChainProvenance;
   updatedAt?: ChainProvenance;
 };

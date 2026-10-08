@@ -38,6 +38,7 @@ const order: ApiOrder = {
   expiry: "4000000000",
   royaltyAmount: "0",
   royaltyCap: "0",
+  feeBps: 200,
   royaltyRecipient: "0x0",
 };
 const token: ApiToken = {

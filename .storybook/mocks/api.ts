@@ -28,6 +28,7 @@ export const marketplaceRequest = fn(
                   expiry: "4000000000",
                   royaltyAmount: "0",
                   royaltyCap: "200000000000000000",
+                  feeBps: 200,
                   royaltyRecipient: "0x4",
                 },
                 sellerProceeds: "1860000000000000000",

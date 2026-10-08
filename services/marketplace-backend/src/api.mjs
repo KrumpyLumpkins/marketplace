@@ -518,7 +518,7 @@ export function createApi({ store, config, rpc, verifySignature }) {
           const hash = "0x" + BigInt(uint(route[1], 252)).toString(16);
           const activity = store.db
             .prepare(
-              "SELECT body FROM entities WHERE kind='activity' AND json_extract(body,'$.provenance.transactionHash')=? AND json_extract(body,'$.type') IN ('order_created','order_filled','order_cancelled','initialized','trading_changed','collection_policy','currency_policy','admin_proposed','admin_transferred') LIMIT 1",
+              "SELECT body FROM entities WHERE kind='activity' AND json_extract(body,'$.provenance.transactionHash')=? AND json_extract(body,'$.type') IN ('order_created','order_filled','order_cancelled','initialized','trading_changed','fee_policy_changed','collection_policy','currency_policy','admin_proposed','admin_transferred') LIMIT 1",
             )
             .get(hash);
           const event = activity ? JSON.parse(activity.body) : null;

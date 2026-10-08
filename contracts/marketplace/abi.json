@@ -91,6 +91,10 @@
       {
         "name": "royalty_amount",
         "type": "core::integer::u256"
+      },
+      {
+        "name": "fee_bps",
+        "type": "core::integer::u16"
       }
     ]
   },
@@ -179,6 +183,10 @@
           {
             "name": "max_royalty",
             "type": "core::integer::u256"
+          },
+          {
+            "name": "max_fee_bps",
+            "type": "core::integer::u16"
           }
         ],
         "outputs": [
@@ -215,6 +223,10 @@
           {
             "name": "max_royalty",
             "type": "core::integer::u256"
+          },
+          {
+            "name": "max_fee_bps",
+            "type": "core::integer::u16"
           }
         ],
         "outputs": [
@@ -247,6 +259,10 @@
           {
             "name": "max_royalty",
             "type": "core::integer::u256"
+          },
+          {
+            "name": "max_fee_bps",
+            "type": "core::integer::u16"
           }
         ],
         "outputs": [
@@ -446,6 +462,22 @@
           {
             "name": "enabled",
             "type": "core::bool"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "set_fee",
+        "inputs": [
+          {
+            "name": "fee_bps",
+            "type": "core::integer::u16"
+          },
+          {
+            "name": "fee_recipient",
+            "type": "core::starknet::contract_address::ContractAddress"
           }
         ],
         "outputs": [],
@@ -654,6 +686,23 @@
   },
   {
     "type": "event",
+    "name": "biblio_marketplace::Marketplace::FeePolicyChanged",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "fee_bps",
+        "type": "core::integer::u16",
+        "kind": "data"
+      },
+      {
+        "name": "fee_recipient",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
     "name": "biblio_marketplace::Marketplace::CollectionPolicyChanged",
     "kind": "struct",
     "members": [
@@ -748,6 +797,11 @@
       {
         "name": "TradingChanged",
         "type": "biblio_marketplace::Marketplace::TradingChanged",
+        "kind": "nested"
+      },
+      {
+        "name": "FeePolicyChanged",
+        "type": "biblio_marketplace::Marketplace::FeePolicyChanged",
         "kind": "nested"
       },
       {

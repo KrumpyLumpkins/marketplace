@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "description": "Reject caller-supplied client IP identity",
+      "priority": 10,
+      "enabled": true,
+      "if": { "attr": "http.header", "key": "x-real-ip", "op": "matches", "value": "*" },
+      "then": { "action": "block", "params": { "status": 403, "body": "Client IP identity must be supplied by ingress." } }
+    }
+  ]
+}

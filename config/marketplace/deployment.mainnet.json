@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "network": "SN_MAIN",
+  "chainId": "0x534e5f4d41494e",
+  "address": "0x7ced79b9da11b280209425dce4329d6b8aa5fa03f81a807b9bf3cfbd64cb9d7",
+  "deploymentBlock": 16050533,
+  "classHash": "0x4667d1780f7c3dbbe1751d879bf9ae40318edd418c39486568dfa231fb4bdfa",
+  "compiledClassHash": "0x492f11926fb5ceefa1ccef81a11307d0e8d6a3bbb3f42513b76150efc78d2ec",
+  "sourceSha256": "c0a56ab2ea80f9d5feed1292d7cecec50bc811caa0977c946523e39a40e728eb",
+  "abiSha256": "39e3b6287219e73093a6b377bba9efba3dcb0258a15068acbe2fc4a3b495cdcc",
+  "sourceCommit": "9cfc5b54f426ae6ac555c5e9d7d93c2b722cb672",
+  "administrator": "0x1d0ba8786e38bfa6e4518e51897988cbafe87835cf43c5c42592e9f5c813aa7",
+  "initialFeeBps": 500,
+  "initialFeeRecipient": "0x1d0ba8786e38bfa6e4518e51897988cbafe87835cf43c5c42592e9f5c813aa7",
+  "pausedAtVerification": true,
+  "verifiedBlock": 16050580,
+  "verifiedBlockHash": "0x3a0ce519ccc290003a0409124e10576d201d336ea21f231717302cb0155a1ec",
+  "planId": "6c47f8861348b649049073cd3dc99007c60f2ab4e30152d2873eb52eb34a9131",
+  "transactions": [
+    {
+      "step": "declare",
+      "hash": "0x51619e67a34d3bbc272baa76e81e474a5d01fd2ce913e196e70354e6ccf2d8c",
+      "block": 16050501,
+      "finality": "ACCEPTED_ON_L2",
+      "execution": "SUCCEEDED",
+      "actualFee": {
+        "amount": "0x11b43f8699be357c0",
+        "unit": "FRI"
+      }
+    },
+    {
+      "step": "deploy",
+      "hash": "0x65629535a06ee32b4af360f0b1fca799f07db7f74e403ba2cb3f2fac72ccff9",
+      "block": 16050533,
+      "finality": "ACCEPTED_ON_L2",
+      "execution": "SUCCEEDED",
+      "actualFee": {
+        "amount": "0xb7b26d7168ec20",
+        "unit": "FRI"
+      }
+    },
+    {
+      "step": "configure",
+      "hash": "0x7ac10ab9e299e5dfa5f0708f599ce5a875f823e7e0016172898eed78fd50353",
+      "block": 16050562,
+      "finality": "ACCEPTED_ON_L2",
+      "execution": "SUCCEEDED",
+      "actualFee": {
+        "amount": "0x12efd4573ac8b40",
+        "unit": "FRI"
+      }
+    }
+  ],
+  "releaseScope": "Paused mainnet bootstrap and Railway indexing only. Trading activation not approved.",
+  "validation": {
+    "internalSecurityReview": true,
+    "independentAudit": false,
+    "localSignedRehearsal": true,
+    "publicSepoliaRehearsal": false,
+    "mainnetFork": {
+      "block": 16049220,
+      "realmsTokenId": "1038",
+      "currencies": [
+        "STRK",
+        "LORDS"
+      ],
+      "sampleListingsAndTransfersPassed": true
+    },
+    "historicalBackfillComplete": false,
+    "supportedWalletAcceptance": false
+  },
+  "productionUrl": "https://web-production-2a4cb.up.railway.app"
+}

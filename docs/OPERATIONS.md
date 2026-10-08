@@ -8,7 +8,7 @@ instructions below remain useful for local rehearsal on a shared host.
 
 Use one chain database per chain and marketplace deployment. Keep application state in its adjacent `.app` file and assets in the configured directory. Run one indexing worker and one metadata worker per database. The API supports 1–8 Node workers with `MARKETPLACE_API_WORKERS`; keep embedded indexing off when using multiple API workers. SQLite WAL permits readers during a writer transaction; this topology is not high availability.
 
-Deploy the non-upgradeable marketplace with explicit administrator, protocol fee basis points (0–500) and fee recipient. Enable each reviewed ERC-721 collection and standard ERC-20 currency through administrator transactions. Record the source/compiler/class hashes, deployment block and administration addresses in the registry. Production addresses are deliberately unset. An immutable contract change requires a new deployment and an explicit migration.
+Deploy the non-upgradeable marketplace with explicit administrator, protocol fee basis points (0–500) and fee recipient. Enable each reviewed ERC-721 collection and standard ERC-20 currency through administrator transactions. Record the source/compiler/class hashes, deployment block and administration addresses in the registry. The paused production deployment and approved asset addresses are recorded in `config/marketplace/deployment.mainnet.json` and `registry.mainnet.json`; Railway consumes that exported registry. The administrator can update the default fee rate (0–500 bps) and recipient atomically with `set_fee`; old orders retain their fee rate and all future fills use the current recipient. Follow the SDK administration flow and monitor `FeePolicyChanged` in the indexer. A contract-code change requires a new deployment and an explicit migration.
 
 Build without the `fixtures` feature for release. Keep private keys out of the backend: it verifies account signatures and may relay already-signed wallet invokes through `/rpc`, but never constructs signatures or holds custody. Operator authorization is separate from wallet sessions.
 
@@ -212,8 +212,12 @@ Direct API connections are limited by their normalized TCP peer IP. Forwarded
 headers are ignored by default, including loopback callers. For the selected
 Railway topology, the checked-in IaC sets
 `MARKETPLACE_TRUSTED_PROXY_HOSTS=web.railway.internal`; the API resolves that exact
-service hostname and accepts only its relayed `X-Real-IP`. Railway's public edge
-sets this header and the Next.js rewrite carries it to the private backend.
+service hostname and accepts only its relayed `X-Real-IP`. The configured Railway
+edge rule rejects caller-supplied `X-Real-IP` before ingress supplies the genuine
+identity and the Next.js rewrite carries it to the private backend. The live
+8 October test showed that default ingress preserved forged values: do not rely
+on an assumed overwrite guarantee. Apply `pnpm railway:edge -- ENVIRONMENT` when
+creating either environment; its policy is `infra/railway/edge-rules.json`.
 `X-Forwarded-For` is never used to establish identity. The backend must have no
 public domain/TCP proxy, and web public traffic must enter through Railway HTTP
 ingress. See the [Railway client-IP contract](https://station.railway.com/questions/need-authoritative-railway-client-ip-p-b7a7b4bd)
@@ -226,7 +230,11 @@ client-supplied forwarding headers; do not trust it without that ingress boundar
 DNS results are cached for 30 seconds, and lookup failure grants no new header
 trust. Malformed or multi-value IP headers fall back to the TCP peer. Each visitor
 retains the 300-request/minute quota; `/health/live` is exempt from visitor quotas.
-Staging still needs a live ingress anti-spoofing and multi-visitor check.
+Live staging checks passed after installing the rule: 300 requests from one
+simulated visitor succeeded, its next request returned 429, and another visitor
+still received 200. Through public ingress, varying `X-Forwarded-For` did not evade
+the quota, while supplying `X-Real-IP` returned 403. Repeat this check after
+changing ingress or proxy configuration.
 
 ## Historical source boundary changes
 

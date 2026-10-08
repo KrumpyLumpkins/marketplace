@@ -3,8 +3,10 @@
 These scripts prepare and execute the existing immutable v1 contract. They do
 not deploy infrastructure, create accounts, transfer funding, or place trades.
 [The build plan](BUILD-PLAN.md) owns launch approval; [operations](OPERATIONS.md)
-owns backend, frontend and recovery procedures. Mainnet remains blocked by the
-open audit, dependency, asset-compatibility and rehearsal gates recorded there.
+owns backend, frontend and recovery procedures. A paused mainnet bootstrap is recorded in
+[deployment.mainnet.json](../config/marketplace/deployment.mainnet.json). Trading
+activation remains subject to the open audit, compatibility, wallet and indexing
+gates in the build plan.
 
 ## Sequence and authority
 
@@ -52,7 +54,7 @@ accepted block hashes. The tooling reuses the pinned Starknet.js 10.8.0 developm
 alias; the native backend gains no runtime dependency.
 
 Fill `config.json` with the intended deployer/admin addresses and their class
-hashes, immutable fee recipient/rate (0–500 bps), a fixed salt, UDC class hash,
+hashes, initial fee recipient/rate (0–500 bps), a fixed salt, UDC class hash,
 explicit maximum fee in **FRI** per transaction, and reviewed asset lists.
 There is deliberately no default fee, admin address, fee cap or asset approval.
 
@@ -82,7 +84,7 @@ health/trait restrictions are not encoded by this v1 contract.
 `release` contains references to the reviewed contract audit, asset compatibility
 matrix, public Sepolia rehearsal and human release approval. References are an
 audit trail, **not machine verification of those reports**. Mainnet sends require
-all four; this repository currently has no completed mainnet approval.
+all four; the bootstrap decision records internal/local evidence and the explicitly uncompleted independent/public acceptance checks. It is not approval to activate trading.
 
 ## 2. Probe identities and freeze a plan
 
@@ -254,3 +256,33 @@ point-in-time check and cannot prevent an asset administrator upgrading later.
 
 Primary references: [Starknet.js 10.8 deployment](https://starknet-js.com/docs/10.8.0/guides/contracts/create_contract/)
 and [OpenZeppelin's UDC address/interface](https://docs.openzeppelin.com/contracts-cairo/3.x/udc).
+
+## Configure the local signer interactively
+
+Run `pnpm contracts:env` from the repository root. It prompts without echo for
+`DEPLOYMENT_RPC_URL`, `DEPLOYMENT_SIGNER_ADDRESS` and
+`DEPLOYMENT_SIGNER_PRIVATE_KEY`, then atomically saves ignored `.env.deployment`
+with mode `600`. Blank responses retain existing values; supplying a private key
+switches from an optional signer module to private-key signing. This configures
+an existing funded account; it does not create/fund an account or submit a
+transaction. Keep this file local. The Railway API/indexer requires no signing
+key. Probe identities and complete the deployment plan/gates before using it.
+
+## Fee administration after deployment
+
+The administrator can use SDK `contract.admin.prepareSetFee(account, feeBps, recipient)`
+and `contract.admin.submit`, or export `buildSetFee(marketplace, feeBps, recipient)`
+for an administrator wallet. This atomically changes the new-order rate and the
+recipient for all future fills. The hard ceiling remains 500 bps; recipient must
+be nonzero. It works while paused and emits `FeePolicyChanged`. Existing orders
+retain their fee rate. New order calls must supply `max_fee_bps`.
+
+The deployment plan binds the **initial** fee terms. Deployment verification and
+activation continue to require those reviewed terms; an unexpected fee change
+during rollout fails verification. Routine post-launch fee administration is
+separate from that initial deployment attestation.
+
+This ABI revision adds one felt to order terms and one argument to creation.
+Regenerate/review class and ABI hashes and build the matching SDK/indexer before
+deployment. There is no mainnet marketplace to migrate yet. Old local fixture
+plans/databases must not be reused with the revised class.

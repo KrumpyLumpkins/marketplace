@@ -168,7 +168,7 @@ export type OrderIntent = {
   replaceIds?: string[];
 };
 export function prepareOrder(
-  context: PreparationContext,
+  context: PreparationContext & { feeBps: number },
   input: OrderIntent,
   now = Math.floor(Date.now() / 1000),
 ) {
@@ -213,6 +213,7 @@ export function prepareOrder(
         price: amount,
         expiry,
         royaltyCap,
+        maxFeeBps: context.feeBps,
       }),
     );
   }
@@ -383,7 +384,7 @@ export function createTrades(deps: {
       chainId: c.config.chainId,
       mode: "trade",
       expiresAt: Math.floor(Date.now() / 1000) + 60,
-      calls: prepareOrder(c.value, input),
+      calls: prepareOrder({ ...c.value, feeBps: c.config.feeBps }, input),
       terms: {
         kind: input.kind,
         currency: input.currency.address,

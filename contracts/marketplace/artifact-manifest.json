@@ -2,8 +2,13 @@
   "name": "Marketplace",
   "version": 1,
   "scarb": "2.15.1",
-  "classHash": "0x711fcefbfd0554c8df9de809b712732415928f0815c4a908215c22930bdd94c",
-  "compiledClassHash": "0x5a4ec705e1fe02a60c41ed6995f0a3087620a3b6014cac7a08cfb5ffae304b3",
-  "sourceSha256": "9beb648723cb312cbabe5b032bae188f8a0a38df197868a3f44df800fc90ecd5",
-  "productionDeployment": null
+  "classHash": "0x4667d1780f7c3dbbe1751d879bf9ae40318edd418c39486568dfa231fb4bdfa",
+  "compiledClassHash": "0x492f11926fb5ceefa1ccef81a11307d0e8d6a3bbb3f42513b76150efc78d2ec",
+  "sourceSha256": "c0a56ab2ea80f9d5feed1292d7cecec50bc811caa0977c946523e39a40e728eb",
+  "productionDeployment": {
+    "network": "SN_MAIN",
+    "address": "0x7ced79b9da11b280209425dce4329d6b8aa5fa03f81a807b9bf3cfbd64cb9d7",
+    "blockNumber": 16050533,
+    "record": "config/marketplace/deployment.mainnet.json"
+  }
 }

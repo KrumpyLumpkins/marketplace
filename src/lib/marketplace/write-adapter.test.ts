@@ -41,6 +41,7 @@ describe("owned transaction encoding", () => {
       price: "100",
       expiry: 123,
       royaltyCap: "5",
+      maxFeeBps: 200,
     };
     expect(
       buildCreateOrder({ ...base, kind: "token_offer", tokenId: "0" })
@@ -48,7 +49,7 @@ describe("owned transaction encoding", () => {
     ).toBe("create_offer");
     expect(
       buildCreateOrder({ ...base, kind: "collection_offer" }).calldata,
-    ).toEqual(["0x9", "0x8", "100", "0", "123", "5", "0"]);
+    ).toEqual(["0x9", "0x8", "100", "0", "123", "5", "0", "200"]);
   });
 });
 

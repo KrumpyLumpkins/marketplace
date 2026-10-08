@@ -72,7 +72,7 @@ fn has_error(error: Array<felt252>, expected: felt252) {
 // No caller cheat is active on the market when the probe buys: callback identity is real.
 #[test]
 #[feature("safe_dispatcher")]
-fn receiver_cannot_reenter_any_of_the_fourteen_mutating_entrypoints() {
+fn receiver_cannot_reenter_any_of_the_fifteen_mutating_entrypoints() {
     let (m, c, n) = setup();
     let probe = IProbeDispatcher { contract_address: deploy("ReceiverProbe", array![]) };
     let safe_probe = IProbeSafeDispatcher { contract_address: probe.contract_address };
@@ -85,21 +85,25 @@ fn receiver_cannot_reenter_any_of_the_fourteen_mutating_entrypoints() {
         );
     n.set_receiver_checks(true);
     start_cheat_caller_address(m.contract_address, addr(20));
-    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5);
+    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
     stop_cheat_caller_address(m.contract_address);
     let buy = array![20, nonce.into(), c.contract_address.into(), 100, 0];
     let attacks = array![
         (
             selector!("create_listing"),
-            array![n.contract_address.into(), 1, 0, c.contract_address.into(), 100, 0, 200, 5, 0],
+            array![
+                n.contract_address.into(), 1, 0, c.contract_address.into(), 100, 0, 200, 5, 0, 500,
+            ],
         ),
         (
             selector!("create_offer"),
-            array![n.contract_address.into(), 1, 0, c.contract_address.into(), 100, 0, 200, 5, 0],
+            array![
+                n.contract_address.into(), 1, 0, c.contract_address.into(), 100, 0, 200, 5, 0, 500,
+            ],
         ),
         (
             selector!("create_collection_offer"),
-            array![n.contract_address.into(), c.contract_address.into(), 100, 0, 200, 5, 0],
+            array![n.contract_address.into(), c.contract_address.into(), 100, 0, 200, 5, 0, 500],
         ),
         (selector!("cancel_order"), array![nonce.into()]),
         (selector!("cancel_orders"), array![1, nonce.into()]),
@@ -115,8 +119,8 @@ fn receiver_cannot_reenter_any_of_the_fourteen_mutating_entrypoints() {
         ),
         (selector!("set_collection"), array![n.contract_address.into(), 0]),
         (selector!("set_currency"), array![c.contract_address.into(), 0]),
-        (selector!("set_paused"), array![1]), (selector!("propose_admin"), array![99]),
-        (selector!("accept_admin"), array![]),
+        (selector!("set_fee"), array![300, 60]), (selector!("set_paused"), array![1]),
+        (selector!("propose_admin"), array![99]), (selector!("accept_admin"), array![]),
     ];
     for (selector, payload) in attacks {
         probe.configure(m.contract_address, selector, payload.span(), false);
@@ -154,7 +158,7 @@ fn receiver_rejection_reverts_payments_approvals_and_filled_state() {
     probe.configure(m.contract_address, 0, array![].span(), true);
     n.set_receiver_checks(true);
     start_cheat_caller_address(m.contract_address, addr(20));
-    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5);
+    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
     stop_cheat_caller_address(m.contract_address);
     let safe = IProbeSafeDispatcher { contract_address: probe.contract_address };
     has_error(
@@ -179,7 +183,7 @@ fn receiver_rejection_reverts_payments_approvals_and_filled_state() {
 fn payment_callback_cannot_cancel_and_failed_call_releases_guard() {
     let (m, c, n) = setup();
     start_cheat_caller_address(m.contract_address, addr(20));
-    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5);
+    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
     c.set_payment_reentry(m.contract_address, nonce);
     start_cheat_caller_address(m.contract_address, addr(30));
     let safe = IMarketplaceSafeDispatcher { contract_address: m.contract_address };
@@ -198,8 +202,8 @@ fn max_u256_cart_sum_cannot_wrap_into_an_affordable_cart() {
     let (m, c, n) = setup();
     start_cheat_caller_address(m.contract_address, addr(20));
     let max: u256 = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-    let a = m.create_listing(n.contract_address, 1, c.contract_address, max, 200, 5);
-    let b = m.create_listing(n.contract_address, 2, c.contract_address, 100, 200, 5);
+    let a = m.create_listing(n.contract_address, 1, c.contract_address, max, 200, 5, 500);
+    let b = m.create_listing(n.contract_address, 2, c.contract_address, 100, 200, 5, 500);
     start_cheat_caller_address(m.contract_address, addr(30));
     let safe = IMarketplaceSafeDispatcher { contract_address: m.contract_address };
     assert!(safe.buy_many(array![key(a), key(b)].span(), c.contract_address, max, 150).is_err());
@@ -215,7 +219,7 @@ fn max_u256_cart_sum_cannot_wrap_into_an_affordable_cart() {
 fn cancellation_batch_rolls_back_when_later_nonce_is_unknown() {
     let (m, c, n) = setup();
     start_cheat_caller_address(m.contract_address, addr(20));
-    let a = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5);
+    let a = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
     let safe = IMarketplaceSafeDispatcher { contract_address: m.contract_address };
     has_error(safe.cancel_orders(array![a, 999].span()).unwrap_err(), 'NOT_OPEN');
     assert_eq!(m.get_order(key(a)).state, 1);
@@ -228,7 +232,7 @@ fn cancellation_batch_rolls_back_when_later_nonce_is_unknown() {
 fn disabling_both_assets_does_not_prevent_expired_order_cancellation() {
     let (m, c, n) = setup();
     start_cheat_caller_address(m.contract_address, addr(20));
-    let a = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5);
+    let a = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
     start_cheat_caller_address(m.contract_address, addr(10));
     m.set_currency(c.contract_address, false);
     m.set_collection(n.contract_address, false);
@@ -245,7 +249,7 @@ fn deadline_currency_kind_and_self_trade_checks_cannot_be_bypassed() {
     let (m, c, n) = setup();
     let safe = IMarketplaceSafeDispatcher { contract_address: m.contract_address };
     start_cheat_caller_address(m.contract_address, addr(20));
-    let a = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5);
+    let a = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
     has_error(safe.buy_listing(key(a), c.contract_address, 100).unwrap_err(), 'SELF_TRADE');
     start_cheat_caller_address(m.contract_address, addr(30));
     has_error(
@@ -269,7 +273,7 @@ fn payout_aliases_match_net_balances_without_charging_the_buyer_twice() {
         let (m, c, n) = setup();
         n.set_royalty(recipient, 5);
         start_cheat_caller_address(m.contract_address, addr(20));
-        let a = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5);
+        let a = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
         start_cheat_caller_address(m.contract_address, addr(30));
         m.buy_listing(key(a), c.contract_address, 100);
         assert_eq!(c.balance_of(addr(30)), if recipient == addr(30) {
@@ -326,7 +330,7 @@ fn false_return_after_fee_or_royalty_transfer_reverts_earlier_payouts() {
     for recipient in array![addr(40), addr(50)] {
         let (m, c, n) = setup();
         start_cheat_caller_address(m.contract_address, addr(20));
-        let a = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5);
+        let a = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
         c.set_false_after_recipient(recipient);
         start_cheat_caller_address(m.contract_address, addr(30));
         let safe = IMarketplaceSafeDispatcher { contract_address: m.contract_address };
@@ -346,8 +350,8 @@ fn false_return_after_fee_or_royalty_transfer_reverts_earlier_payouts() {
 fn distinct_orders_for_the_same_nft_cannot_double_fill_a_cart() {
     let (m, c, n) = setup();
     start_cheat_caller_address(m.contract_address, addr(20));
-    let a = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5);
-    let b = m.create_listing(n.contract_address, 1, c.contract_address, 200, 200, 5);
+    let a = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
+    let b = m.create_listing(n.contract_address, 1, c.contract_address, 200, 200, 5, 500);
     start_cheat_caller_address(m.contract_address, addr(30));
     let safe = IMarketplaceSafeDispatcher { contract_address: m.contract_address };
     has_error(
@@ -365,7 +369,7 @@ fn distinct_orders_for_the_same_nft_cannot_double_fill_a_cart() {
 fn batch_bounds_fail_before_any_fill_or_cancellation() {
     let (m, c, n) = setup();
     start_cheat_caller_address(m.contract_address, addr(20));
-    let a = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5);
+    let a = m.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
     let safe = IMarketplaceSafeDispatcher { contract_address: m.contract_address };
     let mut nonces = array![];
     let mut keys = array![];
@@ -394,20 +398,24 @@ fn malformed_royalty_and_zero_price_cannot_allocate_orders_or_consume_nonces() {
     let safe = IMarketplaceSafeDispatcher { contract_address: m.contract_address };
     n.set_royalty(zero(), 5);
     has_error(
-        safe.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5).unwrap_err(),
+        safe
+            .create_listing(n.contract_address, 1, c.contract_address, 100, 200, 5, 500)
+            .unwrap_err(),
         'ROYALTY_RECEIVER',
     );
     n.set_royalty(addr(50), 98);
     has_error(
-        safe.create_listing(n.contract_address, 1, c.contract_address, 100, 200, 98).unwrap_err(),
+        safe
+            .create_listing(n.contract_address, 1, c.contract_address, 100, 200, 98, 500)
+            .unwrap_err(),
         'NO_PROCEEDS',
     );
     n.set_royalty(zero(), 0);
     has_error(
-        safe.create_listing(n.contract_address, 1, c.contract_address, 0, 200, 0).unwrap_err(),
+        safe.create_listing(n.contract_address, 1, c.contract_address, 0, 200, 0, 500).unwrap_err(),
         'NO_PROCEEDS',
     );
-    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 1, 200, 0);
+    let nonce = m.create_listing(n.contract_address, 1, c.contract_address, 1, 200, 0, 500);
     assert_eq!(nonce, 1);
     start_cheat_caller_address(m.contract_address, addr(30));
     m.buy_listing(key(nonce), c.contract_address, 1);
@@ -425,7 +433,10 @@ fn zero_and_full_width_token_ids_do_not_alias() {
         n.set_approval(id, m.contract_address);
         stop_cheat_caller_address(n.contract_address);
         start_cheat_caller_address(m.contract_address, addr(20));
-        keys.append(key(m.create_listing(n.contract_address, id, c.contract_address, 100, 200, 5)));
+        keys
+            .append(
+                key(m.create_listing(n.contract_address, id, c.contract_address, 100, 200, 5, 500)),
+            );
     }
     start_cheat_caller_address(m.contract_address, addr(30));
     m.buy_many(keys.span(), c.contract_address, 200, 150);
@@ -443,8 +454,8 @@ fn overlapping_offers_cannot_spend_more_than_remaining_funds() {
     c.approve(m.contract_address, 10000);
     stop_cheat_caller_address(c.contract_address);
     start_cheat_caller_address(m.contract_address, addr(70));
-    let a = m.create_offer(n.contract_address, 1, c.contract_address, 100, 200, 5);
-    let b = m.create_offer(n.contract_address, 2, c.contract_address, 100, 200, 5);
+    let a = m.create_offer(n.contract_address, 1, c.contract_address, 100, 200, 5, 500);
+    let b = m.create_offer(n.contract_address, 2, c.contract_address, 100, 200, 5, 500);
     start_cheat_caller_address(m.contract_address, addr(20));
     m.accept_offer(OrderKey { maker: addr(70), nonce: a }, c.contract_address, 93);
     let safe = IMarketplaceSafeDispatcher { contract_address: m.contract_address };

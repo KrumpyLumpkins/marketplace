@@ -207,3 +207,16 @@ test("admin transfer clears the nomination and rewind restores it", () => {
   assert.equal(s.get("config", "marketplace").admin, address("2"));
   s.close();
 });
+
+test('fee updates replay and rewind without rewriting order snapshots', () => {
+  const s=new Store(':memory:');
+  s.applyBlock(block(1,'0x0',[{type:'initialized',feeBps:200,feeRecipient:address('40')},{type:'order_created',key:'fee-order',kind:'listing',feeBps:200,collection:address('9'),tokenId:'1',maker:address('2'),currency:address('8'),buyerDebit:'100',expiry:'999'}]));
+  s.applyBlock(block(2,'0x65',[{type:'fee_policy_changed',feeBps:500,feeRecipient:address('60')}]));
+  assert.equal(s.get('config','marketplace').feeBps,500);
+  assert.equal(s.get('config','marketplace').feeRecipient,address('60'));
+  assert.equal(s.get('order','fee-order').feeBps,200);
+  s.rewind(1);
+  assert.equal(s.get('config','marketplace').feeBps,200);
+  assert.equal(s.get('config','marketplace').feeRecipient,address('40'));
+  s.close();
+});

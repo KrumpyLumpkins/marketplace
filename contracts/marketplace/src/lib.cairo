@@ -32,6 +32,7 @@ pub struct Terms {
     pub royalty_cap: u256,
     pub royalty_recipient: ContractAddress,
     pub royalty_amount: u256,
+    pub fee_bps: u16,
 }
 #[derive(Copy, Drop, Serde)]
 pub struct Order {
@@ -79,6 +80,7 @@ pub trait IMarketplace<T> {
         buyer_debit: u256,
         expiry: u64,
         max_royalty: u256,
+        max_fee_bps: u16,
     ) -> u64;
     fn create_offer(
         ref self: T,
@@ -88,6 +90,7 @@ pub trait IMarketplace<T> {
         buyer_debit: u256,
         expiry: u64,
         max_royalty: u256,
+        max_fee_bps: u16,
     ) -> u64;
     fn create_collection_offer(
         ref self: T,
@@ -96,6 +99,7 @@ pub trait IMarketplace<T> {
         buyer_debit: u256,
         expiry: u64,
         max_royalty: u256,
+        max_fee_bps: u16,
     ) -> u64;
     fn cancel_order(ref self: T, nonce: u64);
     fn cancel_orders(ref self: T, nonces: Span<u64>);
@@ -118,6 +122,7 @@ pub trait IMarketplace<T> {
     ) -> (u256, ContractAddress, u256, u256);
     fn set_collection(ref self: T, collection: ContractAddress, enabled: bool);
     fn set_currency(ref self: T, currency: ContractAddress, enabled: bool);
+    fn set_fee(ref self: T, fee_bps: u16, fee_recipient: ContractAddress);
     fn set_paused(ref self: T, paused: bool);
     fn propose_admin(ref self: T, admin: ContractAddress);
     fn accept_admin(ref self: T);
@@ -157,6 +162,7 @@ pub mod Marketplace {
         OrderCancelled: OrderCancelled,
         OrderFilled: OrderFilled,
         TradingChanged: TradingChanged,
+        FeePolicyChanged: FeePolicyChanged,
         CollectionPolicyChanged: CollectionPolicyChanged,
         CurrencyPolicyChanged: CurrencyPolicyChanged,
         AdminProposed: AdminProposed,
@@ -201,6 +207,11 @@ pub mod Marketplace {
         pub fee_recipient: ContractAddress,
         pub royalty_amount: u256,
         pub royalty_recipient: ContractAddress,
+    }
+    #[derive(Drop, starknet::Event)]
+    pub struct FeePolicyChanged {
+        pub fee_bps: u16,
+        pub fee_recipient: ContractAddress,
     }
     #[derive(Drop, starknet::Event)]
     pub struct TradingChanged {
@@ -253,10 +264,20 @@ pub mod Marketplace {
             buyer_debit: u256,
             expiry: u64,
             max_royalty: u256,
+            max_fee_bps: u16,
         ) -> u64 {
             self.lock();
             let nonce = self
-                .create(1, collection, token_id, currency, buyer_debit, expiry, max_royalty);
+                .create(
+                    1,
+                    collection,
+                    token_id,
+                    currency,
+                    buyer_debit,
+                    expiry,
+                    max_royalty,
+                    max_fee_bps,
+                );
             self.unlock();
             nonce
         }
@@ -268,10 +289,20 @@ pub mod Marketplace {
             buyer_debit: u256,
             expiry: u64,
             max_royalty: u256,
+            max_fee_bps: u16,
         ) -> u64 {
             self.lock();
             let nonce = self
-                .create(2, collection, token_id, currency, buyer_debit, expiry, max_royalty);
+                .create(
+                    2,
+                    collection,
+                    token_id,
+                    currency,
+                    buyer_debit,
+                    expiry,
+                    max_royalty,
+                    max_fee_bps,
+                );
             self.unlock();
             nonce
         }
@@ -282,9 +313,11 @@ pub mod Marketplace {
             buyer_debit: u256,
             expiry: u64,
             max_royalty: u256,
+            max_fee_bps: u16,
         ) -> u64 {
             self.lock();
-            let nonce = self.create(3, collection, 0, currency, buyer_debit, expiry, max_royalty);
+            let nonce = self
+                .create(3, collection, 0, currency, buyer_debit, expiry, max_royalty, max_fee_bps);
             self.unlock();
             nonce
         }
@@ -386,6 +419,16 @@ pub mod Marketplace {
             self.emit(CurrencyPolicyChanged { currency, enabled });
             self.unlock();
         }
+        fn set_fee(ref self: ContractState, fee_bps: u16, fee_recipient: ContractAddress) {
+            self.lock();
+            self.only_admin();
+            assert(fee_bps <= 500, 'FEE_CAP');
+            assert(fee_recipient != zero(), 'ZERO_ADDRESS');
+            self.fee_bps.write(fee_bps);
+            self.fee_recipient.write(fee_recipient);
+            self.emit(FeePolicyChanged { fee_bps, fee_recipient });
+            self.unlock();
+        }
         fn set_paused(ref self: ContractState, paused: bool) {
             self.lock();
             self.only_admin();
@@ -449,8 +492,12 @@ pub mod Marketplace {
             buyer_debit: u256,
             expiry: u64,
             max_royalty: u256,
+            max_fee_bps: u16,
         ) -> u64 {
             self.trading(collection, currency);
+            let fee_bps = self.fee_bps.read();
+            assert(max_fee_bps <= 500, 'FEE_CAP');
+            assert(fee_bps <= max_fee_bps, 'FEE_CHANGED');
             assert(expiry > get_block_timestamp(), 'EXPIRED');
             let maker = get_caller_address();
             assert(maker != zero(), 'ZERO_ADDRESS');
@@ -465,7 +512,7 @@ pub mod Marketplace {
                 self.royalty(collection, token_id, buyer_debit)
             };
             assert(amount <= max_royalty, 'ROYALTY_CAP');
-            payouts(buyer_debit, self.fee_bps.read(), if kind == 3 {
+            payouts(buyer_debit, fee_bps, if kind == 3 {
                 max_royalty
             } else {
                 amount
@@ -482,6 +529,7 @@ pub mod Marketplace {
                 royalty_cap: max_royalty,
                 royalty_recipient: receiver,
                 royalty_amount: amount,
+                fee_bps,
             };
             self.terms.write((maker, nonce), terms);
             self.states.write((maker, nonce), 1);
@@ -617,7 +665,7 @@ pub mod Marketplace {
             min_proceeds: u256,
         ) {
             let (protocol_fee, seller_proceeds) = payouts(
-                terms.buyer_debit, self.fee_bps.read(), royalty_amount,
+                terms.buyer_debit, terms.fee_bps, royalty_amount,
             );
             assert(seller_proceeds >= min_proceeds, 'MIN_PROCEEDS');
             let fee_recipient = self.fee_recipient.read();

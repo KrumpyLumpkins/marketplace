@@ -74,7 +74,7 @@ test("constructor and administrative calls validate addresses, booleans and fee 
 });
 test("exact royalty caps cover contract-valid orders beyond the UI percentage policy", () => {
   const calls = sdk.prepareOrder(
-    { marketplace: "0x9", chain: "LOCAL", account: "0x2" },
+    { marketplace: "0x9", chain: "LOCAL", account: "0x2", feeBps: 200 },
     {
       kind: "listing",
       collection: "0xa",
@@ -85,7 +85,7 @@ test("exact royalty caps cover contract-valid orders beyond the UI percentage po
       durationSeconds: 60,
     },
   );
-  assert.deepEqual(calls.at(-1).calldata.slice(-2), ["75", "0"]);
+  assert.deepEqual(calls.at(-1).calldata.slice(-3), ["75", "0", "200"]);
 });
 test("ABI coverage matches the Cairo interface and the generated source manifest", async () => {
   const { createHash } = await import("node:crypto");
@@ -137,6 +137,7 @@ const felts = [
   "0x4",
   "5",
   "0",
+  "200",
   "1",
 ];
 test("direct reads are TanStack queries, preserve u256/u64 values and support pinned blocks", async () => {
@@ -180,7 +181,7 @@ test("direct reads are TanStack queries, preserve u256/u64 values and support pi
   }
 });
 test("read decoders distinguish missing orders and reject malformed or incompatible responses", () => {
-  assert.equal(sdk.decodeContractOrder(Array(14).fill("0")).state, "missing");
+  assert.equal(sdk.decodeContractOrder(Array(15).fill("0")).state, "missing");
   assert.deepEqual(sdk.decodeContractConfig(["1", "0x2", "1", "500", "0x4"]), {
     version: 1,
     admin: "0x2",
@@ -328,7 +329,7 @@ test("governance rejects non-admin preparation, changed administrators and forei
 test("high-level cancellation uses the native span entrypoint and creation supports full u64 expiries", () => {
   assert.equal(
     sdk.prepareCancellation(
-      { marketplace: "0x9", chain: "LOCAL", account: "0x2" },
+      { marketplace: "0x9", chain: "LOCAL", account: "0x2", feeBps: 200 },
       ["LOCAL:0x9:0x2:1", "LOCAL:0x9:0x2:2"],
     )[0].entrypoint,
     "cancel_orders",
@@ -345,7 +346,7 @@ test("high-level cancellation uses the native span entrypoint and creation suppo
   assert.equal(
     sdk
       .prepareOrder(
-        { marketplace: "0x9", chain: "LOCAL", account: "0x2" },
+        { marketplace: "0x9", chain: "LOCAL", account: "0x2", feeBps: 200 },
         intent,
       )
       .at(-1).calldata[6],
@@ -504,4 +505,14 @@ test("direct query options snapshot order keys and block IDs before callers muta
   } finally {
     client.dispose();
   }
+});
+
+test('fee administration and creation encode explicit bounded fee consent', () => {
+  assert.deepEqual(sdk.buildSetFee('0x9',300,'0x6'),{contractAddress:'0x9',entrypoint:'set_fee',calldata:['300','0x6']});
+  assert.throws(()=>sdk.buildSetFee('0x9',501,'0x6'),/500/);
+  assert.throws(()=>sdk.buildSetFee('0x9',200,'0x0'),/address/i);
+  const order={marketplace:'0x9',kind:'collection_offer',collection:'0xa',currency:'0x3',price:'100',expiry:'1000',royaltyCap:'0',maxFeeBps:200};
+  assert.equal(sdk.buildCreateOrder(order).calldata.at(-1),'200');
+  assert.throws(()=>sdk.buildCreateOrder({...order,maxFeeBps:501}),/500/);
+  assert.throws(()=>sdk.buildCreateOrder({...order,maxFeeBps:undefined}));
 });

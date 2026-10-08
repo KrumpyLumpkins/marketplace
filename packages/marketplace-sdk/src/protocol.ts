@@ -84,6 +84,7 @@ export function buildCreateOrder(o: {
   price: string;
   expiry: IntegerInput;
   royaltyCap: string;
+  maxFeeBps: number;
 }): AccountCall {
   if (!["listing", "token_offer", "collection_offer"].includes(o.kind))
     throw new Error("Unknown order kind.");
@@ -101,6 +102,7 @@ export function buildCreateOrder(o: {
       ...uint256(o.price),
       u64(o.expiry),
       ...uint256(o.royaltyCap),
+      feeBps(o.maxFeeBps),
     ],
   };
 }
@@ -293,5 +295,22 @@ export function buildQuoteTerms(
       ...uint256(tokenId),
       ...uint256(buyerDebit),
     ],
+  };
+}
+
+function feeBps(value: number): string {
+  const fee = unsigned(value, 16, "fee");
+  if (fee > 500n) throw new Error("Protocol fee cannot exceed 500 bps.");
+  return fee.toString();
+}
+export function buildSetFee(
+  marketplace: string,
+  rate: number,
+  recipient: string,
+): AccountCall {
+  return {
+    contractAddress: address(marketplace),
+    entrypoint: "set_fee",
+    calldata: [feeBps(rate), address(recipient)],
   };
 }

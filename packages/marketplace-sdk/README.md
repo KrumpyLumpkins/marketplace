@@ -82,11 +82,12 @@ Every one of the 17 public marketplace entrypoints has an SDK interface. `CONTRA
 | `quote_terms` | `contract.quoteTerms`, `contract.quoteQuery` |
 | `set_collection` | `contract.admin.prepareSetCollection` |
 | `set_currency` | `contract.admin.prepareSetCurrency` |
+| `set_fee` | `contract.admin.prepareSetFee`, `buildSetFee` |
 | `set_paused` | `contract.admin.prepareSetPaused` |
 | `propose_admin` | `contract.admin.prepareProposeAdmin` |
 | `accept_admin` | `contract.admin.prepareAcceptAdmin` |
 
-Each administration operation also has a corresponding `build…` call builder. `buildConstructorCalldata(admin, feeBps, feeRecipient)` validates deployment inputs; class declaration/deployment itself remains the host provider's responsibility. Fees are immutable and capped at 500 bps by this contract. It has no fee-update, upgrade, auction, ERC-1155, or pending-admin getter to expose.
+Each administration operation also has a corresponding `build…` call builder. `buildConstructorCalldata(admin, feeBps, feeRecipient)` validates deployment inputs; class declaration/deployment itself remains the host provider's responsibility. `contract.admin.prepareSetFee(account, feeBps, recipient)` and `buildSetFee` expose atomic administrator fee updates, capped at 500 bps with a nonzero recipient. Rates apply to new orders; each order retains its `feeBps` snapshot. The current recipient receives fees on future fills, including older orders. `buildCreateOrder` requires `maxFeeBps`; `prepareOrder` requires `context.feeBps`, and the client trading methods bind the reviewed configuration automatically. This ABI revision requires the matching contract/indexer and a fresh deployment-bound database. It has no upgrade, auction, ERC-1155, or pending-admin getter to expose.
 
 ### Direct reads and governance
 

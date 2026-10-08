@@ -45,7 +45,9 @@ export function readTerms(data) {
     expiry = r.int(),
     royaltyCap = r.u256(),
     royaltyRecipient = r.addr(),
-    royaltyAmount = r.u256();
+    royaltyAmount = r.u256(),
+    feeBps = Number(r.int(16));
+  if (feeBps > 500) throw new ApiError("INVALID_EVENT", "Fee exceeds cap.");
   r.end();
   return {
     kind,
@@ -57,6 +59,7 @@ export function readTerms(data) {
     royaltyCap,
     royaltyRecipient,
     royaltyAmount,
+    feeBps,
   };
 }
 export function decodeEvent(raw, config) {
@@ -117,7 +120,13 @@ export function decodeEvent(raw, config) {
           paused: false,
           marketplace: source,
         };
-      else if (name === "TradingChanged")
+      else if (name === "FeePolicyChanged") {
+        const feeBps = Number(r.int(16)),
+          feeRecipient = r.addr();
+        if (raw.keys.length !== 1 || feeBps > 500 || BigInt(feeRecipient) === 0n)
+          throw new ApiError("INVALID_EVENT", "Invalid fee policy.");
+        e = { type: "fee_policy_changed", feeBps, feeRecipient };
+      } else if (name === "TradingChanged")
         e = { type: "trading_changed", paused: r.bool() };
       else if (name === "CollectionPolicyChanged") {
         if (raw.keys.length !== 2)

@@ -12,6 +12,7 @@ import {
   buildSetCollection,
   buildSetCurrency,
   buildSetPaused,
+  buildSetFee,
   buildProposeAdmin,
   buildAcceptAdmin,
   type AccountCall,
@@ -48,6 +49,7 @@ export type ContractOrder = {
   royaltyCap: string;
   royaltyRecipient: string;
   royaltyAmount: string;
+  feeBps: number;
 };
 export type ContractQuote = {
   buyerDebit: string;
@@ -82,14 +84,16 @@ export function decodeContractConfig(values: string[]): ContractConfig {
   };
 }
 export function decodeContractOrder(values: string[]): ContractOrder {
-  length(values, 14);
+  length(values, 15);
   const kind = Number(unsigned(values[0], 8, "kind")),
-    state = Number(unsigned(values[13], 8, "state"));
+    state = Number(unsigned(values[14], 8, "state"));
   if (kind > 3 || state > 3 || (state === 0 ? kind !== 0 : kind === 0))
     throw new Error("Unknown contract order kind or state.");
   const kinds = [null, "listing", "token_offer", "collection_offer"] as const,
     states = ["missing", "open", "filled", "cancelled"] as const;
   const tokenId = decodeU256(values[2], values[3]);
+  const fee = unsigned(values[13], 16, "fee");
+  if (fee > 500n) throw new Error("Protocol fee exceeds 500 bps.");
   return {
     kind: kinds[kind],
     state: states[state],
@@ -101,6 +105,7 @@ export function decodeContractOrder(values: string[]): ContractOrder {
     royaltyCap: decodeU256(values[8], values[9]),
     royaltyRecipient: decodedAddress(values[10], true),
     royaltyAmount: decodeU256(values[11], values[12]),
+    feeBps: Number(fee),
   };
 }
 export function decodeContractQuote(
@@ -132,6 +137,7 @@ export type PreparedAdminAction = {
   action:
     | "set_collection"
     | "set_currency"
+    | "set_fee"
     | "set_paused"
     | "propose_admin"
     | "accept_admin";
@@ -279,6 +285,11 @@ export function createContractAccess(deps: {
         currency: string,
         enabled: boolean,
       ) => prepare(account, buildSetCurrency(market(), currency, enabled)),
+      prepareSetFee: (
+        account: string,
+        feeBps: number,
+        recipient: string,
+      ) => prepare(account, buildSetFee(market(), feeBps, recipient)),
       prepareSetPaused: (account: string, paused: boolean) =>
         prepare(account, buildSetPaused(market(), paused)),
       prepareProposeAdmin: (account: string, nominee: string) =>

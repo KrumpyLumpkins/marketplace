@@ -130,3 +130,9 @@ Browser tests use the built frontend and a local fixture backend. [The build pla
 Staging and production run on Railway. See [Railway setup](docs/RAILWAY.md) for
 service configuration, isolated volumes, environment variables and deployment
 steps. Run `pnpm railway:check` to validate both environment definitions locally.
+
+Set local deployment credentials with `pnpm contracts:env` (hidden input; ignored
+`.env.deployment`, mode 600). Set hosted shared variables with
+`pnpm railway:variable -- staging STARKNET_RPC_URL` (or `production`). These
+commands do not deploy contracts or enable trading. The [Railway guide](docs/RAILWAY.md)
+lists the deployed URLs, remaining inputs and redeploy commands.

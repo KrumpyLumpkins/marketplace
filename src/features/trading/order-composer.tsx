@@ -58,7 +58,12 @@ export function OrderComposer({
     await trade.execute(async (marketplace) => {
       if (!selected) throw new Error("Choose a currency.");
       return prepareOrder(
-        { marketplace, chain: trade.config!.chain, account: trade.address! },
+        {
+          marketplace,
+          chain: trade.config!.chain,
+          account: trade.address!,
+          feeBps: trade.config!.feeBps,
+        },
         {
           kind,
           collection,

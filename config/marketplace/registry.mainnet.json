@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "chains": {
+    "SN_MAIN": {
+      "chainId": "0x534e5f4d41494e",
+      "marketplace": "0x7ced79b9da11b280209425dce4329d6b8aa5fa03f81a807b9bf3cfbd64cb9d7",
+      "marketplaceClassHash": "0x4667d1780f7c3dbbe1751d879bf9ae40318edd418c39486568dfa231fb4bdfa",
+      "marketplaceStartBlock": 16050533,
+      "collections": [
+        {
+          "address": "0x7ae27a31bb6526e3de9cf02f081f6ce0615ac12a6d7b85ee58b8ad7947a2809",
+          "name": "Realms",
+          "standard": "ERC721",
+          "startBlock": 664162,
+          "classHash": "0x42731c2355af9d59eda314ea3cca49ea3cc85173b2ca3c35c6c9df1c087cc43",
+          "metadata": {
+            "enabled": true
+          }
+        }
+      ],
+      "currencies": [
+        {
+          "address": "0x4718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+          "symbol": "STRK",
+          "decimals": 18,
+          "classHash": "0x2e77ee61d4df3d988ee1f42ea5442e913862cc82c2584d212ecda76666498fc"
+        },
+        {
+          "address": "0x124aeb495b947201f5fac96fd1138e326ad86195b98df6dec9009158a533b49",
+          "symbol": "LORDS",
+          "decimals": 18,
+          "classHash": "0x9f9205f50528a4c6308c69c675c14e65f31c72b1f7f1d2375d04fae1eec546"
+        }
+      ]
+    }
+  }
+}

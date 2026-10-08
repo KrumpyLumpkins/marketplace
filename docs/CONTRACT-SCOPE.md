@@ -2,7 +2,7 @@
 
 [BUILD-PLAN.md](./BUILD-PLAN.md) owns launch scope and delivery gates. This document defines the contract design for that plan, including one-shot collection offers. The user confirmed the economic and administration defaults on 6 October 2026; production addresses and fee rate remain deployment inputs.
 
-Version 0.2 · 6 October 2026
+Version 0.3 · 8 October 2026
 
 Status: implemented locally under `contracts/marketplace`, with ABI and artifact manifest. This design is not an assertion of audited safety or production deployment.
 
@@ -51,9 +51,10 @@ Order key: `(maker, maker_nonce)` within a marketplace deployment. A maker's mon
 | currency | Exact approved ERC-20 address |
 | buyer_debit | Exact total ERC-20 payment for the trade, uint256 in the reference design |
 | expiry | Chain timestamp after which the order cannot fill |
+| fee_bps | Protocol fee rate snapshotted at creation, bounded by maker consent |
 | royalty policy | Fixed amount/recipient for token-specific orders; committed maximum amount and bounded fill-time resolution for collection offers |
 
-The deployment's protocol fee rate and receiver are immutable configuration. Token-specific seller proceeds derive from stored terms; collection-offer proceeds additionally use the bounded royalty for the delivered NFT. Store terminal state separately from immutable terms so fill/cancel avoids rewriting the complete order.
+The administrator can atomically update the current fee rate and recipient with `set_fee`, within the hard 500-bps ceiling. Each order snapshots its fee rate on creation; later rate changes apply only to new orders. The fee recipient is resolved at fill, including for older orders. Creation takes `max_fee_bps` and reverts if the current rate exceeds that reviewed limit; a lower rate is accepted. Token-specific seller proceeds derive from stored terms; collection-offer proceeds additionally use the bounded royalty for the delivered NFT. Store terminal state separately from immutable terms so fill/cancel avoids rewriting the complete order.
 
 State: `Open → Filled` or `Open → Cancelled`. Expired is derived when chain time is greater than or equal to expiry; it needs no keeper write. Expiry must be in the future when created, with no arbitrary eight-hour minimum. An expired but unfilled order can still be cancelled.
 
@@ -69,7 +70,7 @@ Temporary invalidity is not cancellation. A listing may become executable again 
 
 Recommended model: the displayed order price is **buyer debit**, inclusive of marketplace fee and royalty. Network fees are separate.
 
-For buyer debit `P`, immutable protocol fee rate `b`, protocol fee `F`, and royalty `R` resolved under the committed order policy:
+For buyer debit `P`, order-snapshotted protocol fee rate `b`, protocol fee `F`, and royalty `R` resolved under the committed order policy:
 
 ```text
 F = floor(P × b / 10_000)
@@ -77,7 +78,7 @@ seller_proceeds = P - F - R
 buyer_debit = seller_proceeds + F + R = P
 ```
 
-All arithmetic is checked and integer-exact. Avoid multiplication overflow with a proven quotient/remainder formulation or checked wider arithmetic; do not silently cap a uint256 price into a smaller type. Require `F + R < P` for positive seller proceeds. The protocol fee has a constructor-validated ceiling; proposed ceiling is 500 bps, with actual launch rate still a product choice.
+All arithmetic is checked and integer-exact. Avoid multiplication overflow with a proven quotient/remainder formulation or checked wider arithmetic; do not silently cap a uint256 price into a smaller type. Require `F + R < P` for positive seller proceeds. The protocol fee has a constructor- and setter-validated ceiling of 500 bps, with the user selecting 500 bps for initial deployment on 8 October 2026.
 
 There is no executor-selected client fee or recipient. A seller accepting a token offer cannot charge its buyer more than `P`, regardless of the buyer's excess ERC-20 allowance. This is a mandatory regression against the legacy behavior.
 
@@ -99,9 +100,9 @@ Conceptual interface; exact Cairo types and error selectors will be committed be
 
 | Entry point | Authorized caller and behavior |
 | --- | --- |
-| `create_listing(terms, max_royalty_amount)` | Current NFT owner creates immutable sell terms; returns maker nonce |
-| `create_offer(terms, max_royalty_amount)` | Buyer creates immutable terms for one specific NFT; returns maker nonce |
-| `create_collection_offer(terms, max_royalty_amount)` | Buyer commits collection-wide one-shot terms and a royalty cap; returns maker nonce |
+| `create_listing(terms, max_royalty_amount, max_fee_bps)` | Current NFT owner creates immutable sell terms; returns maker nonce |
+| `create_offer(terms, max_royalty_amount, max_fee_bps)` | Buyer creates immutable terms for one specific NFT; returns maker nonce |
+| `create_collection_offer(terms, max_royalty_amount, max_fee_bps)` | Buyer commits collection-wide one-shot terms and a royalty cap; returns maker nonce |
 | `cancel_order(nonce)` | Maker cancels their open order, including when expired/paused/disabled |
 | `cancel_orders(nonces)` | Maker cancels a bounded batch atomically; define/reject duplicate nonces |
 | `buy_listing(key, currency, max_total)` | Caller pays and receives NFT; validates expected currency and total |
@@ -110,7 +111,8 @@ Conceptual interface; exact Cairo types and error selectors will be committed be
 | `accept_collection_offer(key, token_id, currency, min_seller_proceeds)` | Caller supplies one NFT from the committed collection; enforces royalty cap and consumes the whole order |
 | `get_order(key)` | Direct immutable terms and stored state |
 | `quote_terms(collection, token_id, buyer_debit)` | Nonbinding creation quote; creation repeats checks and applies caller limits |
-| `get_config()` | Deployment version, immutable fee settings, pause and capabilities |
+| `set_fee(fee_bps, fee_recipient)` | Administrator atomically updates the new-order rate (0–500 bps) and nonzero recipient for future fills; available while paused |
+| `get_config()` | Deployment version, current fee settings, pause and capabilities |
 
 For cancellation, unknown order or filled order returns a clear error; repeat cancellation can be an idempotent no-op, without emitting a second cancellation event. The batch must follow the same explicit rule for each member.
 
@@ -141,9 +143,9 @@ Offers use the same settlement/accounting core with buyer and seller roles rever
 
 Recommended baseline: non-upgradeable settlement contract, with a dedicated multisig-controlled administrator. New code deploys to a new address. This choice requires product confirmation before deployment; the scope does not introduce an upgrade proxy by default.
 
-Allow only narrowly defined administration: pause/resume trading, register supported collections/currencies, disable/re-enable trading for a registered asset, and two-step administrator transfer. Changes emit explicit events. Cancellation remains available regardless of those trading switches.
+Allow only narrowly defined administration: pause/resume trading, register supported collections/currencies, disable/re-enable trading for a registered asset, two-step administrator transfer, and bounded fee-policy updates. Changes emit explicit events. Cancellation remains available regardless of those trading switches.
 
-The administrator cannot transfer users' funds/NFTs, fill for an arbitrary payer, rewrite/cancel maker orders, change existing fee terms, replace the contract class, or execute arbitrary external calls. Protocol fee rate/receiver remain fixed per deployment under this model. Any accidental-funds rescue function is excluded from the first version unless separately justified and specified.
+The administrator cannot transfer users' funds/NFTs, fill for an arbitrary payer, rewrite/cancel maker orders, change existing orders' fee rates, replace the contract class, or execute arbitrary external calls. Fee recipient rotation affects future fills but cannot change gross buyer debit or seller deductions. Any accidental-funds rescue function is excluded from the first version unless separately justified and specified.
 
 Approved token contracts can themselves be upgradeable. Capture their identity/behavior in compatibility tests and monitor changes; our own immutability does not make external asset code immutable.
 
@@ -153,7 +155,8 @@ The contract emits public, versioned lifecycle events. The Node backend needs on
 
 | Event | Required content |
 | --- | --- |
-| `MarketplaceInitialized` | Schema/deployment version, immutable fees/receiver, administrator and initial policy; chunk asset registry events if needed |
+| `MarketplaceInitialized` | Schema/deployment version, initial fees/receiver, administrator and initial policy; chunk asset registry events if needed |
+| `FeePolicyChanged` | New default fee rate and fee recipient; replay updates configuration without rewriting order snapshots |
 | `OrderCreated` | Maker/nonce, kind, collection and optional token, currency, exact buyer debit, protocol terms, royalty snapshot or cap/policy, expiry |
 | `OrderCancelled` | Maker/nonce and cancelling maker |
 | `OrderFilled` | Maker/nonce, buyer, seller, collection/token, currency, buyer debit, seller proceeds, fee/royalty recipients and amounts |
@@ -201,6 +204,7 @@ Required invariants and scenarios:
 - Restoration of ownership/funds can restore availability only for orders that remain open; cancellation stays permanent.
 - Token-specific snapshots remain fixed. Collection-offer royalties obey the maker's committed cap and taker's minimum proceeds; a different token or mutable royalty quote cannot enlarge buyer debit.
 - Collection offers accept only the committed collection and fill once; no valid token ID acts as a wildcard sentinel.
+- Fee updates require the current administrator, reject zero recipients and rates above 500 bps, and preserve old listing/token-offer/collection-offer rates. Stale creation consent fails; mixed-rate carts and recipient aliases settle exactly.
 - Event replay equals direct state at fixed checkpoints, through cancellation, multiple fills, restart and fork recovery.
 - The legacy extra-client-fee scenario is impossible because no uncommitted surcharge exists in the interface.
 
@@ -216,7 +220,7 @@ After new orders exist, rollback means keeping the new deployment discoverable a
 
 ## 13. Open product choices
 
-Confirmed: inclusive buyer-debit pricing, token-order royalty snapshots, capped fill-time collection-offer royalties, and non-upgradeable settlement with limited administration. Implementation uses a 500-bps protocol ceiling. Actual protocol rate, receiver, approved launch collections/currencies and administrator addresses remain production deployment inputs.
+Confirmed: inclusive buyer-debit pricing, token-order royalty snapshots, capped fill-time collection-offer royalties, and non-upgradeable settlement with limited administration. Implementation uses a 500-bps protocol ceiling. The initial protocol rate is 500 bps and the recipient is the local signer, as selected on 8 October 2026. Realms is the sole initial NFT collection. STRK and LORDS are the selected payment currencies. Initial administrator and transaction fee ceiling remain deployment inputs.
 
 Deferred contract features: off-chain signed orders, trait/criteria offers, private/reserved orders and ERC-1155/partial fills. Also defer auctions, arbitrary routers, reward tokens, referral/client-fee machinery and gas sponsorship unless a later requirement justifies them.
 
@@ -229,3 +233,5 @@ The product boundaries come from the user's choices in this chat. Economic rules
 - [Starknet fees](https://docs.starknet.io/learn/protocol/fees): resource-based measurement context.
 - [Cairo events](https://www.starknet.io/cairo-book/ch101-03-contract-events.html) and [storage optimization](https://www.starknet.io/cairo-book/ch103-01-optimizing-storage-costs.html): implementation mechanisms to evaluate, not automatic performance guarantees.
 - [OpenZeppelin Cairo security](https://docs.openzeppelin.com/contracts-cairo/4.x/security): candidate primitive guidance; pin a compatible version before code adoption.
+
+On 8 October 2026 the user authorized administrator updates to the fee percentage and recipient. This supersedes the original deployment-fixed fee policy; contract code remains non-upgradeable.

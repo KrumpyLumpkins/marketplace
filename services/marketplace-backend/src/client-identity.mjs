@@ -36,8 +36,8 @@ export function createClientIdentity(config, resolve = lookup) {
     if (!(await peers()).has(peer)) return peer;
     const forwarded = req.headers[header];
     if (typeof forwarded !== 'string' || forwarded.length > 2048) return peer;
-    // Railway overwrites this at public ingress. Its trusted private frontend
-    // relays it unchanged; never infer identity from a caller-supplied XFF chain.
+    // Railway edge rules reject caller-supplied X-Real-IP before ingress adds
+    // it. Only the trusted private frontend may relay that identity; ignore XFF.
     const candidate = forwarded.trim();
     return normalize(candidate) ?? peer;
   };

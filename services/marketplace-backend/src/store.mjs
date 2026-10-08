@@ -264,6 +264,15 @@ export class Store {
       );
     } else if (e.type === "initialized") {
       this.put("config", "marketplace", { ...e, updatedAt: p }, height);
+    } else if (e.type === "fee_policy_changed") {
+      const cfg = this.get("config", "marketplace");
+      if (!cfg) throw new ApiError("MISSING_CONFIG", "Missing initialization.");
+      this.put(
+        "config",
+        "marketplace",
+        { ...cfg, feeBps: e.feeBps, feeRecipient: e.feeRecipient, updatedAt: p },
+        height,
+      );
     } else if (e.type === "trading_changed") {
       const cfg = this.get("config", "marketplace");
       if (!cfg) throw new ApiError("MISSING_CONFIG", "Missing initialization.");

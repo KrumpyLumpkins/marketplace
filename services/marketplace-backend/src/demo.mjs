@@ -67,6 +67,7 @@ if (!store.head()) {
           buyerDebit: String(BigInt(10 + i) * 10n ** 18n),
           expiry: String(time + 30 * 86400),
           royaltyCap: "0",
+          feeBps: 200,
           royaltyAmount: "0",
           royaltyRecipient: address("0"),
         });

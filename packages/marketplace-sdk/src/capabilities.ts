@@ -26,6 +26,7 @@ export const CONTRACT_CAPABILITIES = {
     "client.contract.admin.prepareSetCurrency",
     "sdk.buildSetCurrency",
   ],
+  set_fee: ["client.contract.admin.prepareSetFee", "sdk.buildSetFee"],
   set_paused: ["client.contract.admin.prepareSetPaused", "sdk.buildSetPaused"],
   propose_admin: [
     "client.contract.admin.prepareProposeAdmin",
@@ -38,4 +39,4 @@ export const CONTRACT_CAPABILITIES = {
 } as const;
 
 export const SUPPORTED_MARKETPLACE_ABI_SHA256 =
-  "80927c616ca0865d9544496686405a4aff0a2cae83f670e15590139f110b9927";
+  "50528057dca7ea86bd8718cef948a2a1454b36139a7fc69a80fc12bbae0175c2";

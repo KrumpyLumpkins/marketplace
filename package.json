@@ -40,7 +40,10 @@
     "contracts:deploy": "node scripts/deployment/cli.mjs",
     "contracts:deploy:test": "vitest run --project unit scripts/deployment/*.test.mjs",
     "contracts:deploy:rehearse": "node scripts/deployment/rehearse.mjs",
-    "railway:check": "node --experimental-strip-types scripts/railway/check.mjs"
+    "railway:check": "node --experimental-strip-types scripts/railway/check.mjs",
+    "contracts:env": "node scripts/deployment/configure-env.mjs",
+    "railway:variable": "node scripts/railway/set-variable.mjs",
+    "railway:edge": "node scripts/railway/edge-rules.mjs"
   },
   "dependencies": {
     "@biblio/marketplace": "workspace:*",
