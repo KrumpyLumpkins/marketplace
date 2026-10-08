@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { MarketplaceTokenCard } from "@/components/marketplace/token-card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { AssetGridSkeleton } from "@/components/marketplace/loading-state";
 import {
   useCollectionQuery,
   useCollectionTokensQuery,
@@ -111,17 +111,7 @@ function HoldingTokenBatch({
   return (
     <>
       {isLoading ? (
-        <div className={cn("grid gap-3", gridClasses)}>
-          {tokenIds.map((id) => (
-            <Card key={id}>
-              <CardContent className="space-y-2 p-3">
-                <Skeleton className="aspect-square w-full" />
-                <Skeleton className="h-3 w-2/3" />
-                <Skeleton className="h-3 w-1/3" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <AssetGridSkeleton label="Loading collection holdings" count={Math.min(tokenIds.length, 8)} gridClassName={gridClasses} />
       ) : tokensQuery.isError ? (
         <Card className="border-dashed">
           <CardContent className="py-4 text-sm text-muted-foreground">

@@ -44,7 +44,7 @@ export function HeroBanner({
 
   if (isLoading) {
     return (
-      <div data-testid="hero-banner" className="relative h-56 w-full overflow-hidden rounded-[8px] border border-[color:var(--realm-border-etched)] sm:h-72 lg:h-80">
+      <div role="status" aria-label="Loading featured collection" data-testid="hero-banner" className="relative h-56 w-full overflow-hidden rounded-[8px] border border-[color:var(--realm-border-etched)] sm:h-72 lg:h-80">
         <Skeleton data-testid="hero-banner-skeleton" className="h-full w-full rounded-none" />
       </div>
     );

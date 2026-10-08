@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ListSkeleton } from "@/components/marketplace/loading-state";
 import { MarketPrice } from "@/components/marketplace/market-price";
 import { formatRelativeExpiry } from "@/lib/marketplace/token-display";
 import type { ApiOrder } from "@/lib/marketplace/types";
@@ -56,11 +56,7 @@ export function OfferList({
       <CardContent className="space-y-4 pt-4">
         {children}
         {loading && orders.length === 0 && (
-          <div role="status" aria-label="Loading offers" className="space-y-3">
-            {[0, 1, 2].map((i) => (
-              <Skeleton key={i} className="h-28 w-full rounded-xl" />
-            ))}
-          </div>
+          <ListSkeleton label="Loading offers" />
         )}
         <ul className="space-y-3" aria-label="Offers for this asset">
           {orders.map((order) => (

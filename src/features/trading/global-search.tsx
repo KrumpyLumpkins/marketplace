@@ -1,4 +1,5 @@
 "use client";
+import { AssetGridSkeleton } from "@/components/marketplace/loading-state";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { marketplaceRequest, tokenFromApi } from "@/lib/marketplace/api-client";
@@ -17,7 +18,7 @@ export function GlobalSearch({ query }: { query: string }) {
     <main className="market-page space-y-6">
       <h1 className="text-2xl">Search: {query}</h1>
       {result.isPending ? (
-        <p>Searching…</p>
+        <AssetGridSkeleton label="Searching marketplace" gridClassName="grid-cols-2 md:grid-cols-4" />
       ) : result.isError ? (
         <p role="alert">Search is unavailable. Try again shortly.</p>
       ) : (

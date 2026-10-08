@@ -1,4 +1,5 @@
 "use client";
+import { ListSkeleton } from "@/components/marketplace/loading-state";
 import { WalletConnectButton } from "@/components/layout/wallet-connect-button";
 import Link from "next/link";
 import { useState } from "react";
@@ -64,7 +65,7 @@ export function NotificationsView() {
           </CardContent>
         </Card>
       ) : query.isPending ? (
-        <p>Loading notifications…</p>
+        <ListSkeleton label="Loading notifications" />
       ) : query.isError ? (
         <p role="alert">Unable to load notifications.</p>
       ) : query.data?.length ? (

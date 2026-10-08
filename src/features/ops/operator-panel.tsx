@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { ListSkeleton } from "@/components/marketplace/loading-state";
 
 import { getMarketplaceRuntimeConfig } from "@/lib/marketplace/config";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -13,6 +14,8 @@ type Report = {
   body: { collection: string; tokenId?: string; reason: string };
 };
 export function OperatorPanel() {
+  const [busy, setBusy] = useState(false);
+  const [loadingReports, setLoadingReports] = useState(false);
   const [key, setKey] = useState(""),
     [reports, setReports] = useState<Report[]>([]),
     [message, setMessage] = useState("");
@@ -27,33 +30,41 @@ export function OperatorPanel() {
     }
   }
   async function operator(path: string, body?: unknown) {
-    const chain = getMarketplaceRuntimeConfig().chainLabel;
-    const response = await fetch(
-      `/api/marketplace/v1/chains/${chain}/operator/${path}`,
-      {
-        method: body ? "POST" : "GET",
-        headers: {
-          authorization: `Bearer ${key}`,
-          ...(body ? { "content-type": "application/json" } : {}),
+    setBusy(true);
+    try {
+      const chain = getMarketplaceRuntimeConfig().chainLabel;
+      const response = await fetch(
+        `/api/marketplace/v1/chains/${chain}/operator/${path}`,
+        {
+          method: body ? "POST" : "GET",
+          headers: {
+            authorization: `Bearer ${key}`,
+            ...(body ? { "content-type": "application/json" } : {}),
+          },
+          body: body ? JSON.stringify(body) : undefined,
         },
-        body: body ? JSON.stringify(body) : undefined,
-      },
-    );
-    const json = await response.json();
-    if (!response.ok)
-      throw new Error(json.error?.message ?? "Operator request failed.");
-    return json.data;
+      );
+      const json = await response.json();
+      if (!response.ok)
+        throw new Error(json.error?.message ?? "Operator request failed.");
+      return json.data;
+    } finally {
+      setBusy(false);
+    }
   }
   async function load() {
+    setLoadingReports(true);
     try {
       setReports(await operator("reports"));
       setMessage("Reports loaded.");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Request failed.");
+    } finally {
+      setLoadingReports(false);
     }
   }
   return (
-    <div className="space-y-5">
+    <fieldset disabled={busy} className="min-w-0 space-y-5">
       <Card>
         <CardHeader>
           <CardTitle>Operator reports</CardTitle>
@@ -71,8 +82,11 @@ export function OperatorPanel() {
             Load reports
           </Button>
           <p role="status" className="text-sm">
-            {message}
+            {busy ? "Working…" : message}
           </p>
+          {loadingReports && reports.length === 0 && (
+            <ListSkeleton label="Loading reports" compact />
+          )}
           <div className="space-y-2 rounded border p-3">
             <h3 className="font-medium">Registered collection controls</h3>
             <Input
@@ -173,6 +187,6 @@ export function OperatorPanel() {
           ))}
         </CardContent>
       </Card>
-    </div>
+    </fieldset>
   );
 }

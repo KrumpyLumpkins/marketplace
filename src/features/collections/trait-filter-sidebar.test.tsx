@@ -343,7 +343,7 @@ describe("trait filter sidebar", () => {
       />,
     );
 
-    expect(screen.getByText(/loading values/i)).toBeVisible();
+    expect(screen.getByRole("status", { name: "Loading trait values" })).toBeVisible();
   });
 
   it("badge_count_shown_for_active_filters_without_values_loaded", () => {

@@ -27,16 +27,15 @@ export function CollectionCardsSection({
       </h2>
 
       {isLoading ? (
-        <div
+        <div role="status" aria-label="Loading collections"
           data-testid="collection-cards-grid"
           className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4"
         >
           {Array.from({ length: 8 }).map((_, index) => (
-            <Skeleton
-              key={index}
-              data-testid="collection-card-skeleton"
-              className="aspect-square w-full"
-            />
+            <div key={index} className={index < 2 ? "overflow-hidden rounded-lg border border-border/50 sm:col-span-2 md:col-span-1 lg:col-span-2" : "overflow-hidden rounded-lg border border-border/50"}>
+              <Skeleton data-testid="collection-card-skeleton" className={index < 2 ? "aspect-[16/9] w-full rounded-none" : "aspect-square w-full rounded-none"} />
+              <div className="space-y-2 p-3"><Skeleton className="h-5 w-2/3" /><Skeleton className="h-4 w-1/3" /><Skeleton className="h-4 w-1/2" /></div>
+            </div>
           ))}
         </div>
       ) : collections.length === 0 ? (

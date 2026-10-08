@@ -26,7 +26,7 @@ export default function RootLayout({
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`${fontClassName} antialiased`} style={fontVariables}>
         <MarketplaceProvider>
-          <Suspense fallback={null}>
+          <Suspense fallback={<div aria-hidden="true" className="h-[108px] border-b border-border bg-background" />}>
             <Header />
           </Suspense>
           <MarketplaceLayout>

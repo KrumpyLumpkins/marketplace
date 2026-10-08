@@ -1,4 +1,5 @@
 "use client";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -136,6 +137,7 @@ export function CollectionsTable({ collections, currency, isLoading = false }: C
 
   return (
     <div className="realm-panel overflow-hidden" data-testid="collections-table">
+      {isLoading && <span role="status" className="sr-only">Loading collections</span>}
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-[color:var(--realm-border-etched)] text-xs text-muted-foreground">
@@ -171,16 +173,17 @@ export function CollectionsTable({ collections, currency, isLoading = false }: C
             })}
           </tr>
         </thead>
-        <tbody>
+        <tbody aria-busy={isLoading}>
           {isLoading
             ? Array.from({ length: 5 }).map((_, index) => (
                 <tr key={index} className="border-b border-[color:var(--realm-border-etched)]/60 last:border-b-0">
-                  <td className="px-3 py-3" colSpan={COLUMNS.length}>
+                  <td className="px-3 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="size-11 animate-pulse rounded-md bg-muted" />
-                      <div className="h-4 w-40 animate-pulse rounded bg-muted" />
+                      <Skeleton className="size-11 shrink-0" />
+                      <Skeleton className="h-4 w-16 sm:w-40" />
                     </div>
                   </td>
+                  {COLUMNS.slice(1).map(column => <td key={column.key} className={cn("px-3 py-3", column.className)}><Skeleton className="ml-auto h-4 w-10 sm:w-16" /></td>)}
                 </tr>
               ))
             : rows.map(({ collection, index }) => {
@@ -225,7 +228,7 @@ export function CollectionsTable({ collections, currency, isLoading = false }: C
                     </td>
                     <td className="hidden px-3 py-2.5 text-right tabular-nums md:table-cell">
                       {stats?.pending ? (
-                        <span className="text-muted-foreground">…</span>
+                        <span role="status" aria-label="Loading volume"><Skeleton className="ml-auto h-4 w-16" /></span>
                       ) : stats?.volume ? (
                         <span className="inline-flex flex-col items-end">
                           <span className="inline-flex items-center gap-1 font-medium">

@@ -36,3 +36,13 @@ describe("TokenMedia", () => {
     expect(screen.getByRole("img", { name: "Hero" })).toHaveAttribute("loading", "eager");
   });
 });
+
+it("shows loading feedback until artwork loads and resets it for a new source", () => {
+  const {rerender} = render(<TokenMedia alt="Asset" sources={["/a.png"]} />);
+  const image = screen.getByRole("img", {name: "Asset"});
+  expect(image).toHaveAttribute("aria-busy", "true");
+  fireEvent.load(image);
+  expect(image).toHaveAttribute("aria-busy", "false");
+  rerender(<TokenMedia alt="Asset" sources={["/b.png"]} />);
+  expect(image).toHaveAttribute("aria-busy", "true");
+});

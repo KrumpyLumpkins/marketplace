@@ -1,4 +1,5 @@
 "use client";
+import { AssetGridSkeleton } from "@/components/marketplace/loading-state";
 
 import { useDeferredValue, useMemo, useState } from "react";
 import { WalletIdentity } from "./wallet-identity";
@@ -216,18 +217,7 @@ export function WalletProfileView({
       ) : null}
 
       {isLoading ? (
-        <div data-testid="profile-loading" className="space-y-2 pt-2">
-          <div className="h-4 w-40 animate-pulse rounded bg-muted" />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="space-y-2 rounded-lg border border-border/50 p-3">
-                <div className="aspect-square w-full animate-pulse rounded bg-muted" />
-                <div className="h-3 w-2/3 animate-pulse rounded bg-muted" />
-                <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />
-              </div>
-            ))}
-          </div>
-        </div>
+        <div data-testid="profile-loading"><AssetGridSkeleton label="Loading holdings" count={8} gridClassName="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4" /></div>
       ) : isError ? (
         <p className="text-sm text-destructive">
           Unable to load wallet items right now.

@@ -1,4 +1,6 @@
 "use client";
+import { LoadingRegion } from "@/components/marketplace/loading-state";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -222,7 +224,7 @@ export function TraitFilterSidebar({
 
       {/* Loading / empty states */}
       {isLoading ? (
-        <p className="text-xs text-muted-foreground">Loading traits...</p>
+        <LoadingRegion label="Loading traits"><div className="space-y-3">{[0,1,2].map(i => <Skeleton key={i} className="h-9 w-full" />)}</div></LoadingRegion>
       ) : sortedTraitNames.length === 0 ? (
         <p className="text-xs text-muted-foreground">No trait data available.</p>
       ) : null}
@@ -272,7 +274,7 @@ export function TraitFilterSidebar({
                     className="space-y-2 px-2 pb-2"
                   >
                     {isLoadingValues ? (
-                      <p className="text-xs text-muted-foreground">Loading values...</p>
+                      <LoadingRegion label="Loading trait values"><div className="space-y-2">{[0,1,2].map(i => <Skeleton key={i} className="h-6 w-full" />)}</div></LoadingRegion>
                     ) : (
                       renderFilterControl(traitName, openGroupValues)
                     )}

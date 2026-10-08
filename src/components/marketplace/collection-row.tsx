@@ -23,8 +23,7 @@ import { expandTokenIdVariants } from "@/lib/marketplace/token-id";
 import { matchesHomeSearch, normalizeHomeSearchQuery } from "@/lib/marketplace/home-search";
 import { MarketplaceTokenCard } from "@/components/marketplace/token-card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { AssetCardSkeleton } from "@/components/marketplace/loading-state";
 import {
   cartItemFromTokenListing,
   cheapestListingByTokenId,
@@ -262,17 +261,9 @@ export function CollectionRow({
 
       {/* Scroll row — edge-to-edge, padded with px on inner items */}
       {tokenQuery.isLoading ? (
-        <div className="flex gap-3 overflow-x-auto pb-2 px-4 sm:px-6 lg:px-8">
+        <div role="status" aria-label="Loading collection tokens" className="flex gap-3 overflow-x-auto pb-2 px-4 sm:px-6 lg:px-8">
           {Array.from({ length: 6 }).map((_, index) => (
-            <Card key={index} className="w-48 shrink-0">
-              <CardContent className="space-y-2 p-3">
-                <Skeleton
-                  className="h-40 w-full"
-                  data-testid="collection-row-skeleton"
-                />
-                <Skeleton className="h-4 w-2/3" />
-              </CardContent>
-            </Card>
+            <div key={index} className="w-48 shrink-0"><AssetCardSkeleton mediaTestId="collection-row-skeleton" /></div>
           ))}
         </div>
       ) : null}

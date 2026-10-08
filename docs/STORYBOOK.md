@@ -248,3 +248,28 @@ candidate URLs. Realm resource icons are the Eternum game catalogue, keyed by
 the game's resource names (`src/components/marketplace/resource-icon.tsx`).
 
 `CollectionNotEnabled` verifies indexed-but-not-allowlisted collections cannot submit orders or show a misleading proceeds quote. The configuration endpoint supplies the indexed collection policy; live config polling updates the form after administrator activation.
+
+## Loading states
+
+Use `Skeleton` for the shared muted surface, corner radius and reduced-motion-safe
+pulse. Group decorative placeholders in `LoadingRegion` so each section has one
+accessible status announcement. Use `AssetGridSkeleton` for card grids (pass the
+same density and media aspect ratio as the populated view), `ListSkeleton` for
+orders/activity, and `TokenDetailSkeleton` for the token page. Limit placeholder
+counts; do not render a skeleton for every NFT in a large wallet.
+
+Route `loading.tsx` files and Suspense fallbacks reuse these components. Keep
+existing data and controls visible during background refetches; skeletons represent
+initial pending data. Price, offer and sale summaries must not display an empty
+result before their respective request completes. Action progress stays on the
+button or in the existing transaction modal. Artwork pulses within its reserved
+media area until loaded, then stops, including when a browser-cached image is used.
+
+`Marketplace/Loading states` covers assets, density, portrait media, orders,
+activity, token details, collection and home shells. `Marketplace/Artwork loading`,
+`Marketplace/Operator loading` and `Marketplace/Token market summary/Loading`
+cover image completion/failure, disabled actions during a report request and
+pending prices. Browser review includes 390, 768 and 1440px layouts; a delayed
+local fixture API verifies home → collection → token and portfolio loading to
+content transitions. Wallet-only data states use isolated stories/tests; no live
+wallet transaction is required for this presentation change.

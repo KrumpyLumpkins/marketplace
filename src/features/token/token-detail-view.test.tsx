@@ -326,7 +326,7 @@ it("shows trait rarity and in-game resource artwork", async () => {
 it("renders loading before offering trades", () => {
   detail.mockReturnValue({ isLoading: true });
   show();
-  expect(screen.getByText("Loading token…")).toBeInTheDocument();
+  expect(screen.getByRole("status", { name: "Loading token" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Make offer" })).toBeNull();
 });
 

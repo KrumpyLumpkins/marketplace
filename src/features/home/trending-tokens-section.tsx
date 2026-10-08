@@ -1,7 +1,7 @@
 "use client";
 
 import { MarketplaceTokenCard } from "@/components/marketplace/token-card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { AssetCardSkeleton } from "@/components/marketplace/loading-state";
 import type { TrendingToken } from "@/features/home/types";
 import { useEntrance } from "@/lib/animation";
 
@@ -30,11 +30,11 @@ export function TrendingTokensSection({
       <h2 className="realm-kicker text-lg">{title}</h2>
 
       {isLoading ? (
-        <div data-testid="trending-tokens-scroll" className="overflow-x-auto">
+        <div role="status" aria-label="Loading recent sales" data-testid="trending-tokens-scroll" className="overflow-x-auto">
           <div className="flex gap-3 pb-2">
             {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="w-48 shrink-0">
-                <Skeleton data-testid="trending-token-skeleton" className="aspect-square w-full" />
+              <div key={index} className={index === 0 ? "w-60 shrink-0" : "w-48 shrink-0"}>
+                <AssetCardSkeleton mediaTestId="trending-token-skeleton" />
               </div>
             ))}
           </div>

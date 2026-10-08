@@ -37,6 +37,8 @@ export function TokenMedia({
   const [attempt, setAttempt] = useState({ key, index: 0 });
   const index = attempt.key === key ? attempt.index : 0;
   const source = sources[index];
+  const [loadedSource, setLoadedSource] = useState<string | null>(null);
+  const pending = loadedSource !== source;
 
   if (!source) {
     return (
@@ -60,7 +62,10 @@ export function TokenMedia({
     // eslint-disable-next-line @next/next/no-img-element
     <img
       alt={alt}
-      className={cn("h-full w-full object-cover", className)}
+      className={cn("h-full w-full object-cover", pending && "bg-muted/70 animate-pulse motion-reduce:animate-none", className)}
+      aria-busy={alt ? pending : undefined}
+      onLoad={() => setLoadedSource(source)}
+      ref={(image) => { if (image?.complete && image.naturalWidth > 0) setLoadedSource(source); }}
       data-media-index={index}
       decoding="async"
       loading={priority ? "eager" : "lazy"}

@@ -1,5 +1,5 @@
 "use client";
-import {formatCurrencyAmount} from "@/lib/marketplace/amount-display";
+import { formatCurrencyAmount } from "@/lib/marketplace/amount-display";
 
 import Link from "next/link";
 import { AssetGrid } from "@/components/marketplace/asset-grid";
@@ -23,7 +23,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MarketplaceTokenCard } from "@/components/marketplace/token-card";
 import { ResourceTraitIcons } from "@/components/marketplace/resource-trait-icons";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AssetGridSkeleton,
+  ListSkeleton,
+} from "@/components/marketplace/loading-state";
 import { TokenSymbol } from "@/components/ui/token-symbol";
 import {
   Table,
@@ -159,13 +162,23 @@ function isAliveAdventurer(token: NormalizedToken) {
     return false;
   }
 
-  const expiredValue = stringAttribute(token, ["Expired", "Status", "Alive", "Dead"]);
+  const expiredValue = stringAttribute(token, [
+    "Expired",
+    "Status",
+    "Alive",
+    "Dead",
+  ]);
   if (!expiredValue) {
     return true;
   }
 
   const normalized = expiredValue.toLowerCase();
-  if (normalized === "expired" || normalized === "dead" || normalized === "false" || normalized === "0") {
+  if (
+    normalized === "expired" ||
+    normalized === "dead" ||
+    normalized === "false" ||
+    normalized === "0"
+  ) {
     return false;
   }
 
@@ -219,13 +232,14 @@ export function CollectionTokenGrid({
   onCanLoadMoreChange,
   sweepPreviewTokenIds,
 }: CollectionTokenGridProps) {
-  const currency = useMarketCurrency(state => state.currency);
+  const currency = useMarketCurrency((state) => state.currency);
   const { addListingToCart, isRecentlyAdded } = useAddToCartFeedback();
   const collectionFilterConfig = useMemo(
     () => getCollectionFilterConfig(address),
     [address],
   );
-  const showInlineResources = collectionFilterConfig.showInlineResources === true;
+  const showInlineResources =
+    collectionFilterConfig.showInlineResources === true;
   const tokenCardConfig = collectionFilterConfig.tokenCard;
   const gridMode = layout;
   const tokenIdsKey = useMemo(() => tokenIds?.join(",") ?? "", [tokenIds]);
@@ -262,7 +276,20 @@ export function CollectionTokenGrid({
     listedOnly,
     filters: Object.entries(activeFilters ?? {}).map(([name, values]) => {
       const range = [...values].map(decodeRangeFilterValue).find(Boolean);
-      return range ? {name, ...range} : {name, values: [...values].map(v => v === "true" ? true : v === "false" ? false : /^\d+$/.test(v) && Number.isSafeInteger(Number(v)) ? Number(v) : v)};
+      return range
+        ? { name, ...range }
+        : {
+            name,
+            values: [...values].map((v) =>
+              v === "true"
+                ? true
+                : v === "false"
+                  ? false
+                  : /^\d+$/.test(v) && Number.isSafeInteger(Number(v))
+                    ? Number(v)
+                    : v,
+            ),
+          };
     }),
   });
   const listingQuery = useCollectionListingsQuery({
@@ -280,7 +307,17 @@ export function CollectionTokenGrid({
 
   useEffect(() => {
     dispatch({ type: "RESET" });
-  }, [address, projectId, limit, tokenIdsKey, activeFiltersKey, sortMode, currency, query, listedOnly]);
+  }, [
+    address,
+    projectId,
+    limit,
+    tokenIdsKey,
+    activeFiltersKey,
+    sortMode,
+    currency,
+    query,
+    listedOnly,
+  ]);
 
   useEffect(() => {
     if (!tokenQuery.isSuccess) return;
@@ -288,14 +325,19 @@ export function CollectionTokenGrid({
     dispatch({ type: "APPEND_PAGE", pageTokens });
   }, [tokenQuery.data, tokenQuery.isSuccess]);
 
-  const listingPrices = cheapestListingByTokenId([...(listingQuery.data ?? []), ...pagination.tokens.flatMap(t => t.best_listing ? [t.best_listing] : [])]);
+  const listingPrices = cheapestListingByTokenId([
+    ...(listingQuery.data ?? []),
+    ...pagination.tokens.flatMap((t) =>
+      t.best_listing ? [t.best_listing] : [],
+    ),
+  ]);
   const listingPriceMap = listingPriceByTokenId(listingQuery.data);
   const isAdventurersCollection = useMemo(
     () =>
       getMarketplaceRuntimeConfig().collections.some(
         (collection) =>
-          normalizeAddress(collection.address) === normalizeAddress(address)
-          && collection.name.trim().toLowerCase() === "adventurers",
+          normalizeAddress(collection.address) === normalizeAddress(address) &&
+          collection.name.trim().toLowerCase() === "adventurers",
       ),
     [address],
   );
@@ -312,7 +354,11 @@ export function CollectionTokenGrid({
   // The API applies sorting and filters across the full collection before pagination.
   const visibleTokens = pagination.tokens;
   const filteredVisibleTokens = useMemo(
-    () => filterTokensByActiveFilters(visibleTokens, activeFilters ?? EMPTY_ACTIVE_FILTERS),
+    () =>
+      filterTokensByActiveFilters(
+        visibleTokens,
+        activeFilters ?? EMPTY_ACTIVE_FILTERS,
+      ),
     [activeFilters, visibleTokens],
   );
   const displayTokens = useMemo(
@@ -336,10 +382,7 @@ export function CollectionTokenGrid({
     onTokensChangeRef.current?.(displayTokens);
   }, [displayTokens, visibleTokensSignature]);
 
-  const sortedTokens = useMemo(
-    () => displayTokens,
-    [displayTokens],
-  );
+  const sortedTokens = useMemo(() => displayTokens, [displayTokens]);
   const isListMode = gridMode === "list";
   const density = isListMode ? "compact" : gridMode;
 
@@ -357,16 +400,18 @@ export function CollectionTokenGrid({
       {toolbar}
 
       {tokenQuery.isLoading && pagination.tokens.length === 0 ? (
-        <AssetGrid density={density}>
-          {Array.from({ length: 6 }).map((_, index) => (
-            <Card key={index}>
-              <CardContent className="space-y-2 p-3">
-                <Skeleton className="aspect-[4/5] w-full" data-testid="token-skeleton" />
-                <Skeleton className="h-4 w-2/3" />
-              </CardContent>
-            </Card>
-          ))}
-        </AssetGrid>
+        isListMode ? (
+          <ListSkeleton label="Loading tokens" count={6} compact />
+        ) : (
+          <AssetGridSkeleton
+            label="Loading tokens"
+            density={density}
+            mediaClassName={
+              tokenCardConfig?.mediaAspectRatioClassName ?? "aspect-[4/5]"
+            }
+            mediaTestId="token-skeleton"
+          />
+        )
       ) : null}
 
       {tokenQuery.isError ? (
@@ -395,11 +440,11 @@ export function CollectionTokenGrid({
               tokenPrice(token);
             const cardItem = cheapestListing
               ? cartItemFromTokenListing(
-                token,
-                address,
-                cheapestListing,
-                projectId,
-              )
+                  token,
+                  address,
+                  cheapestListing,
+                  projectId,
+                )
               : null;
 
             return (
@@ -407,7 +452,8 @@ export function CollectionTokenGrid({
                 <div
                   className={cn(
                     "rounded-lg transition-all duration-150",
-                    isSweepPreview && "relative z-10 ring-2 ring-primary ring-offset-2 ring-offset-background",
+                    isSweepPreview &&
+                      "relative z-10 ring-2 ring-primary ring-offset-2 ring-offset-background",
                   )}
                 >
                   <MarketplaceTokenCard
@@ -418,17 +464,21 @@ export function CollectionTokenGrid({
                     href={`/collections/${address}/${tokenId(token)}`}
                     inlineTraits={
                       showInlineResources ? (
-                        <ResourceTraitIcons resources={realmResources(token.metadata)} />
+                        <ResourceTraitIcons
+                          resources={realmResources(token.metadata)}
+                        />
                       ) : undefined
                     }
-                  linkAriaLabel={`token-${tokenKey}`}
-                  mediaContainerClassName={tokenCardConfig?.mediaAspectRatioClassName}
-                  mediaImageClassName={tokenCardConfig?.mediaImageClassName}
-                  onBuyNow={
+                    linkAriaLabel={`token-${tokenKey}`}
+                    mediaContainerClassName={
+                      tokenCardConfig?.mediaAspectRatioClassName
+                    }
+                    mediaImageClassName={tokenCardConfig?.mediaImageClassName}
+                    onBuyNow={
                       cardItem && !isSweepPreview
                         ? () => {
-                          addListingToCart(cardItem);
-                        }
+                            addListingToCart(cardItem);
+                          }
                         : undefined
                     }
                     price={price}
@@ -458,15 +508,22 @@ export function CollectionTokenGrid({
                   const tokenKey = displayTokenId(token);
                   const cheapestListing = listingPrices.get(tokenKey);
                   const isAdded = isRecentlyAdded(cheapestListing?.orderId);
-                  const isSweepPreview = sweepPreviewTokenIds?.has(tokenKey) ?? false;
+                  const isSweepPreview =
+                    sweepPreviewTokenIds?.has(tokenKey) ?? false;
                   const price =
                     cheapestListing?.price ??
                     listingPriceMap.get(tokenKey) ??
                     tokenPrice(token);
-                  const displayPrice = token.amountsInBaseUnits && price!=null ? formatCurrencyAmount(price,currency) : formatPriceForDisplay(price);
+                  const displayPrice =
+                    token.amountsInBaseUnits && price != null
+                      ? formatCurrencyAmount(price, currency)
+                      : formatPriceForDisplay(price);
 
                   return (
-                    <TableRow key={tokenId(token)} className={cn(isSweepPreview && "bg-muted/60")}>
+                    <TableRow
+                      key={tokenId(token)}
+                      className={cn(isSweepPreview && "bg-muted/60")}
+                    >
                       <TableCell>
                         <div className="space-y-0.5">
                           <Link
@@ -475,7 +532,9 @@ export function CollectionTokenGrid({
                           >
                             {tokenName(token)}
                           </Link>
-                          <p className="text-xs text-muted-foreground">#{tokenKey}</p>
+                          <p className="text-xs text-muted-foreground">
+                            #{tokenKey}
+                          </p>
                           {showInlineResources ? (
                             <ResourceTraitIcons
                               resources={realmResources(token.metadata)}
@@ -496,7 +555,9 @@ export function CollectionTokenGrid({
                             ) : null}
                           </p>
                         ) : (
-                          <p className="text-xs text-muted-foreground">Not listed</p>
+                          <p className="text-xs text-muted-foreground">
+                            Not listed
+                          </p>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
@@ -518,10 +579,20 @@ export function CollectionTokenGrid({
                           }}
                           size="sm"
                           type="button"
-                          variant={isAdded ? "default" : isSweepPreview ? "secondary" : "outline"}
+                          variant={
+                            isAdded
+                              ? "default"
+                              : isSweepPreview
+                                ? "secondary"
+                                : "outline"
+                          }
                           className="w-full sm:w-auto"
                         >
-                          {isAdded ? "Added" : isSweepPreview ? "Pending sweep" : "Add to cart"}
+                          {isAdded
+                            ? "Added"
+                            : isSweepPreview
+                              ? "Pending sweep"
+                              : "Add to cart"}
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -539,7 +610,7 @@ export function CollectionTokenGrid({
             {query
               ? `Nothing matches "${query}". Try a name or an exact token id.`
               : listedOnly
-                ? "No listed items match these filters. Turn off \"Listed only\" to see every item."
+                ? 'No listed items match these filters. Turn off "Listed only" to see every item.'
                 : "No tokens match your filters. Try removing some filters."}
           </CardContent>
         </Card>

@@ -99,3 +99,12 @@ export const Explained: Story = {
 export const Mobile: Story = {
   globals: { viewport: { value: "narrow", isRotated: false } },
 };
+
+export const Loading: Story = {
+  args: { priceLoading: true, offersLoading: true, activityLoading: true },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("status", { name: "Loading price" })).toBeInTheDocument();
+    await expect(canvas.queryByText("Not listed")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("No offers")).not.toBeInTheDocument();
+  },
+};

@@ -1,4 +1,5 @@
 "use client";
+import { AssetGridSkeleton, ListSkeleton } from "@/components/marketplace/loading-state";
 import { WalletConnectButton } from "@/components/layout/wallet-connect-button";
 import { formatCurrencyAmount } from "@/lib/marketplace/amount-display";
 import { useState } from "react";
@@ -200,7 +201,7 @@ export function TraderDashboard() {
             {holdings.isError ? (
               <p role="alert">Unable to load holdings.</p>
             ) : holdings.isPending ? (
-              <p>Loading inventory…</p>
+              <AssetGridSkeleton label="Loading inventory" gridClassName="grid-cols-2 md:grid-cols-4 xl:grid-cols-5" />
             ) : (
               <>
                 <div className="flex items-center gap-3">
@@ -327,7 +328,7 @@ export function TraderDashboard() {
                 </Card>
               )}
               {orders.isPending ? (
-                <p>Loading orders…</p>
+                <ListSkeleton label="Loading orders" />
               ) : orders.isError ? (
                 <p role="alert">Unable to load orders.</p>
               ) : (
@@ -404,7 +405,7 @@ export function TraderDashboard() {
             </TabsContent>
           ))}
           <TabsContent value="history" className="space-y-3">
-            {history.isError ? (
+            {history.isPending ? <ListSkeleton label="Loading activity" compact /> : history.isError ? (
               <p role="alert">Unable to load activity.</p>
             ) : (
               history.data?.items.map((event) => (

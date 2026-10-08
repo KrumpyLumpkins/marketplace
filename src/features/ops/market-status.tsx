@@ -38,7 +38,9 @@ export function MarketStatus({
                   : "Trading temporarily unavailable"}
         </p>
         <p className="text-sm text-muted-foreground">
-          {error
+          {loading
+            ? "Checking network and indexer freshness."
+            : error
             ? "We could not check the marketplace. Refresh to try again."
             : config?.demo
               ? "Browse sample NFTs and try the cart. Purchases and offers are disabled in this demo."

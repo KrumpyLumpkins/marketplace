@@ -1,5 +1,6 @@
 "use client";
 
+import { Skeleton } from "@/components/ui/skeleton";
 import type { ReactNode } from "react";
 import { InfoTip } from "@/components/marketplace/info-tip";
 import { MarketPrice } from "@/components/marketplace/market-price";
@@ -17,6 +18,9 @@ export type TokenMarketSummaryProps = {
   lastSale?: MarketAmount | null;
   /** Open listings for this token; mentioned when more than one is live. */
   listedCount?: number;
+  priceLoading?: boolean;
+  offersLoading?: boolean;
+  activityLoading?: boolean;
 };
 
 const HELP = {
@@ -44,7 +48,8 @@ export function pickTopOffer(
   preferredCurrency?: string | null,
 ): MarketAmount | null {
   const offers = orders.filter(
-    (order) => order.kind !== "listing" && parseAmount(order.buyerDebit) !== null,
+    (order) =>
+      order.kind !== "listing" && parseAmount(order.buyerDebit) !== null,
   );
   if (offers.length === 0) return null;
 
@@ -54,7 +59,9 @@ export function pickTopOffer(
   const pool =
     preferred.length > 0
       ? preferred
-      : offers.filter((order) => sameCurrency(order.currency, offers[0].currency));
+      : offers.filter((order) =>
+          sameCurrency(order.currency, offers[0].currency),
+        );
 
   let best = pool[0];
   let bestAmount = parseAmount(best.buyerDebit) ?? 0n;
@@ -72,7 +79,8 @@ export function pickTopOffer(
 export function pickLastSale(items: TokenActivityItem[]): MarketAmount | null {
   let latest: TokenActivityItem | null = null;
   for (const item of items) {
-    if (item.type !== "order_filled" || !item.buyerDebit || !item.currency) continue;
+    if (item.type !== "order_filled" || !item.buyerDebit || !item.currency)
+      continue;
     if (!latest || item.provenance.timestamp > latest.provenance.timestamp) {
       latest = item;
     }
@@ -121,6 +129,9 @@ export function TokenMarketSummary({
   topOffer,
   lastSale,
   listedCount,
+  priceLoading = false,
+  offersLoading = false,
+  activityLoading = false,
 }: TokenMarketSummaryProps) {
   return (
     <dl
@@ -137,21 +148,47 @@ export function TokenMarketSummary({
             : undefined
         }
       >
-        <MarketPrice amount={price} currency={currency} empty="Not listed" />
+        {priceLoading ? (
+          <span role="status" aria-label="Loading price">
+            <Skeleton className="h-6 w-24" />
+          </span>
+        ) : (
+          <MarketPrice amount={price} currency={currency} empty="Not listed" />
+        )}
       </Tile>
-      <Tile label="Top offer" help={HELP.topOffer} testId="market-summary-top-offer">
-        <MarketPrice
-          amount={topOffer?.amount}
-          currency={topOffer?.currency}
-          empty="No offers"
-        />
+      <Tile
+        label="Top offer"
+        help={HELP.topOffer}
+        testId="market-summary-top-offer"
+      >
+        {offersLoading ? (
+          <span role="status" aria-label="Loading top offer">
+            <Skeleton className="h-6 w-24" />
+          </span>
+        ) : (
+          <MarketPrice
+            amount={topOffer?.amount}
+            currency={topOffer?.currency}
+            empty="No offers"
+          />
+        )}
       </Tile>
-      <Tile label="Last sale" help={HELP.lastSale} testId="market-summary-last-sale">
-        <MarketPrice
-          amount={lastSale?.amount}
-          currency={lastSale?.currency}
-          empty="No sales yet"
-        />
+      <Tile
+        label="Last sale"
+        help={HELP.lastSale}
+        testId="market-summary-last-sale"
+      >
+        {activityLoading ? (
+          <span role="status" aria-label="Loading last sale">
+            <Skeleton className="h-6 w-24" />
+          </span>
+        ) : (
+          <MarketPrice
+            amount={lastSale?.amount}
+            currency={lastSale?.currency}
+            empty="No sales yet"
+          />
+        )}
       </Tile>
     </dl>
   );

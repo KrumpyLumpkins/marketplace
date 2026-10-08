@@ -1,4 +1,5 @@
 "use client";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import { InfoTip } from "@/components/marketplace/info-tip";
 import { TokenSymbol } from "@/components/ui/token-symbol";
@@ -53,7 +54,7 @@ export function CollectionStatsStrip({ address, currency }: CollectionStatsStrip
     tokenCount && listingCount && Number(tokenCount) > 0
       ? Math.min(100, (Number(listingCount) / Number(tokenCount)) * 100)
       : null;
-  const pending = (value: React.ReactNode, isPending: boolean) => (isPending ? "…" : value);
+  const pending = (value: React.ReactNode, isPending: boolean) => (isPending ? <span role="status" aria-label="Loading statistic" className="inline-block w-16"><Skeleton className="h-5 w-full" /></span> : value);
 
   return (
     <dl className="flex flex-wrap gap-2" data-testid="collection-stats-strip">

@@ -1,3 +1,4 @@
+import { CollectionPageSkeleton } from "@/components/marketplace/loading-state";
 import { Suspense } from "react";
 import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import type { Metadata } from "next";
@@ -31,7 +32,7 @@ export default async function CollectionPage({
   return (
     <main className="flex min-h-screen w-full items-start px-4 pb-6 sm:px-6">
       <HydrationBoundary state={dehydrate(queryClient)}>
-        <Suspense>
+        <Suspense fallback={<CollectionPageSkeleton />}>
           <CollectionRouteContainer address={address} cursor={cursor ?? null} />
         </Suspense>
       </HydrationBoundary>

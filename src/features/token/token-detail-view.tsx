@@ -1,4 +1,8 @@
 "use client";
+import {
+  TokenDetailSkeleton,
+  ListSkeleton,
+} from "@/components/marketplace/loading-state";
 
 import { useId, useState } from "react";
 import Link from "next/link";
@@ -50,9 +54,14 @@ import { useTraitRarity } from "./use-trait-rarity";
 
 type ComposerKind = "listing" | "token_offer";
 
-function sameAddress(left: string | null | undefined, right: string | null | undefined) {
+function sameAddress(
+  left: string | null | undefined,
+  right: string | null | undefined,
+) {
   if (!left || !right) return false;
-  return normalizeMarketplaceAddress(left) === normalizeMarketplaceAddress(right);
+  return (
+    normalizeMarketplaceAddress(left) === normalizeMarketplaceAddress(right)
+  );
 }
 
 function sameTokenId(left: string, right: string) {
@@ -105,7 +114,10 @@ export function TokenDetailView({
   const cartItems = useCartStore((s) => s.items);
   const setCartOpen = useCartStore((s) => s.setOpen);
   const { addListingToCart } = useAddToCartFeedback();
-  const offers = useCollectionOffersQuery(address, { tokenMatch: tokenId, limit: 50 });
+  const offers = useCollectionOffersQuery(address, {
+    tokenMatch: tokenId,
+    limit: 50,
+  });
   const activity = useInfiniteQuery<ApiPage<TokenActivityItem>>({
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (page) => page.nextCursor ?? undefined,
@@ -119,15 +131,17 @@ export function TokenDetailView({
   const [composer, setComposer] = useState<ComposerKind | null>(null);
   const composerId = useId();
 
-  const offerItems = (offers.data?.pages.flatMap((page) => page.items) ?? []).filter(
+  const offerItems = (
+    offers.data?.pages.flatMap((page) => page.items) ?? []
+  ).filter(
     (order) =>
       order.kind !== "listing" &&
       (order.tokenId == null || sameTokenId(order.tokenId, tokenId)),
   );
-  const activityItems = activity.data?.pages.flatMap((page) => page.items) ?? [];
+  const activityItems =
+    activity.data?.pages.flatMap((page) => page.items) ?? [];
 
-  if (detail.isLoading)
-    return <div className="p-8 text-muted-foreground">Loading token…</div>;
+  if (detail.isLoading) return <TokenDetailSkeleton />;
   if (detail.isError || !detail.data?.token)
     return (
       <Card>
@@ -149,13 +163,20 @@ export function TokenDetailView({
       : null;
   const attributes = traitAttributesFromMetadata(token.metadata);
   const collectionName =
-    collection.data?.metadata?.name ?? seedCollectionName(address) ?? formatAddress(address);
+    collection.data?.metadata?.name ??
+    seedCollectionName(address) ??
+    formatAddress(address);
 
   const tokenListings = listings.data ?? [];
-  const cheapest = cheapestListingByTokenId(tokenListings).get(BigInt(tokenId).toString());
-  const myListing = tokenListings.find((listing) => sameAddress(listing.owner, trade.address));
+  const cheapest = cheapestListingByTokenId(tokenListings).get(
+    BigInt(tokenId).toString(),
+  );
+  const myListing = tokenListings.find((listing) =>
+    sameAddress(listing.owner, trade.address),
+  );
   const isOwner = ownership.effectiveIsOwner;
-  const owner = ownership.holderAddress ?? (isOwner ? (trade.address ?? null) : null);
+  const owner =
+    ownership.holderAddress ?? (isOwner ? (trade.address ?? null) : null);
 
   const toggleComposer = (kind: ComposerKind) =>
     setComposer((current) => (current === kind ? null : kind));
@@ -197,7 +218,9 @@ export function TokenDetailView({
           {owner && isOwner ? <Badge variant="secondary">You</Badge> : null}
         </div>
         {description ? (
-          <p className="max-w-prose text-sm text-muted-foreground">{description}</p>
+          <p className="max-w-prose text-sm text-muted-foreground">
+            {description}
+          </p>
         ) : null}
       </header>
 
@@ -214,6 +237,9 @@ export function TokenDetailView({
         </div>
         <div className="space-y-4">
           <TokenMarketSummary
+            priceLoading={listings.isPending}
+            offersLoading={offers.isPending}
+            activityLoading={activity.isPending}
             price={cheapest?.price}
             currency={cheapest?.currency}
             topOffer={pickTopOffer(offerItems, cheapest?.currency)}
@@ -234,7 +260,7 @@ export function TokenDetailView({
                   </Button>
                 </p>
               ) : listings.isPending ? (
-                <p className="text-sm text-muted-foreground">Loading price…</p>
+                <ListSkeleton label="Loading price" count={1} />
               ) : (
                 <ListingPurchase
                   price={cheapest?.price}
@@ -364,13 +390,13 @@ export function TokenDetailView({
               items={activityItems}
               chain={getMarketplaceRuntimeConfig().chainLabel}
             />
+          ) : activity.isPending ? (
+            <ListSkeleton label="Loading activity" compact />
           ) : (
             <p className="pt-3 text-sm text-muted-foreground">
-              {activity.isPending
-                ? "Loading activity…"
-                : activity.isError
-                  ? "Activity is unavailable. Try again shortly."
-                  : "No indexed activity yet."}
+              {activity.isError
+                ? "Activity is unavailable. Try again shortly."
+                : "No indexed activity yet."}
             </p>
           )}
           {activity.hasNextPage ? (

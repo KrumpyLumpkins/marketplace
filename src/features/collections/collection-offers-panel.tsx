@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ListSkeleton } from "@/components/marketplace/loading-state";
 import { MarketPrice } from "@/components/marketplace/market-price";
 import { OrderComposer } from "@/features/trading/order-composer";
 import { useCollectionOffersQuery } from "@/lib/marketplace/market-data";
@@ -157,11 +157,7 @@ export function CollectionOffersPanel({
           )}
 
           {query.isPending ? (
-            <div role="status" aria-label="Loading offers" className="space-y-3">
-              {[0, 1, 2].map((index) => (
-                <Skeleton key={index} className="h-28 w-full rounded-xl" />
-              ))}
-            </div>
+            <ListSkeleton label="Loading offers" />
           ) : orders.length > 0 ? (
             <ul className="space-y-3" aria-label="Open offers">
               {orders.map((order) => (

@@ -1,4 +1,5 @@
 "use client";
+import { LoadingRegion } from "@/components/marketplace/loading-state";
 
 import { useId, useState, type ReactNode } from "react";
 import { ToggleGroup as ToggleGroupPrimitive } from "radix-ui";
@@ -84,7 +85,7 @@ export function ChartFrame({
       </header>
       <div ref={ref} className="min-w-0">
         {loading ? (
-          <Skeleton className="w-full" style={{ height }} data-testid="chart-skeleton" />
+          <LoadingRegion label={`Loading ${title}`}><Skeleton className="w-full" style={{ height }} data-testid="chart-skeleton" /></LoadingRegion>
         ) : view === "table" ? (
           <div className="max-h-72 overflow-auto rounded-[6px] border border-[color:var(--realm-border-etched)] text-xs">
             {table}

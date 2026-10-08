@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ListSkeleton } from "@/components/marketplace/loading-state";
 import {
   Table,
   TableBody,
@@ -267,11 +267,7 @@ export function CollectionActivityFeed({ address }: { address: string }) {
       )}
 
       {query.isPending ? (
-        <div role="status" aria-label="Loading activity" className="space-y-3">
-          {[0, 1, 2, 3].map((index) => (
-            <Skeleton key={index} className="h-14 w-full rounded-lg" />
-          ))}
-        </div>
+        <ListSkeleton label="Loading activity" compact />
       ) : events.length > 0 ? (
         <>
           <div className="hidden md:block">
