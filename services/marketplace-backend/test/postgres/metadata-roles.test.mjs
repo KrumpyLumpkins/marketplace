@@ -131,3 +131,139 @@ test("runtime roles isolate application data and chain ownership; metadata and H
     await pool.query(`DROP ROLE "${spec.name}"`);
   }
 });
+
+test("metadata reuses unchanged cached images and records failed changed-image downloads", async (t) => {
+  const db = await testDatabase(t),
+    pool = db.pool();
+  await migrate(pool);
+  const store = new PgStore(pool);
+  await store.applyBlock(block(1, "2"));
+  let image =
+      "https://example.org/ipfs/QmS136SdgcHsiaKJdFVfQWNMS5tHHcbazbUxYqpUZKVEj6",
+    calls = 0,
+    fail = false;
+  const rpc = { contract: async () => uriFelts({ name: "Realm", image }) };
+  const fetchResource = async () => {
+    calls++;
+    if (fail) throw new Error("Metadata timeout");
+    return {
+      bytes: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'),
+      contentType: "image/svg+xml",
+    };
+  };
+  const id = `${address("9")}:1`;
+  await refreshMetadata(
+    store,
+    rpc,
+    { chain: "LOCAL" },
+    { limit: 1, fetchResource },
+  );
+  const first = await store.get("token", id);
+  assert.ok(first.image);
+  assert.equal(calls, 1);
+  await store.put("metadata_job", id, { state: "pending" });
+  fail = true;
+  await refreshMetadata(
+    store,
+    rpc,
+    { chain: "LOCAL" },
+    { limit: 1, fetchResource },
+  );
+  const repeat = await store.get("token", id);
+  assert.equal(repeat.image, first.image);
+  assert.equal(calls, 1, "unchanged media must not download again");
+  image = "https://example.org/changed.svg";
+  await store.put("metadata_job", id, { state: "pending" });
+  await refreshMetadata(
+    store,
+    rpc,
+    { chain: "LOCAL" },
+    { limit: 1, fetchResource },
+  );
+  const failed = await store.get("token", id);
+  assert.equal(
+    failed.image,
+    null,
+    "never attribute old artwork to a changed source",
+  );
+  assert.equal(failed.metadata.imageStatus, "failed");
+  assert.equal(failed.metadata.imageError, "Metadata timeout");
+  assert.equal(failed.metadataStatus, "ready");
+});
+
+test("metadata recovery prioritizes explicit jobs and missing images over cached refreshes", async (t) => {
+  const { metadataCandidates } = await import("../../src/metadata-store.mjs");
+  const db = await testDatabase(t),
+    pool = db.pool();
+  await migrate(pool);
+  const store = new PgStore(pool);
+  const b = block(1, "2");
+  b.events = ["1", "2", "3"].map((tokenId) => ({ ...b.events[0], tokenId }));
+  await store.applyBlock(b);
+  const id = (n) => `${address("9")}:${n}`;
+  await store.putMetadata(id(1), {
+    image: "/cached.svg",
+    metadataFetchedAt: 1,
+  });
+  await store.putMetadata(id(2), { image: null, metadataFetchedAt: 3 });
+  await store.putMetadata(id(3), {
+    image: "/cached.svg",
+    metadataFetchedAt: 4,
+  });
+  await store.put("metadata_job", id(3), { state: "pending" });
+  assert.deepEqual(
+    (await metadataCandidates(store, Date.now(), 3)).map((t) => t.tokenId),
+    ["3", "2", "1"],
+  );
+});
+
+test("metadata downloads overlap within a bounded pool and retain cached mutable media on transient failures", async (t) => {
+  const db = await testDatabase(t),
+    pool = db.pool();
+  await migrate(pool);
+  const store = new PgStore(pool);
+  const b = block(1, "2");
+  b.events = Array.from({ length: 7 }, (_, i) => ({
+    ...b.events[0],
+    tokenId: String(i + 1),
+  }));
+  await store.applyBlock(b);
+  let active = 0,
+    peak = 0;
+  const rpc = {
+    contract: async () =>
+      uriFelts({ name: "Realm", image: "https://example.org/realm.svg" }),
+  };
+  const fetchResource = async () => {
+    active++;
+    peak = Math.max(active, peak);
+    await new Promise((r) => setTimeout(r, 20));
+    active--;
+    return { bytes: Buffer.from("<svg/>"), contentType: "image/svg+xml" };
+  };
+  await refreshMetadata(
+    store,
+    rpc,
+    { chain: "LOCAL" },
+    { limit: 7, fetchResource },
+  );
+  assert.ok(peak > 1);
+  assert.ok(peak <= 4);
+  const id = `${address("9")}:1`,
+    first = await store.get("token", id);
+  await store.put("metadata_job", id, { state: "pending" });
+  await refreshMetadata(
+    store,
+    rpc,
+    { chain: "LOCAL" },
+    {
+      limit: 1,
+      fetchResource: async () => {
+        throw new Error("origin unavailable");
+      },
+    },
+  );
+  const after = await store.get("token", id);
+  assert.equal(after.image, first.image);
+  assert.equal(after.metadata.imageError, "origin unavailable");
+});

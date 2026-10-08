@@ -4,8 +4,11 @@ import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { MarketplaceTokenCard } from "@/components/marketplace/token-card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCollectionQuery, useCollectionTokensQuery } from "@/lib/marketplace/hooks";
-import { expandTokenIdVariants } from "@/lib/marketplace/token-id";
+import {
+  useCollectionQuery,
+  useCollectionTokensQuery,
+} from "@/lib/marketplace/hooks";
+import { normalizeCollectionTokenId } from "@/lib/marketplace/token-id";
 import { tokenId } from "@/lib/marketplace/token-display";
 import { cn } from "@/lib/utils";
 import { useEntrance } from "@/lib/animation";
@@ -32,27 +35,67 @@ export function CollectionHoldingSection({
   density,
   projectId,
 }: CollectionHoldingSectionProps) {
-  const expandedTokenIds = useMemo(
-    () => expandTokenIdVariants(tokenIds),
-    [tokenIds],
-  );
+  const batches = useMemo(() => {
+    const ids = [
+      ...new Set(
+        tokenIds
+          .map(normalizeCollectionTokenId)
+          .filter((id): id is string => id !== null),
+      ),
+    ];
+    return Array.from(
+      { length: Math.max(1, Math.ceil(ids.length / 100)) },
+      (_, i) => ids.slice(i * 100, (i + 1) * 100),
+    );
+  }, [tokenIds]);
 
   const collectionQuery = useCollectionQuery({
     address: collectionAddress,
     fetchImages: false,
     projectId,
   });
-  const tokensQuery = useCollectionTokensQuery({
-    address: collectionAddress,
-    project: projectId,
-    tokenIds: expandedTokenIds,
-    limit: expandedTokenIds.length,
-    fetchImages: true,
-  });
-
   const resolvedCollectionName = resolveCollectionName(
     collectionQuery.data?.metadata,
     collectionName,
+  );
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-2 border-b border-[color:var(--realm-border-etched)] pb-2">
+        <h2 className="realm-kicker text-lg">{resolvedCollectionName}</h2>
+        <span className="rounded-[6px] border border-[color:var(--realm-border-etched)] bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground">
+          {tokenIds.length}
+        </span>
+      </div>
+
+      {batches.map((ids, i) => (
+        <HoldingTokenBatch
+          key={i}
+          collectionAddress={collectionAddress}
+          tokenIds={ids}
+          density={density}
+          projectId={projectId}
+        />
+      ))}
+    </section>
+  );
+}
+
+function HoldingTokenBatch({
+  collectionAddress,
+  tokenIds,
+  density,
+  projectId,
+}: Omit<CollectionHoldingSectionProps, "collectionName">) {
+  const tokensQuery = useCollectionTokensQuery(
+    {
+      address: collectionAddress,
+      project: projectId,
+      tokenIds,
+      limit: tokenIds.length,
+      fetchImages: true,
+    },
+    { enabled: tokenIds.length > 0 },
   );
 
   const gridRef = useEntrance<HTMLDivElement>({
@@ -66,14 +109,7 @@ export function CollectionHoldingSection({
   const gridClasses = GRID_CLASSES[density];
 
   return (
-    <section className="space-y-3">
-      <div className="flex items-center gap-2 border-b border-[color:var(--realm-border-etched)] pb-2">
-        <h2 className="realm-kicker text-lg">{resolvedCollectionName}</h2>
-        <span className="rounded-[6px] border border-[color:var(--realm-border-etched)] bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground">
-          {tokenIds.length}
-        </span>
-      </div>
-
+    <>
       {isLoading ? (
         <div className={cn("grid gap-3", gridClasses)}>
           {tokenIds.map((id) => (
@@ -111,11 +147,14 @@ export function CollectionHoldingSection({
           ))}
         </div>
       )}
-    </section>
+    </>
   );
 }
 
-function resolveCollectionName(metadata: unknown, fallbackName: string): string {
+function resolveCollectionName(
+  metadata: unknown,
+  fallbackName: string,
+): string {
   if (metadata && typeof metadata === "object") {
     const name = (metadata as Record<string, unknown>).name;
     if (typeof name === "string" && name.trim().length > 0) {

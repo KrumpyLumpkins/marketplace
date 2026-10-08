@@ -2,9 +2,22 @@ import { fn } from "storybook/test";
 import { CURRENCY, fixtureConfig, useScenario } from "../scenario";
 export const marketplaceRequest = fn(
   async (path: string, _query?: unknown, body?: unknown) => {
-    if (path === "/marketplace/config") return {...fixtureConfig, demo:useScenario.getState().demo};
-    if (path === "/auth/session") return {account:null};
-    if (path === "/collections/0xa/stats") return {days:7,byCurrency:[{currency:CURRENCY,volume:"42000000000000000000",sales:3,history:[]}],floors:[]};
+    if (path === "/marketplace/config")
+      return { ...fixtureConfig, demo: useScenario.getState().demo };
+    if (path === "/auth/session") return { account: null };
+    if (path === "/collections/0xa/stats")
+      return {
+        days: 7,
+        byCurrency: [
+          {
+            currency: CURRENCY,
+            volume: "42000000000000000000",
+            sales: 3,
+            history: [],
+          },
+        ],
+        floors: [],
+      };
     if (path.endsWith("/best-bid")) {
       const scenario = useScenario.getState();
       if (scenario.apiState === "pending") return new Promise(() => {});
@@ -81,3 +94,33 @@ export const marketplaceRequest = fn(
 );
 
 export { tokenFromApi } from "../../src/lib/marketplace/api-client";
+
+// Portfolio fixtures obey the production API's maximum 100 IDs per request.
+export const fetchCollectionTokens = fn(
+  async (options: { tokenIds?: string[]; address: string }) => {
+    if (useScenario.getState().apiState === "error")
+      throw new Error("Token details unavailable");
+    if (useScenario.getState().apiState === "pending")
+      return new Promise<never>(() => {});
+    const ids = options.tokenIds ?? [];
+    if (ids.length > 100) throw new Error("Invalid token IDs");
+    return {
+      page: {
+        tokens:
+          useScenario.getState().apiState === "empty"
+            ? []
+            : ids.map((id) => ({
+                contract_address: options.address,
+                token_id: id,
+                metadata: { name: `Realm ${id}` },
+                image: "/banners/realms.png",
+              })),
+        nextCursor: null,
+      },
+      error: null,
+    };
+  },
+);
+export const ownedClient = {
+  getCollection: async () => ({ metadata: { name: "Realms" } }),
+};

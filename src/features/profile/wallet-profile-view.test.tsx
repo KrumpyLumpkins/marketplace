@@ -312,6 +312,7 @@ describe("WalletProfileView", () => {
         address: "0xcollection-a",
         project: "project-a",
       }),
+      { enabled: true },
     );
   });
 });
