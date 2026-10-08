@@ -1,4 +1,5 @@
 import { expect } from "storybook/test";
+import { exo2, geistMono } from "@/lib/fonts";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,12 +64,16 @@ const meta = {
       getComputedStyle(
         canvas.getByText("Exo 2 · interface text, labels and descriptions."),
       ).fontFamily,
-    ).toContain("Exo");
+    ).toContain(exo2.style.fontFamily.split(",")[0].replace(/['"]/g, ""));
     await expect(
       getComputedStyle(
         canvas.getByText("Geist Mono · 0x0123…abcd · 12.345 STRK"),
       ).fontFamily,
-    ).toContain("Geist");
+    ).toContain(geistMono.style.fontFamily.split(",")[0].replace(/['"]/g, ""));
+    for (const family of [exo2.style.fontFamily, geistMono.style.fontFamily]) {
+      const loaded = await document.fonts.load(`16px ${family}`);
+      await expect(loaded.length).toBeGreaterThan(0);
+    }
     await expect(
       getComputedStyle(
         canvas.getByRole("heading", { name: "Realms Marketplace" }),

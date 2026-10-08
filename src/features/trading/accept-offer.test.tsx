@@ -44,27 +44,28 @@ beforeEach(() => {
 });
 it("requires a fresh review when the selected NFT changes", async () => {
   const { rerender } = render(<AcceptOffer order={order} tokenId="1" />);
-  fireEvent.click(screen.getByText("Review offer"));
+  fireEvent.click(screen.getByRole("button", {name:"Review offer"}));
   await screen.findByText("Confirm acceptance");
   rerender(<AcceptOffer order={order} tokenId="2" />);
   expect(screen.queryByText("Confirm acceptance")).toBeNull();
 });
 it("does not retain an old confirmation after preflight fails", async () => {
   render(<AcceptOffer order={order} tokenId="1" />);
-  fireEvent.click(screen.getByText("Review offer"));
+  fireEvent.click(screen.getByRole("button", {name:"Review offer"}));
   await screen.findByText("Confirm acceptance");
   request.mockRejectedValue(new Error("Offer cancelled"));
-  fireEvent.click(screen.getByText("Review offer"));
+  fireEvent.click(screen.getByRole("button", {name:"Close"}));
+  fireEvent.click(screen.getByRole("button", {name:"Review offer"}));
   await screen.findByText("Offer cancelled");
   expect(screen.queryByText("Confirm acceptance")).toBeNull();
 });
 it("prevents duplicate preview requests while checking", async () => {
   request.mockReturnValue(new Promise(() => {}));
   render(<AcceptOffer order={order} tokenId="1" />);
-  fireEvent.click(screen.getByText("Review offer"));
+  fireEvent.click(screen.getByRole("button", {name:"Review offer"}));
   await waitFor(() =>
     expect(
-      screen.getByRole("button", { name: /checking|review offer/i }),
+      screen.getByRole("button", { name: "Review offer", hidden: true }),
     ).toBeDisabled(),
   );
 });

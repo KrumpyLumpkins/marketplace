@@ -1,10 +1,8 @@
 "use client";
 import { useTrade } from "@/lib/marketplace/use-trade";
-import { TradeStatus } from "./trade-status";
-import { Button } from "@/components/ui/button";
+import { TransactionFeedback } from "./transaction-feedback";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { UnknownSubmission } from "./unknown-submission";
 export function MarketToolbar() {
   const trade = useTrade();
   const config = { data: trade.config, isError: trade.configError };
@@ -32,24 +30,7 @@ export function MarketToolbar() {
           {config.isError ? "Market data unavailable" : "Trading unavailable"}
         </Badge>
       )}
-      {trade.address && (
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={trade.busy}
-          onClick={() => void trade.resume()}
-        >
-          Check saved transaction
-        </Button>
-      )}
-      <TradeStatus state={trade.state} />
-      {trade.address && trade.state.unknownSubmission && (
-        <UnknownSubmission
-          key={`${trade.address}:${trade.config?.marketplace}`}
-          busy={trade.busy}
-          onReconcile={trade.reconcileUnknown}
-        />
-      )}
+      <TransactionFeedback />
     </div>
   );
 }

@@ -3,7 +3,6 @@ import { ListingPurchase } from "./listing-purchase";
 import { TokenActivity, type TokenActivityItem } from "./token-activity";
 import { useCartStore } from "@/features/cart/store/cart-store";
 import { getMarketplaceRuntimeConfig } from "@/lib/marketplace/config";
-import { formatCurrencyAmount } from "@/lib/marketplace/amount-display";
 import { BestBid } from "@/features/trading/best-bid";
 import { AcceptOffer } from "@/features/trading/accept-offer";
 import { ReportToken } from "@/features/trading/report-token";
@@ -16,11 +15,7 @@ import {
 } from "@/lib/marketplace/hooks";
 import { useTokenOwnership } from "./use-token-ownership";
 import { useTrade } from "@/lib/marketplace/use-trade";
-import {
-  tokenName,
-  tokenImage,
-  getTokenSymbol,
-} from "@/lib/marketplace/token-display";
+import { tokenName, tokenImage } from "@/lib/marketplace/token-display";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +25,7 @@ import {
   cartItemFromTokenListing,
 } from "@/features/cart/listing-utils";
 import { OrderComposer } from "@/features/trading/order-composer";
-import { TradeStatus } from "@/features/trading/trade-status";
+import { OfferList } from "./offer-list";
 import { marketplaceRequest } from "@/lib/marketplace/api-client";
 import { prepareCancellation } from "@biblio/marketplace";
 import type { ApiOrder, ApiPage } from "@/lib/marketplace/types";
@@ -61,28 +56,34 @@ export function TokenDetailView({
     walletAddress: trade.address,
     isConnected: !!trade.address,
   });
-  const cartItems = useCartStore(s=>s.items);
-  const setCartOpen = useCartStore(s=>s.setOpen);
+  const cartItems = useCartStore((s) => s.items);
+  const setCartOpen = useCartStore((s) => s.setOpen);
   const { addListingToCart } = useAddToCartFeedback();
   const offers = useInfiniteQuery<ApiPage<ApiOrder>>({
-    initialPageParam:undefined as string|undefined,
-    getNextPageParam:page=>page.nextCursor??undefined,
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
     queryKey: ["owned", "token-offers", address, tokenId],
-    queryFn: ({pageParam}) =>
+    queryFn: ({ pageParam }) =>
       marketplaceRequest<ApiPage<ApiOrder>>(`/collections/${address}/offers`, {
         state: "open",
         tokenMatch: tokenId,
-        limit: 50,cursor:pageParam,
+        limit: 50,
+        cursor: pageParam,
       }),
   });
   const activity = useInfiniteQuery<ApiPage<TokenActivityItem>>({
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: page => page.nextCursor ?? undefined,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
     queryKey: ["owned", "activity", address, tokenId],
-    queryFn: ({pageParam}) => marketplaceRequest<ApiPage<TokenActivityItem>>(`/tokens/${address}/${tokenId}/activity`, {limit:20,cursor:pageParam}),
+    queryFn: ({ pageParam }) =>
+      marketplaceRequest<ApiPage<TokenActivityItem>>(
+        `/tokens/${address}/${tokenId}/activity`,
+        { limit: 20, cursor: pageParam },
+      ),
   });
-  const offerItems=offers.data?.pages.flatMap(page=>page.items)??[];
-  const activityItems=activity.data?.pages.flatMap(page=>page.items)??[];
+  const offerItems = offers.data?.pages.flatMap((page) => page.items) ?? [];
+  const activityItems =
+    activity.data?.pages.flatMap((page) => page.items) ?? [];
   if (detail.isLoading)
     return <div className="p-8 text-muted-foreground">Loading token…</div>;
   if (detail.isError || !detail.data?.token)
@@ -107,10 +108,7 @@ export function TokenDetailView({
     attributes?: Array<{ trait_type: string; value: unknown }>;
   };
   return (
-    <div
-      className="mx-auto max-w-7xl space-y-4"
-      data-testid="token-detail"
-    >
+    <div className="mx-auto max-w-7xl space-y-4" data-testid="token-detail">
       <Link
         href={`/collections/${address}`}
         className="text-sm text-muted-foreground hover:text-foreground"
@@ -149,13 +147,36 @@ export function TokenDetailView({
               <CardTitle>Listings</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {listings.isError ? <p role="alert">Listing prices are unavailable. <Button variant="outline" onClick={()=>void listings.refetch()}>Retry</Button></p> : listings.isPending ? <p>Loading price…</p> : <ListingPurchase
-                price={cheapest?.price} currency={cheapest?.currency}
-                inCart={!!cheapest && cartItems.some(item=>item.orderId===cheapest.orderId)}
-                isOwner={ownership.effectiveIsOwner}
-                onViewCart={()=>setCartOpen(true)}
-                onAdd={()=>{if(cheapest) addListingToCart(cartItemFromTokenListing(token,address,cheapest));}}
-              />}
+              {listings.isError ? (
+                <p role="alert">
+                  Listing prices are unavailable.{" "}
+                  <Button
+                    variant="outline"
+                    onClick={() => void listings.refetch()}
+                  >
+                    Retry
+                  </Button>
+                </p>
+              ) : listings.isPending ? (
+                <p>Loading price…</p>
+              ) : (
+                <ListingPurchase
+                  price={cheapest?.price}
+                  currency={cheapest?.currency}
+                  inCart={
+                    !!cheapest &&
+                    cartItems.some((item) => item.orderId === cheapest.orderId)
+                  }
+                  isOwner={ownership.effectiveIsOwner}
+                  onViewCart={() => setCartOpen(true)}
+                  onAdd={() => {
+                    if (cheapest)
+                      addListingToCart(
+                        cartItemFromTokenListing(token, address, cheapest),
+                      );
+                  }}
+                />
+              )}
             </CardContent>
           </Card>
           {ownership.effectiveIsOwner ? (
@@ -167,7 +188,15 @@ export function TokenDetailView({
                     disabled={trade.busy}
                     onClick={() =>
                       void trade.execute(
-                        (m) => prepareCancellation({marketplace:m,chain:trade.config!.chain,account:trade.address!},[myListing.id]),
+                        (m) =>
+                          prepareCancellation(
+                            {
+                              marketplace: m,
+                              chain: trade.config!.chain,
+                              account: trade.address!,
+                            },
+                            [myListing.id],
+                          ),
                         "cancel",
                       )
                     }
@@ -193,7 +222,6 @@ export function TokenDetailView({
               </CardContent>
             </Card>
           )}
-          <TradeStatus state={trade.state} />
         </div>
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
@@ -213,51 +241,30 @@ export function TokenDetailView({
             ))}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Offers</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <BestBid
-              collection={address}
-              tokenId={tokenId}
-              isOwner={ownership.effectiveIsOwner}
-            />
-            {offerItems
-              .filter(
-                (o) =>
-                  o.kind !== "listing" &&
-                  (o.tokenId == null || BigInt(o.tokenId) === BigInt(tokenId)),
-              )
-              .map((o) => (
-                <div
-                  key={o.id}
-                  className="flex items-center justify-between gap-2 border-b pb-2"
-                >
-                  <div>
-                    <p>
-                      {formatCurrencyAmount(o.buyerDebit, o.currency)}{" "}
-                      {getTokenSymbol(o.currency)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {o.kind === "collection_offer"
-                        ? "Collection offer"
-                        : "Token offer"}{" "}
-                      · funds checked on acceptance
-                    </p>
-                  </div>
-                  {ownership.effectiveIsOwner && (
-                    <AcceptOffer order={o} tokenId={tokenId} />
-                  )}
-                </div>
-              ))}
-            {offers.isError&&<p role="alert">Offers are unavailable. Try again shortly.</p>}
-            {offers.hasNextPage&&<Button variant="outline" disabled={offers.isFetchingNextPage} onClick={()=>void offers.fetchNextPage()}>More offers</Button>}
-            {!offers.isPending&&!offers.isError&&!offerItems.some((o) => o.kind !== "listing") && (
-              <p className="text-sm text-muted-foreground">No offers yet.</p>
-            )}
-          </CardContent>
-        </Card>
+        <OfferList
+          orders={offerItems.filter(
+            (o) =>
+              o.kind !== "listing" &&
+              (o.tokenId == null || BigInt(o.tokenId) === BigInt(tokenId)),
+          )}
+          loading={offers.isPending}
+          error={offers.isError}
+          hasMore={offers.hasNextPage}
+          loadingMore={offers.isFetchingNextPage}
+          onRetry={() => void offers.refetch()}
+          onMore={() => void offers.fetchNextPage()}
+          renderAction={
+            ownership.effectiveIsOwner
+              ? (order) => <AcceptOffer order={order} tokenId={tokenId} />
+              : undefined
+          }
+        >
+          <BestBid
+            collection={address}
+            tokenId={tokenId}
+            isOwner={ownership.effectiveIsOwner}
+          />
+        </OfferList>
       </div>
       <Card>
         <CardHeader>
@@ -265,15 +272,30 @@ export function TokenDetailView({
         </CardHeader>
         <CardContent>
           {activityItems.length ? (
-            <TokenActivity items={activityItems} chain={getMarketplaceRuntimeConfig().chainLabel} />
+            <TokenActivity
+              items={activityItems}
+              chain={getMarketplaceRuntimeConfig().chainLabel}
+            />
           ) : (
             <p className="text-sm text-muted-foreground">
-              {activity.isPending?"Loading activity…":activity.isError?"Activity is unavailable. Try again shortly.":"No indexed activity yet."}
+              {activity.isPending
+                ? "Loading activity…"
+                : activity.isError
+                  ? "Activity is unavailable. Try again shortly."
+                  : "No indexed activity yet."}
             </p>
           )}
         </CardContent>
       </Card>
-      {activity.hasNextPage&&<Button variant="outline" disabled={activity.isFetchingNextPage} onClick={()=>void activity.fetchNextPage()}>More activity</Button>}
+      {activity.hasNextPage && (
+        <Button
+          variant="outline"
+          disabled={activity.isFetchingNextPage}
+          onClick={() => void activity.fetchNextPage()}
+        >
+          More activity
+        </Button>
+      )}
       <ReportToken collection={address} tokenId={tokenId} />
     </div>
   );

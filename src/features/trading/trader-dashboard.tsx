@@ -20,7 +20,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { OrderComposer } from "./order-composer";
-import { TradeStatus } from "./trade-status";
 import { AcceptOffer } from "./accept-offer";
 import { getTokenSymbol } from "@/lib/marketplace/token-display";
 function IncomingOffer({ order }: { order: ApiOrder }) {
@@ -435,7 +434,6 @@ export function TraderDashboard() {
           </TabsContent>
         </Tabs>
       )}
-      <TradeStatus state={trade.state} />
     </main>
   );
 }

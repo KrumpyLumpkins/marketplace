@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
+import { TransactionFeedback } from "@/features/trading/transaction-feedback";
 import { CartSidebar } from "./cart-sidebar";
 import { useCartStore } from "../store/cart-store";
 import { cartItem, useScenario } from "../../../../.storybook/scenario";
@@ -7,6 +8,7 @@ import { signCalls } from "../../../../.storybook/mocks/trade";
 const meta = {
   title: "Trading/Cart",
   component: CartSidebar,
+  decorators: [Story => <><TransactionFeedback /><Story /></>],
   parameters: { layout: "fullscreen" },
   beforeEach() {
     useScenario.setState({ connected: true });

@@ -15,7 +15,6 @@ import { useTrade } from "@/lib/marketplace/use-trade";
 import { marketplaceRequest } from "@/lib/marketplace/api-client";
 import { prepareCheckout, TradePreparationError } from "@biblio/marketplace";
 import { getTokenSymbol } from "@/lib/marketplace/token-display";
-import { TradeStatus } from "@/features/trading/trade-status";
 export function CartSidebar() {
   const {
     items,
@@ -116,7 +115,6 @@ export function CartSidebar() {
                 {lastActionError}
               </p>
             )}
-            <TradeStatus state={trade.state} />
           </div>
           <div className="space-y-3 border-t p-4">
             <div className="flex justify-between font-medium">

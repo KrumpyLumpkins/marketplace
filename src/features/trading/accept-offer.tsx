@@ -1,7 +1,14 @@
 "use client";
-import { getTokenSymbol } from "@/lib/marketplace/token-display";
-import { TradeStatus } from "./trade-status";
-import { formatCurrencyAmount } from "@/lib/marketplace/amount-display";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { MarketPrice } from "@/components/marketplace/market-price";
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import type { ApiOrder } from "@/lib/marketplace/types";
@@ -20,6 +27,8 @@ export function AcceptOffer({
   tokenId: string;
 }) {
   const trade = useTrade();
+  const [open, setOpen] = useState(false);
+  const handingOff = useRef(false);
   const scope = [
     order.id,
     tokenId,
@@ -62,6 +71,8 @@ export function AcceptOffer({
     }
   }
   async function accept() {
+    handingOff.current = true;
+    setOpen(false);
     await trade.execute((m) => {
       if (!quote) throw new Error("Review the offer again.");
       return prepareAcceptance(
@@ -73,46 +84,130 @@ export function AcceptOffer({
     });
   }
   return (
-    <div className="space-y-2">
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={
-          previewPending || trade.busy || !trade.address || !!trade.config?.demo
+    <Dialog
+      open={open}
+      onOpenChange={(value) => {
+        setOpen(value);
+        if (!value) {
+          requestSequence.current++;
+          setPreviewPending(false);
+          setReview(null);
         }
-        onClick={() => void preview()}
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button
+          size="sm"
+          variant="outline"
+          className="min-h-11 border-primary/30 hover:bg-primary/10"
+          disabled={
+            previewPending ||
+            trade.busy ||
+            !trade.address ||
+            !!trade.config?.demo
+          }
+          onClick={() => void preview()}
+        >
+          Review offer
+        </Button>
+      </DialogTrigger>
+      <DialogContent
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl p-5 sm:p-6"
+        onCloseAutoFocus={(event) => {
+          if (handingOff.current) {
+            event.preventDefault();
+            handingOff.current = false;
+          }
+        }}
       >
-        {previewPending ? "Checking offer…" : "Review offer"}
-      </Button>
-      {quote && (
-        <div className="rounded-md border p-3 text-sm">
-          <p>
-            You receive at least{" "}
-            {formatCurrencyAmount(quote.rows[0].sellerProceeds, order.currency)}{" "}
-            {getTokenSymbol(order.currency)}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Protocol:{" "}
-            {formatCurrencyAmount(quote.rows[0].protocolFee, order.currency)} ·
-            royalty:{" "}
-            {formatCurrencyAmount(quote.rows[0].royaltyAmount, order.currency)}
-          </p>
-          <Button
-            className="mt-2"
-            size="sm"
-            disabled={trade.busy}
-            onClick={() => void accept()}
-          >
-            Confirm acceptance
+        <DialogHeader>
+          <DialogTitle>Review offer</DialogTitle>
+          <DialogDescription>
+            Review your proceeds for token #{tokenId} before confirming in your
+            wallet.
+          </DialogDescription>
+        </DialogHeader>
+        {previewPending ? (
+          <div role="status" aria-label="Checking offer" className="space-y-3">
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-20 rounded-xl" />
+            <p className="text-sm text-muted-foreground">
+              Checking funding, approvals and your proceeds…
+            </p>
+          </div>
+        ) : quote ? (
+          <>
+            <div className="rounded-xl border border-primary/25 bg-primary/5 p-4">
+              <p className="text-xs text-muted-foreground">
+                You receive at least
+              </p>
+              <p className="mt-1 break-all text-2xl font-semibold text-primary">
+                <MarketPrice
+                  amount={quote.rows[0].sellerProceeds}
+                  currency={order.currency}
+                />
+              </p>
+            </div>
+            <dl className="space-y-3 text-sm">
+              <div className="flex flex-wrap justify-between gap-2">
+                <dt className="text-muted-foreground">Offer amount</dt>
+                <dd className="font-medium">
+                  <MarketPrice
+                    amount={order.buyerDebit}
+                    currency={order.currency}
+                  />
+                </dd>
+              </div>
+              <div className="flex flex-wrap justify-between gap-2">
+                <dt className="text-muted-foreground">Protocol fee</dt>
+                <dd>
+                  <MarketPrice
+                    amount={quote.rows[0].protocolFee}
+                    currency={order.currency}
+                  />
+                </dd>
+              </div>
+              <div className="flex flex-wrap justify-between gap-2">
+                <dt className="text-muted-foreground">Royalty</dt>
+                <dd>
+                  <MarketPrice
+                    amount={quote.rows[0].royaltyAmount}
+                    currency={order.currency}
+                  />
+                </dd>
+              </div>
+            </dl>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Fees and royalties are deducted from the offer amount. Final
+              funding and ownership checks happen on-chain.
+            </p>
+            <Button
+              className="min-h-11 w-full"
+              disabled={trade.busy}
+              onClick={() => void accept()}
+            >
+              Confirm acceptance
+            </Button>
+          </>
+        ) : error ? (
+          <div className="space-y-4">
+            <p role="alert" className="break-words text-sm text-destructive">
+              {error}
+            </p>
+            <Button
+              variant="outline"
+              className="min-h-11 w-full"
+              onClick={() => void preview()}
+            >
+              Check offer again
+            </Button>
+          </div>
+        ) : (
+          <Button variant="outline" onClick={() => void preview()}>
+            Review updated offer
           </Button>
-        </div>
-      )}
-      {error && (
-        <p role="alert" className="text-xs text-destructive">
-          {error}
-        </p>
-      )}
-      <TradeStatus state={trade.state} />
-    </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

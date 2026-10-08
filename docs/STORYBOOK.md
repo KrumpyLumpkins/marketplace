@@ -135,3 +135,35 @@ chain, transaction hash and wallet sender; the user must confirm that the hash
 belongs to the attempted action. Non-submission requires explicit wallet confirmation;
 recovery never automatically replays a trade. Real wallet-provider rehearsal remains
 separate from these component and adapter tests.
+
+## Offer review and transaction feedback
+
+`Marketplace/Asset offers` covers populated, owner, empty, loading, failed,
+paginated and long-value layouts. The multiple-offer review story uses the actual
+acceptance component and checks that only one transaction dialog appears without
+moving the offer list.
+
+`Trading/Transaction modal` covers preparation, wallet approval, submission,
+index updates, delayed indexing, completion, rejection, reversion and unknown
+submission. `Trading/Order composer` checks that content below the form stays in
+place while the modal is open, preserves entered terms after rejection, and checks
+keyboard focus after dismissal. `Trading/Offer review` verifies the proceeds/fee
+breakdown and focus after the review-to-transaction handoff.
+
+The toolbar owns one `TransactionFeedback` instance. Trade controls must not mount
+additional transaction dialogs or inline copies of the shared transaction state.
+The active dialog remains open while the coordinator is busy. When tracking stops,
+it can be dismissed and reopened from the toolbar; delayed transactions expose a
+read-only status check. Dismissal never clears or resubmits a saved transaction.
+These stories simulate wallet responses; they do not sign real transactions.
+
+`Trading/Price input` checks decimal entry without floating-point conversion,
+currency switching, long values, validation and disabled states. The Realms
+composer has no editable royalty cap: new orders submit a zero cap and show a
+fixed 0% creator royalty beside the configured marketplace fee and seller proceeds.
+
+Exo 2 and Geist Mono are bundled under `public/brand/fonts` with their OFL licenses.
+This removes the Google font-service dependency from production builds. The preview
+uses the same font files through public URLs because its local-font adapter emits
+invalid unquoted filesystem URLs when the workspace path contains spaces. Font
+stories verify that the declared faces load rather than silently using a fallback.

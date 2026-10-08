@@ -1,12 +1,15 @@
-import { Exo_2, Geist_Mono } from "next/font/google";
-export const exo2 = Exo_2({
+import localFont from "next/font/local";
+export const exo2 = localFont({
+  src: "../../public/brand/fonts/exo-2-variable.ttf",
   variable: "--font-exo-2",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: "400 700",
+  display: "swap",
 });
-export const geistMono = Geist_Mono({
+export const geistMono = localFont({
+  src: "../../public/brand/fonts/geist-mono-variable.ttf",
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: "100 900",
+  display: "swap",
 });
 export const fontClassName = `${exo2.variable} ${geistMono.variable}`;
 
