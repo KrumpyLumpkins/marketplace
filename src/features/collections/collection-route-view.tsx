@@ -319,7 +319,7 @@ export function CollectionRouteView({
       ) : null}
 
       <Tabs value={tab} onValueChange={(value) => onTabChange?.(value as CollectionTab)} className="w-full gap-4">
-        <TabsList className="h-11 w-full justify-start overflow-x-auto sm:w-auto">
+        <TabsList className="h-11 max-w-full self-start overflow-x-auto">
           {COLLECTION_TABS.map((value) => (
             <TabsTrigger key={value} value={value} className="min-w-20 px-4 text-sm">
               {TAB_LABELS[value]}

@@ -18,7 +18,7 @@ export function TokenSymbol({ address, showIcon = true, className }: TokenSymbol
         <img
           alt=""
           aria-hidden
-          className="h-3 w-3 rounded-full object-cover"
+          className="size-3.5 rounded-full bg-[color:var(--realm-surface-slate)] object-cover ring-1 ring-[color:var(--realm-border-etched)]"
           src={iconUrl}
         />
       ) : null}

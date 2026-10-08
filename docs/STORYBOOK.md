@@ -170,16 +170,76 @@ stories verify that the declared faces load rather than silently using a fallbac
 
 ## Marketplace navigation
 
-`Marketplace/Navigation` develops the same header used by the app. The 64px
-header links Explore, Portfolio and Trading on desktop; below 1024px these
-appear in the mobile menu with notifications and wallet controls. Search opens
-in a focused sheet on mobile. The logo always links to marketplace home;
-ecosystem links live in a separate menu, and community links live in the footer.
-No unread notification count is shown without authenticated unread data.
+`Marketplace/Navigation` develops the same two-tier header used by the app. The
+top bar is the Realms.World chrome shared with the rest of the site: the
+Realms.World mark, the Home, Games, Account, Marketplace and Scroll sections
+(Marketplace is the current one) and the X, Discord and GitHub links. Below it
+the sticky marketplace toolbar carries the Realms Market wordmark, Explore,
+Portfolio and Trading, global search, the market-status dot, notifications,
+the cart and the wallet control. Below 1024px the ecosystem links, marketplace
+destinations, wallet and community links move into the menu opened from the
+top bar, and search opens in a focused sheet. The banner is 108px tall on
+desktop. The footer repeats the ecosystem and community links.
 
 `MarketToolbar` remains the single transaction-feedback host. It renders an
 alert only for unavailable trading or demo data, with transaction recovery in
 a fixed control that does not shift page content. The header's market-status
-indicator links to `/ops` for detailed freshness. Checkout gating is unchanged.
-Navigation stories cover wallet connection/disconnection, search focus/escape,
-active routes, populated cart, market errors, demo mode and pending transactions.
+indicator links to `/ops` for detailed freshness and renders a neutral
+"Checking market" label until hydration so server and client markup agree.
+Checkout gating is unchanged. Navigation stories cover wallet connection and
+disconnection, search focus and escape, active routes, populated cart, market
+errors, demo mode and pending transactions.
+
+## Market currency
+
+`Marketplace/Currency switcher` is the segmented control that replaced the
+bare currency select. Every option shows its token mark, the active choice is
+checked, arrow keys move between options and an explainer says what the
+currency scopes (floors, listings, offers, statistics and the default for new
+orders). The choice is remembered per browser; `MarketplaceProvider`
+rehydrates it after mount so server and client markup match. The wallet
+balance menu in the header doubles as the same picker. Stories cover the
+default, connected wallet balance, the explainer tooltip, a single currency
+and the 320px viewport.
+
+## Collection market header, tabs and analytics
+
+The collection banner carries the currency switcher and
+`Marketplace/Collection stats`: floor, top offer, 7-day volume and sales,
+listed share and supply, each label explaining its source on hover and focus.
+The page splits into Items, Offers, Activity and Analytics tabs kept in the
+URL (`tab=`), alongside `trait`, `sort`, `q` (search within the collection)
+and `listed=1`.
+
+`Marketplace/Collection toolbar` covers in-collection search, the listed-only
+switch, the sort select (per-collection options such as Resources for Realms)
+and the comfortable, dense and list layouts, with removable filter chips
+underneath. `Marketplace/Collection offers` lists open collection and token
+offers and opens the collection-offer composer inline.
+`Marketplace/Collection activity` is the event feed with Sales, Listings,
+Offers and Transfers filters, a table on md+ and stacked cards below.
+
+`Marketplace/Collection analytics` draws floor history, volume, sales and
+listing depth as plain SVG with a crosshair or per-mark tooltip, a period
+filter that scopes every tile and chart, and a table twin for each chart so no
+value depends on hover. Charts use the brass accent only; identity never
+depends on colour alone. Stories cover populated, empty, error and mobile
+states; the fixture backend (`pnpm backend:demo`) now seeds thirty days of
+sales so the same screens can be checked against the running app.
+
+## Token page
+
+`Marketplace/Token market summary` and `Marketplace/Trait grid` are the pure
+pieces of the restructured token page: price, top offer and last sale tiles
+with explainers, and trait cards that link to the filtered collection, show
+how rare each value is and render Realm resources with the in-game artwork
+from `public/resources`. The page itself keeps the order and listing forms
+collapsed until asked for.
+
+## Artwork and resource icons
+
+`TokenMedia` renders NFT artwork lazily, falls through alternate IPFS
+gateways on error and ends in a labelled placeholder; `tokenMediaSources`
+turns cached assets, `imageSourceUri`, legacy `image_url` and inline SVG into
+candidate URLs. Realm resource icons are the Eternum game catalogue, keyed by
+the game's resource names (`src/components/marketplace/resource-icon.tsx`).

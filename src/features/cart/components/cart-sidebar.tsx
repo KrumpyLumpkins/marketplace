@@ -1,7 +1,10 @@
 "use client";
 import { WalletConnectButton } from "@/components/layout/wallet-connect-button";
+import { TokenMedia } from "@/components/marketplace/token-media";
+import { TokenSymbol } from "@/components/ui/token-symbol";
 import { formatCurrencyAmount } from "@/lib/marketplace/amount-display";
 import { ShoppingCart, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -10,11 +13,11 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { useCartStore } from "../store/cart-store";
+import { CART_MAX_ITEMS, useCartStore } from "../store/cart-store";
 import { useTrade } from "@/lib/marketplace/use-trade";
 import { marketplaceRequest } from "@/lib/marketplace/api-client";
 import { prepareCheckout, TradePreparationError } from "@biblio/marketplace";
-import { getTokenSymbol } from "@/lib/marketplace/token-display";
+
 export function CartSidebar() {
   const {
     items,
@@ -70,32 +73,56 @@ export function CartSidebar() {
       <Sheet open={isOpen} onOpenChange={setOpen}>
         <SheetContent className="w-full sm:max-w-md">
           <SheetHeader>
-            <SheetTitle>Cart</SheetTitle>
+            <SheetTitle className="flex items-center gap-2">
+              Cart
+              <span className="rounded-[6px] border border-[color:var(--realm-border-etched)] px-1.5 py-0.5 font-sans text-xs normal-case tracking-normal text-muted-foreground">
+                {items.length} of {CART_MAX_ITEMS}
+              </span>
+            </SheetTitle>
             <SheetDescription>
-              One currency. Up to 25 NFTs. All purchases settle together.
+              One currency per checkout, up to {CART_MAX_ITEMS} items. Everything settles in a single transaction.
             </SheetDescription>
           </SheetHeader>
-          <div className="flex-1 space-y-3 overflow-y-auto px-4">
+          <div className="flex-1 space-y-2 overflow-y-auto px-4">
             {items.length === 0 ? (
-              <p className="py-8 text-center text-muted-foreground">
-                Your cart is empty.
-              </p>
+              <div className="flex flex-col items-center gap-2 py-10 text-center">
+                <ShoppingCart aria-hidden className="size-6 text-muted-foreground" />
+                <p className="text-muted-foreground">Your cart is empty.</p>
+                <p className="text-xs text-muted-foreground">
+                  Add listings from a collection, or sweep the floor.
+                </p>
+              </div>
             ) : (
               items.map((item) => (
-                <div key={item.orderId} className="rounded-lg border p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-medium">
+                <div
+                  key={item.orderId}
+                  className="rounded-lg border border-[color:var(--realm-border-etched)] bg-[color:var(--realm-surface-iron)]/60 p-2.5"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="size-12 shrink-0 overflow-hidden rounded-md border border-[color:var(--realm-border-etched)] bg-muted">
+                      <TokenMedia
+                        alt=""
+                        fallbackLabel=""
+                        sources={item.tokenImage ? [item.tokenImage] : []}
+                      />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={`/collections/${item.collection}/${item.tokenId}`}
+                        onClick={() => setOpen(false)}
+                        className="block truncate font-medium hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
                         {item.tokenName ?? `Token #${item.tokenId}`}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
+                      </Link>
+                      <p className="flex items-center gap-1 text-sm text-muted-foreground">
                         {formatCurrencyAmount(item.price, item.currency)}{" "}
-                        {getTokenSymbol(item.currency)}
+                        <TokenSymbol address={item.currency} />
                       </p>
                     </div>
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="size-11"
                       aria-label={`Remove ${item.tokenName ?? item.tokenId}`}
                       disabled={trade.busy}
                       onClick={() => removeItem(item.orderId)}
@@ -117,12 +144,12 @@ export function CartSidebar() {
               </p>
             )}
           </div>
-          <div className="space-y-3 border-t p-4">
-            <div className="flex justify-between font-medium">
-              <span>Total payment</span>
-              <span>
+          <div className="space-y-3 border-t border-[color:var(--realm-border-etched)] p-4">
+            <div className="flex items-baseline justify-between">
+              <span className="text-sm text-muted-foreground">Total payment</span>
+              <span className="flex items-center gap-1.5 text-lg font-semibold">
                 {formatCurrencyAmount(total, currency) ?? "0"}{" "}
-                {currency ? getTokenSymbol(currency) : ""}
+                {currency ? <TokenSymbol address={currency} className="text-sm text-muted-foreground" /> : ""}
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -130,12 +157,12 @@ export function CartSidebar() {
               separate.
             </p>
             {!trade.address ? (
-              <WalletConnectButton className="w-full" disabled={!items.length}>
+              <WalletConnectButton className="min-h-11 w-full" disabled={!items.length}>
                 Connect wallet to checkout
               </WalletConnectButton>
             ) : (
               <Button
-                className="w-full"
+                className="min-h-11 w-full"
                 disabled={
                   !items.length ||
                   trade.busy ||
@@ -153,6 +180,11 @@ export function CartSidebar() {
                       : "Checkout"}
               </Button>
             )}
+            {items.length > 0 && !trade.busy ? (
+              <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={clearCart}>
+                Clear cart
+              </Button>
+            ) : null}
           </div>
         </SheetContent>
       </Sheet>

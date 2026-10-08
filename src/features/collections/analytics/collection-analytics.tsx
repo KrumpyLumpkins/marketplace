@@ -119,7 +119,10 @@ export function CollectionAnalytics({ address, currency }: CollectionAnalyticsPr
     [stats.data?.floorHistory, currency, decimals],
   );
   const definedFloors = floorPoints.filter((p) => p.price !== null) as Array<{ price: number }>;
-  const floorDelta = percentChange(definedFloors[0]?.price, definedFloors[definedFloors.length - 1]?.price);
+  const floorDelta =
+    definedFloors.length >= 2
+      ? percentChange(definedFloors[0].price, definedFloors[definedFloors.length - 1].price)
+      : null;
   const currentFloor = stats.data?.floors.find((entry) => sameCurrency(entry.currency, currency))?.price;
 
   const listingPrices = useMemo(

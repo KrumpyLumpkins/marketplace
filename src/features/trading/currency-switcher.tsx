@@ -56,7 +56,14 @@ function CurrencyIcon({ address, symbol, size = 16 }: { address: string; symbol:
   }
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img alt="" aria-hidden className="shrink-0 rounded-full object-cover" height={size} src={icon} width={size} />
+    <img
+      alt=""
+      aria-hidden
+      className="shrink-0 rounded-full bg-[color:var(--realm-surface-slate)] object-cover ring-1 ring-[color:var(--realm-border-etched)]"
+      height={size}
+      src={icon}
+      width={size}
+    />
   );
 }
 

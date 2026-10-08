@@ -49,7 +49,7 @@ describe("CollectionStatsStrip", () => {
     expect(screen.getByText("523")).toBeVisible();
     expect(screen.getByText("24")).toBeVisible();
     expect(screen.getByText("400")).toBeVisible();
-    expect(screen.getByText(/5%/)).toBeVisible();
+    expect(screen.getByText(/\(5%\)/)).toBeVisible();
     expect(screen.getByText("8000")).toBeVisible();
     expect(request).toHaveBeenCalledWith("/collections/0xabc/stats", { days: 7, currency: STRK });
   });

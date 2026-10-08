@@ -105,7 +105,7 @@ export function CollectionStatsStrip({ address, currency }: CollectionStatsStrip
               {listedShare !== null ? (
                 <span className="text-[color:var(--realm-text-muted)]">
                   {" "}
-                  · {listedShare < 1 && listedShare > 0 ? "<1" : Math.round(listedShare)}%
+                  ({listedShare < 1 && listedShare > 0 ? "<1" : Math.round(listedShare)}%)
                 </span>
               ) : null}
             </>
