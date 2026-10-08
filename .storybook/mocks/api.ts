@@ -114,7 +114,7 @@ export const fixtureActivity = [
     type: "transfer",
     collection: "0xa",
     tokenId: "11",
-    from: "0x4",
+    from: "0x0",
     to: "0x9",
     provenance: { blockNumber: 106, transactionHash: "0xabf", timestamp: NOW - 2 * DAY },
   },

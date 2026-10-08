@@ -22,11 +22,11 @@ type StatProps = {
 function Stat({ label, help, children, className }: StatProps) {
   return (
     <div className={cn("realm-stat-pill flex min-w-[7.5rem] flex-col gap-0.5 px-3 py-1.5 backdrop-blur-md", className)}>
-      <span className="flex items-center gap-1 text-[11px] text-[color:var(--realm-text-muted)]">
+      <dt className="flex items-center gap-1 text-[11px] text-[color:var(--realm-text-muted)]">
         {label}
         {help ? <InfoTip label={`About ${label.toLowerCase()}`} text={help} /> : null}
-      </span>
-      <span className="market-stat-value flex items-center gap-1 text-sm font-semibold">{children}</span>
+      </dt>
+      <dd className="market-stat-value flex items-center gap-1 text-sm font-semibold">{children}</dd>
     </div>
   );
 }

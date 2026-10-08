@@ -161,9 +161,9 @@ export function MarketplaceHeader() {
       {/* Realms.World ecosystem bar */}
       <div
         data-testid="ecosystem-bar"
-        className="realm-market-header-shell border-x-0 border-t-0 bg-black/55 backdrop-blur-xl supports-[backdrop-filter]:bg-black/45"
+        className="realm-market-header-shell h-11 border-x-0 border-t-0 bg-black/55 backdrop-blur-xl supports-[backdrop-filter]:bg-black/45"
       >
-        <div className="flex h-11 items-center justify-between gap-3 px-3 sm:px-6">
+        <div className="flex h-full items-center justify-between gap-3 px-3 sm:px-6">
           <a
             href="https://realms.world/"
             target="_blank"

@@ -73,12 +73,12 @@ export function CartSidebar() {
       <Sheet open={isOpen} onOpenChange={setOpen}>
         <SheetContent className="w-full sm:max-w-md">
           <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              Cart
-              <span className="rounded-[6px] border border-[color:var(--realm-border-etched)] px-1.5 py-0.5 font-sans text-xs normal-case tracking-normal text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <SheetTitle>Cart</SheetTitle>
+              <span className="rounded-[6px] border border-[color:var(--realm-border-etched)] px-1.5 py-0.5 text-xs text-muted-foreground">
                 {items.length} of {CART_MAX_ITEMS}
               </span>
-            </SheetTitle>
+            </div>
             <SheetDescription>
               One currency per checkout, up to {CART_MAX_ITEMS} items. Everything settles in a single transaction.
             </SheetDescription>
