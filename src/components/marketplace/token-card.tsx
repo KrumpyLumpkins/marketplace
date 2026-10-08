@@ -7,9 +7,10 @@ import type { NormalizedToken } from "@/lib/marketplace/types";
 import {
   displayTokenId,
   formatPriceForDisplay,
-  tokenImage,
+  tokenMediaSources,
   tokenName,
 } from "@/lib/marketplace/token-display";
+import { TokenMedia } from "@/components/marketplace/token-media";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -56,7 +57,7 @@ export const MarketplaceTokenCard = React.memo(function MarketplaceTokenCard({
   mediaContainerClassName,
   mediaImageClassName,
 }: MarketplaceTokenCardProps) {
-  const image = tokenImage(token);
+  const mediaSources = useMemo(() => tokenMediaSources(token), [token]);
   const resolvedPrice = price ?? token.best_listing?.price;
   const resolvedCurrency = currency ?? token.best_listing?.currency;
   const attributes = useMemo(() => tokenAttributes(token.metadata), [token.metadata]);
@@ -68,16 +69,11 @@ export const MarketplaceTokenCard = React.memo(function MarketplaceTokenCard({
           mediaContainerClassName,
         )}
       >
-        {image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            alt={tokenName(token)}
-            className={cn("h-full w-full object-cover", mediaImageClassName)}
-            src={image}
-          />
-        ) : (
-          <span className="text-xs text-muted-foreground">No Image</span>
-        )}
+        <TokenMedia
+          alt={tokenName(token)}
+          className={cn("h-full w-full object-cover", mediaImageClassName)}
+          sources={mediaSources}
+        />
       </div>
       <CardContent
         aria-label={cardContentAriaLabel}

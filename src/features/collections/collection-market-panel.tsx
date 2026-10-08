@@ -29,6 +29,7 @@ import {
 } from "@/lib/marketplace/token-display";
 import { getCollectionFilterConfig } from "@/lib/marketplace/collection-filter-config";
 import { ResourceTraitIcons } from "@/components/marketplace/resource-trait-icons";
+import { TokenMedia } from "@/components/marketplace/token-media";
 import { resolveMarketActivityDetails } from "@/lib/marketplace/market-activity-details";
 import { useEntrance } from "@/lib/animation";
 
@@ -295,11 +296,9 @@ function ActivityRowItem({
         <div className="flex min-w-0 items-center gap-3">
           {row.tokenImage ? (
             <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[6px] border border-[color:var(--realm-border-etched)] bg-muted">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <TokenMedia
                 alt={row.tokenId ? `Token #${row.tokenId} preview` : `${row.kind} preview`}
-                className="h-full w-full object-cover"
-                src={row.tokenImage}
+                sources={[row.tokenImage]}
               />
             </div>
           ) : null}

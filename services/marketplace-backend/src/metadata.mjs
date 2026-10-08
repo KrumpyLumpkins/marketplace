@@ -133,7 +133,8 @@ export async function fetchPublic(
     req.on("error", reject);
   });
 }
-const fetchMedia = createMediaFetcher(fetchPublic);
+// One shared per-host pacing gate for every origin fetch made with fetchPublic.
+const pacedFetchPublic = createMediaFetcher(fetchPublic);
 
 function feltBytes(v, length) {
   const n = BigInt(v);
@@ -202,18 +203,143 @@ export function normalizeMetadata(raw) {
     ).size,
   };
 }
-const resolveUri = (uri, gateway) =>
-  uri.startsWith("ipfs://")
-    ? `${gateway.replace(/\/$/, "")}/${uri.slice(7).replace(/^ipfs\//, "")}`
-    : uri;
+const MAX_INLINE_METADATA_BYTES = 2 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+/** Consecutive image failures wait 5 min, 30 min, 2 h, 12 h and then 24 h. */
+export const IMAGE_RETRY_BACKOFF_MS = Object.freeze([
+  300000, 1800000, 7200000, 43200000, 86400000,
+]);
+/** Tokens whose metadata is current are re-read every six hours. */
+export const READY_RECHECK_MS = 21600000;
+const CID = "(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})";
+const BARE_CID = new RegExp(`^${CID}(?:/|$)`);
+const IMMUTABLE_MEDIA = new RegExp(
+  `^(?:ipfs://(?:ipfs/)?|https?://[^/]+/ipfs/|/ipfs/)?${CID}(?:/|$)`,
+);
+/** Rewrites IPFS and Arweave references to gateway URLs; other URIs pass through. */
+export function resolveMediaUri(
+  uri,
+  gateway = "https://ipfs.io/ipfs",
+  arweaveGateway = "https://arweave.net",
+) {
+  if (typeof uri !== "string") return uri;
+  const ipfs = (path) =>
+    `${gateway.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+  if (/^ipfs:\/\//i.test(uri))
+    return ipfs(uri.slice("ipfs://".length).replace(/^ipfs\//i, ""));
+  if (/^\/ipfs\//i.test(uri)) return ipfs(uri.slice("/ipfs/".length));
+  if (BARE_CID.test(uri)) return ipfs(uri);
+  if (/^ar:\/\//i.test(uri))
+    return `${arweaveGateway.replace(/\/+$/, "")}/${uri
+      .slice("ar://".length)
+      .replace(/^\/+/, "")}`;
+  return uri;
+}
+const immutableMediaUri = (uri) =>
+  typeof uri === "string" &&
+  (IMMUTABLE_MEDIA.test(uri) || /^(?:ar:|data:)/i.test(uri));
+/** Decodes a data: URI (base64 or percent-encoded) into its bytes; null for other URIs. */
+export function parseDataUri(uri, maxBytes = Infinity) {
+  const match = /^data:([^,]*),([\s\S]*)$/i.exec(
+    typeof uri === "string" ? uri : "",
+  );
+  if (!match) return null;
+  const params = match[1].split(";").map((p) => p.trim().toLowerCase());
+  const mime = params.shift() || "text/plain";
+  const base64 = params.includes("base64");
+  const payload = match[2];
+  // Text this long must decode to more than maxBytes; skip the allocation.
+  if (
+    payload.length >
+    (base64 ? Math.ceil((maxBytes * 4) / 3) + 4 : maxBytes * 3)
+  )
+    throw new Error("Inline data exceeds size limit");
+  let bytes;
+  if (base64) bytes = Buffer.from(payload, "base64");
+  else {
+    let text;
+    try {
+      text = decodeURIComponent(payload);
+    } catch {
+      text = payload; // inline SVG with raw "%" lengths is sent unencoded
+    }
+    bytes = Buffer.from(text, "utf8");
+  }
+  if (bytes.length > maxBytes) throw new Error("Inline data exceeds size limit");
+  return { mime, bytes };
+}
+const IMAGE_EXTENSIONS = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/svg+xml": "svg",
+};
+const IMAGE_TYPES = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+  svg: "image/svg+xml",
+};
+// Gateways commonly label media with these; the bytes decide instead of a rejection.
+const GENERIC_TYPES = new Set([
+  "",
+  "application/octet-stream",
+  "text/plain",
+  "text/xml",
+  "application/xml",
+]);
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const SVG_HEAD =
+  /^\s*(?:<\?xml[^>]*\?>\s*)?(?:<!--[\s\S]*?-->\s*)*(?:<!DOCTYPE[^>]*>\s*)?<svg[\s>]/i;
+function sniffImage(bytes) {
+  if (bytes.subarray(0, 8).equals(PNG_MAGIC)) return "png";
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "jpg";
+  if (/^GIF8[79]a/.test(bytes.toString("latin1", 0, 6))) return "gif";
+  if (
+    bytes.toString("latin1", 0, 4) === "RIFF" &&
+    bytes.toString("latin1", 8, 12) === "WEBP"
+  )
+    return "webp";
+  if (
+    SVG_HEAD.test(bytes.subarray(0, 1024).toString("utf8").replace(/^﻿/, ""))
+  )
+    return "svg";
+  return null;
+}
+/** Maps a declared content type, or sniffed bytes for generic types, to an asset extension. */
+export function imageExtension(contentType, bytes) {
+  const type = String(contentType ?? "")
+    .split(";")[0]
+    .trim()
+    .toLowerCase();
+  const ext =
+    IMAGE_EXTENSIONS[type] ?? (GENERIC_TYPES.has(type) ? sniffImage(bytes) : null);
+  if (!ext) throw new Error("Unsupported image content type");
+  return ext;
+}
 export async function refreshMetadata(
   store,
   rpc,
   config,
-  { assetDir, limit = 10, concurrency = 4, fetchResource = fetchPublic } = {},
+  {
+    assetDir,
+    limit = 10,
+    concurrency = 4,
+    fetchResource = fetchPublic,
+    // Origin traffic shares one paced fetcher per host; injected fetchers run as given.
+    fetchMedia = fetchResource === fetchPublic ? pacedFetchPublic : fetchResource,
+  } = {},
 ) {
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 4)
     throw new Error("Metadata concurrency must be 1–4");
+  const resolve = (uri) =>
+    resolveMediaUri(
+      uri,
+      config.ipfsGateway ?? "https://ipfs.io/ipfs",
+      config.arweaveGateway,
+    );
   await expandMetadataJobs(store);
   const now = Date.now();
   const tokens = await metadataCandidates(store, now, limit);
@@ -237,21 +363,12 @@ export async function refreshMetadata(
         );
       }
       const uri = decodeUri(values);
-      let bytes;
-      if (uri.startsWith("data:application/json;base64,")) {
-        if (uri.length > 2 * 1024 * 1024)
-          throw new Error("Inline metadata too large");
-        bytes = Buffer.from(uri.split(",")[1], "base64");
-      } else if (uri.startsWith("data:application/json,"))
-        bytes = Buffer.from(
-          decodeURIComponent(uri.slice("data:application/json,".length)),
-        );
-      else
-        bytes = (
-          await fetchResource(
-            resolveUri(uri, config.ipfsGateway ?? "https://ipfs.io/ipfs"),
-          )
-        ).bytes;
+      const inline = parseDataUri(uri, MAX_INLINE_METADATA_BYTES);
+      if (inline && !["application/json", "text/plain"].includes(inline.mime))
+        throw new Error("Unsupported inline metadata type");
+      const bytes = inline
+        ? inline.bytes
+        : (await fetchMedia(resolve(uri))).bytes;
       const raw = JSON.parse(bytes.toString()),
         metadata = normalizeMetadata(raw);
       const metadataHash = createHash("sha256").update(bytes).digest("hex");
@@ -261,58 +378,47 @@ export async function refreshMetadata(
         token.image &&
         (token.metadata?.imageSourceUri === metadata.image ||
           token.metadataHash === metadataHash);
-      const immutableImage =
-        typeof metadata.image === "string" &&
-        /^(ipfs:\/\/|https?:\/\/[^/]+\/ipfs\/)(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})(\/|$)/.test(
-          metadata.image,
-        );
       let image = sameSource ? token.image : null;
       let imageError = null;
       if (
         metadata.image &&
-        !(image && immutableImage) &&
+        !(image && immutableMediaUri(metadata.image)) &&
         (assetDir || store.dialect === "postgres")
       ) {
         try {
-          const asset = await (
-            fetchResource === fetchPublic ? fetchMedia : fetchResource
-          )(
-            resolveUri(
-              metadata.image,
-              config.ipfsGateway ?? "https://ipfs.io/ipfs",
-            ),
-            { maxBytes: 10 * 1024 * 1024, timeoutMs: 30000 },
-          );
-          const ext = {
-            "image/png": "png",
-            "image/jpeg": "jpg",
-            "image/webp": "webp",
-            "image/gif": "gif",
-            "image/svg+xml": "svg",
-          }[asset.contentType];
-          if (!ext) throw new Error("Unsupported image content type");
-          if (ext) {
-            const name =
-              createHash("sha256").update(asset.bytes).digest("hex") +
-              "." +
-              ext;
-            if (store.dialect === "postgres")
-              await store.saveAsset(name, asset.contentType, asset.bytes);
-            else {
-              await mkdir(assetDir, { recursive: true });
-              await writeFile(join(assetDir, name), asset.bytes);
-            }
-            image = `/api/marketplace/v1/chains/${config.chain}/assets/${name}`;
+          const inlineImage = parseDataUri(metadata.image, MAX_IMAGE_BYTES);
+          const asset = inlineImage
+            ? { bytes: inlineImage.bytes, contentType: inlineImage.mime }
+            : await fetchMedia(resolve(metadata.image), {
+                maxBytes: MAX_IMAGE_BYTES,
+                timeoutMs: 30000,
+              });
+          const ext = imageExtension(asset.contentType, asset.bytes);
+          const name =
+            createHash("sha256").update(asset.bytes).digest("hex") +
+            "." +
+            ext;
+          if (store.dialect === "postgres")
+            await store.saveAsset(name, IMAGE_TYPES[ext], asset.bytes);
+          else {
+            await mkdir(assetDir, { recursive: true });
+            await writeFile(join(assetDir, name), asset.bytes);
           }
+          image = `/api/marketplace/v1/chains/${config.chain}/assets/${name}`;
         } catch (error) {
           imageError = error.message;
         }
       }
+      // Only a token left without any cached artwork counts as failing; a retained
+      // copy keeps the regular cycle.
+      const imageAttempts =
+        imageError && !image ? (token.metadata?.imageAttempts ?? 0) + 1 : 0;
       const attributes = metadata.attributes;
       patch = {
         metadata: {
           ...metadata,
-          image,
+          // The cached asset once stored; until then the origin stays displayable.
+          image: image ?? metadata.image,
           imageSourceUri: metadata.image,
           imageStatus: imageError
             ? "failed"
@@ -322,6 +428,7 @@ export async function refreshMetadata(
                 ? "failed"
                 : "absent",
           imageError,
+          imageAttempts,
           attributes: attributes.map((a) => ({
             trait_type: a.name,
             value: a.value,
@@ -335,7 +442,13 @@ export async function refreshMetadata(
         metadataStatus: "ready",
         metadataError: null,
         metadataFetchedAt: now,
-        metadataNextAttempt: Date.now() + (imageError ? 300000 : 60000),
+        metadataNextAttempt:
+          Date.now() +
+          (imageAttempts
+            ? IMAGE_RETRY_BACKOFF_MS[
+                Math.min(imageAttempts, IMAGE_RETRY_BACKOFF_MS.length) - 1
+              ]
+            : READY_RECHECK_MS),
       };
     } catch (e) {
       patch = {

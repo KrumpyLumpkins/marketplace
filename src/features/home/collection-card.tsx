@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCollectionTokensQuery } from "@/lib/marketplace/hooks";
 import { tokenImage } from "@/lib/marketplace/token-display";
+import { TokenMedia } from "@/components/marketplace/token-media";
 import { cn } from "@/lib/utils";
 import type { CollectionCardData } from "@/features/home/types";
 
@@ -92,11 +93,10 @@ export function CollectionCard({
         <Card className="overflow-hidden py-0 transition-all duration-200 hover:border-[color:var(--realm-border-strong)] hover:shadow-[0_0_18px_rgba(231,207,136,0.12)]">
           <div className={cn("bg-muted", featured ? "aspect-[16/9]" : "aspect-square")}>
             {resolvedImageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <TokenMedia
                 alt={`${name} preview`}
-                src={resolvedImageUrl}
                 className="h-full w-full object-cover object-center"
+                sources={[resolvedImageUrl]}
               />
             ) : (
               <div

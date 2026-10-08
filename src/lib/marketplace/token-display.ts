@@ -1,5 +1,6 @@
 import type { NormalizedToken } from "@/lib/marketplace/types";
 import { normalizeCollectionTokenId } from "@/lib/marketplace/token-id";
+import { tokenMediaCandidates } from "@/lib/marketplace/media-url";
 
 function normalizeMetadata(token: NormalizedToken) {
   return token.metadata as Record<string, unknown> | null;
@@ -162,26 +163,25 @@ export function tokenName(token: NormalizedToken) {
       : `Token #${displayTokenId(token)}`;
 }
 
-export function tokenImage(token: NormalizedToken) {
+/**
+ * Every displayable media URL for a token, best first: the shared chest
+ * placeholder for Loot Chests, then the cached asset, then each origin the
+ * metadata exposes (IPFS references are rewritten to public gateways).
+ */
+export function tokenMediaSources(token: NormalizedToken): string[] {
   const chestType = chestSource(token);
   if (chestType === "Blitz") {
-    return "/placeholders/blitz-chest.svg";
+    return ["/placeholders/blitz-chest.svg"];
   }
   if (chestType === "S0") {
-    return "/placeholders/s0-chest.svg";
+    return ["/placeholders/s0-chest.svg"];
   }
 
-  if (token.image) {
-    return token.image;
-  }
+  return tokenMediaCandidates({ image: token.image, metadata: token.metadata });
+}
 
-  const metadata = normalizeMetadata(token);
-  const source = metadata?.image ?? metadata?.image_url;
-  if (typeof source === "string" && source.length > 0) {
-    return source;
-  }
-
-  return null;
+export function tokenImage(token: NormalizedToken) {
+  return tokenMediaSources(token)[0] ?? null;
 }
 
 export function formatAddress(address: string) {
@@ -227,7 +227,7 @@ const KNOWN_TOKEN_SYMBOLS: Record<string, string> = {
 const KNOWN_TOKEN_ICONS: Record<string, string> = {
   "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d": "/tokens/strk.svg",
   "0x42dd777885ad2c116be96d4d634abc90a26a790ffb5871e037dd5ae7d2ec86b": "/tokens/survivo.jpg",
-  "0x0124aeb495b947201f5fac96fd1138e326ad86195b98df6dec9009158a533b49": "https://coin-images.coingecko.com/coins/images/22171/small/Frame_1.png?1696521515",
+  "0x0124aeb495b947201f5fac96fd1138e326ad86195b98df6dec9009158a533b49": "/tokens/lords.png",
 };
 
 function normalizeTokenAddress(address: string): string {

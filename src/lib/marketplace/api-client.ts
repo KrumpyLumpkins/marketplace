@@ -36,7 +36,7 @@ export function tokenFromApi(t: ApiToken): NormalizedToken {
     token_id: t.tokenId,
     owner: t.owner,
     total_supply: "1",
-    image: t.image ?? String(t.metadata?.image ?? ""),
+    image: t.image ?? null,
     metadata: {
       ...t.metadata,
       attributes: t.attributes.map((a) => ({
