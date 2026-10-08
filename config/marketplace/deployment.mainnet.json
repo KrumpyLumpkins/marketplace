@@ -12,9 +12,9 @@
   "administrator": "0x1d0ba8786e38bfa6e4518e51897988cbafe87835cf43c5c42592e9f5c813aa7",
   "initialFeeBps": 500,
   "initialFeeRecipient": "0x1d0ba8786e38bfa6e4518e51897988cbafe87835cf43c5c42592e9f5c813aa7",
-  "pausedAtVerification": true,
-  "verifiedBlock": 16050580,
-  "verifiedBlockHash": "0x3a0ce519ccc290003a0409124e10576d201d336ea21f231717302cb0155a1ec",
+  "pausedAtVerification": false,
+  "verifiedBlock": 16060962,
+  "verifiedBlockHash": "0x755a92f303bc97a67938d2c928178f5f9abb7694ac08a6895b55e5a6532500",
   "planId": "6c47f8861348b649049073cd3dc99007c60f2ab4e30152d2873eb52eb34a9131",
   "transactions": [
     {
@@ -49,9 +49,21 @@
         "amount": "0x12efd4573ac8b40",
         "unit": "FRI"
       }
+    },
+    {
+      "step": "activate",
+      "hash": "0x1bca1e72488674aba6d0dc317f9fdb37b8eac4301f9300cbc5ff3e28e68c853",
+      "block": 16060941,
+      "blockHash": "0x6c50ff98d8ac977026a9623977e7ba1281e61ebb07f47f70417f09e3e27ef94",
+      "finality": "ACCEPTED_ON_L2",
+      "execution": "SUCCEEDED",
+      "actualFee": {
+        "amount": "0x59132b30dc9ac0",
+        "unit": "FRI"
+      }
     }
   ],
-  "releaseScope": "Paused mainnet bootstrap and Railway indexing only. Trading activation not approved.",
+  "releaseScope": "Public mainnet trading activated with explicit user waiver of remaining launch gates; incomplete validation is not represented as passed.",
   "validation": {
     "internalSecurityReview": true,
     "independentAudit": false,
@@ -66,8 +78,10 @@
       ],
       "sampleListingsAndTransfersPassed": true
     },
-    "historicalBackfillComplete": false,
-    "supportedWalletAcceptance": false
+    "historicalBackfillComplete": true,
+    "supportedWalletAcceptance": false,
+    "historicalReconciliationPassed": true
   },
-  "productionUrl": "https://web-production-2a4cb.up.railway.app"
+  "productionUrl": "https://web-production-2a4cb.up.railway.app",
+  "activationEvidence": "docs/evidence/mainnet-activation-2026-10-08.json"
 }

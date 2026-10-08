@@ -4,7 +4,15 @@ Version 1.3 · 8 October 2026
 
 **Start here.** This is the consolidated project plan. It joins the contract, indexer, API, existing frontend, OpenSea product benchmark, operations and migration into one delivery sequence. It supersedes earlier launch-boundary statements where they differ; supporting documents provide implementation detail and historical evidence.
 
-Status: implementation in progress. **Trading activation remains blocked by the launch gates below.** The production dependency audit passes its high-severity gate; five moderate findings remain tracked in operations. Standalone Cairo settlement, the native Node indexer/API and retained-UI trading flows are implemented locally; integration and acceptance work is ongoing. A paused mainnet deployment and Railway connection were completed on 8 October 2026; independent audit, completed production backfill and staging soak are not claimed. Track milestone completion here; supporting designs do not maintain competing status lists.
+Status: **public mainnet trading activated on 8 October 2026**, following explicit
+user approval to waive the remaining launch gates. Realms historical backfill and
+pinned supply/ownership/approval reconciliation passed; the public API reported
+zero lag and `safeForCheckout=true` after activation. See the
+[activation record](evidence/mainnet-activation-2026-10-08.json). Independent audit,
+public Sepolia/supported-wallet acceptance, staging soak and other incomplete
+operational checks remain open; activation does not mark them passed. Earlier
+paused-rollout measurements below are historical evidence. Track remaining
+acceptance work here.
 
 ## 1. Product outcome
 

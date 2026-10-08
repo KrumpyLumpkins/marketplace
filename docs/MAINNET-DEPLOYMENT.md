@@ -5,8 +5,12 @@ not deploy infrastructure, create accounts, transfer funding, or place trades.
 [The build plan](BUILD-PLAN.md) owns launch approval; [operations](OPERATIONS.md)
 owns backend, frontend and recovery procedures. A paused mainnet bootstrap is recorded in
 [deployment.mainnet.json](../config/marketplace/deployment.mainnet.json). Trading
-activation remains subject to the open audit, compatibility, wallet and indexing
-gates in the build plan.
+was subsequently activated at block 16060941 after reconciliation and explicit
+user approval to waive the remaining launch gates. The
+[activation record](evidence/mainnet-activation-2026-10-08.json) preserves the receipt,
+public API readiness and uncompleted checks. The standard procedure below remains
+the reference for future deployments; the recorded exception is not a passed audit
+or wallet rehearsal.
 
 ## Sequence and authority
 

@@ -1,0 +1,82 @@
+{
+  "date": "2026-10-08",
+  "planId": "6c47f8861348b649049073cd3dc99007c60f2ab4e30152d2873eb52eb34a9131",
+  "marketplace": "0x7ced79b9da11b280209425dce4329d6b8aa5fa03f81a807b9bf3cfbd64cb9d7",
+  "userApproval": "yes unpause, after explicit disclosure and confirmation of waiver of remaining launch gates",
+  "transaction": {
+    "hash": "0x1bca1e72488674aba6d0dc317f9fdb37b8eac4301f9300cbc5ff3e28e68c853",
+    "block": 16060941,
+    "blockHash": "0x6c50ff98d8ac977026a9623977e7ba1281e61ebb07f47f70417f09e3e27ef94",
+    "finality": "ACCEPTED_ON_L2",
+    "execution": "SUCCEEDED",
+    "actualFee": {
+      "amount": "0x59132b30dc9ac0",
+      "unit": "FRI"
+    }
+  },
+  "verifiedBlock": 16060962,
+  "verifiedBlockHash": "0x755a92f303bc97a67938d2c928178f5f9abb7694ac08a6895b55e5a6532500",
+  "paused": false,
+  "publicApiObservation": {
+    "data": {
+      "chain": "SN_MAIN",
+      "marketplace": "0x7ced79b9da11b280209425dce4329d6b8aa5fa03f81a807b9bf3cfbd64cb9d7",
+      "indexedBlock": 16060960,
+      "chainHead": 16060960,
+      "lagBlocks": 0,
+      "observedAt": 1791429655150,
+      "generation": 2,
+      "sources": [
+        {
+          "hash": "0xaf456d045d9de854b41873c8728a44703eba05ba14e32cbd975fdc5d19dfc3",
+          "block": 16060960,
+          "source": "0x07ae27a31bb6526e3de9cf02f081f6ce0615ac12a6d7b85ee58b8ad7947a2809",
+          "observedAt": 1791429655150,
+          "startBlock": 664162
+        },
+        {
+          "hash": "0xaf456d045d9de854b41873c8728a44703eba05ba14e32cbd975fdc5d19dfc3",
+          "block": 16060960,
+          "source": "0x07ced79b9da11b280209425dce4329d6b8aa5fa03f81a807b9bf3cfbd64cb9d7",
+          "observedAt": 1791429655150,
+          "startBlock": 16050533
+        }
+      ],
+      "history": {
+        "mode": "event_ranges",
+        "error": null,
+        "phase": "market_owners",
+        "state": "passed",
+        "cutoff": 16050532,
+        "supply": "5132",
+        "failure": null,
+        "lastOwner": "0x07f80cebe4b383453cf490b53e4a667fbd632f1ce93223d6f8cedcfb5cd6441c",
+        "proofHash": "0x25814a9e76c433ddba67f1862d6dea8e2be3b6aa9a373d6f0877909d69913ff",
+        "completedAt": 1791428937183,
+        "lastTokenId": "8000",
+        "lastRangeEnd": 16050532,
+        "checkedTokens": 5132,
+        "checkpointHash": "0x3554afdc8f0f59aea23425a656dde81f1d9c44fa14fb95dc55217c9922b15fb",
+        "lastOperatorId": "0x07ae27a31bb6526e3de9cf02f081f6ce0615ac12a6d7b85ee58b8ad7947a2809:0x07df9d85ce0b2ffaae7cc2fca0fd949c0490da8ee6ae35ee224d3b0c226b137f:0x013ae4e41ff29ee8311c84b024ac59a0c13f73fa1ba0cea02fbbf7880ec4835a",
+        "checkpointBlock": 16050532,
+        "checkedOperators": 90
+      },
+      "safeForCheckout": true,
+      "reasons": []
+    },
+    "meta": {
+      "schemaVersion": "1.0.0",
+      "chain": "SN_MAIN",
+      "marketplace": "0x7ced79b9da11b280209425dce4329d6b8aa5fa03f81a807b9bf3cfbd64cb9d7",
+      "indexedBlock": 16060960,
+      "generation": 2,
+      "generatedAt": "2026-10-08T03:20:58.011Z"
+    },
+    "requestId": "a47a4ca7-26dd-47b5-a65f-1b9882adf5f6"
+  },
+  "exceptions": {
+    "independentAudit": "Incomplete; waived for activation, not reported as passed.",
+    "publicSepoliaAndSupportedWalletRehearsal": "Incomplete; waived for activation, not reported as passed.",
+    "remainingLaunchGates": "User approved activation despite the remaining gates. Operational acceptance work remains open."
+  }
+}
