@@ -14,16 +14,24 @@ export type TokenActivityItem = {
   to?: string;
   provenance: { timestamp: number; transactionHash?: string };
 };
+function eventLabel(a: TokenActivityItem) {
+  if (a.type === "order_filled") return "Sale";
+  if (a.type === "order_created")
+    return a.kind === "listing" ? "Listed" : "Offer made";
+  if (a.type === "order_cancelled") return "Order cancelled";
+  if (a.type === "transfer") return "Transfer";
+  return a.type.replaceAll("_", " ");
+}
 function Participant({ label, address }: { label: string; address?: string }) {
   if (!address) return null;
   return (
-    <span className="flex flex-wrap gap-2">
+    <span className="inline-flex items-center gap-1">
       <span className="text-muted-foreground">{label}</span>
       {BigInt(address) === 0n ? (
         <span>Mint / burn</span>
       ) : (
         <Link
-          className="text-primary underline underline-offset-4"
+          className="rounded font-mono text-primary underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           href={`/profile/${address}`}
           title={address}
         >
@@ -35,6 +43,7 @@ function Participant({ label, address }: { label: string; address?: string }) {
     </span>
   );
 }
+/** One event per row: label, participants and provenance, price right-aligned on md+. */
 export function TokenActivity({
   items,
   chain,
@@ -43,36 +52,26 @@ export function TokenActivity({
   chain: string;
 }) {
   return (
-    <ul className="divide-y">
+    <ul className="divide-y divide-border/60">
       {items.map((a) => (
-        <li key={a.id} className="space-y-3 py-4 text-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <strong>
-              {a.type === "order_filled"
-                ? "Sale"
-                : a.type === "order_created"
-                  ? a.kind === "listing"
-                    ? "Listed"
-                    : "Offer made"
-                  : a.type === "order_cancelled"
-                    ? "Order cancelled"
-                    : a.type === "transfer"
-                      ? "Transfer"
-                      : a.type.replaceAll("_", " ")}
-            </strong>
-            {a.buyerDebit && (
+        <li
+          key={a.id}
+          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-3 text-sm md:flex md:gap-4"
+        >
+          <strong className="font-medium md:w-28 md:shrink-0">{eventLabel(a)}</strong>
+          <span className="text-right tabular-nums md:order-last md:ml-auto md:shrink-0">
+            {a.buyerDebit ? (
               <MarketPrice amount={a.buyerDebit} currency={a.currency} />
-            )}
-          </div>
-          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            ) : null}
+          </span>
+          <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs md:col-auto md:min-w-0 md:flex-1">
             <Participant label="Buyer" address={a.buyer} />
             <Participant label="Seller" address={a.seller} />
             <Participant label="Maker" address={a.maker} />
             <Participant label="From" address={a.from} />
             <Participant label="To" address={a.to} />
-          </div>
-          <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
             <time
+              className="text-muted-foreground"
               dateTime={new Date(a.provenance.timestamp * 1000).toISOString()}
             >
               {new Date(a.provenance.timestamp * 1000).toLocaleString()}
@@ -80,7 +79,7 @@ export function TokenActivity({
             {a.provenance.transactionHash &&
               ["SN_MAIN", "SN_SEPOLIA"].includes(chain) && (
                 <a
-                  className="text-primary underline underline-offset-4"
+                  className="rounded text-primary underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   href={buildExplorerTxUrl(chain, a.provenance.transactionHash)}
                   target="_blank"
                   rel="noopener noreferrer"
