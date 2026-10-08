@@ -38,6 +38,7 @@ for (const role of ["api", "index", "metadata"]) {
 ensure("MARKETPLACE_STORE", () => "sqlite");
 ensure("MARKETPLACE_MAINTENANCE", () => "false");
 ensure("POSTGRES_BACKGROUND_ENABLED", () => "false");
+ensure("MARKETPLACE_FAST_HISTORY_ENABLED", () => "false");
 if (
   Object.keys(values).length &&
   !railwayApi(

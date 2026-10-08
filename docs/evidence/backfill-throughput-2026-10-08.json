@@ -1,0 +1,110 @@
+{
+  "date": "2026-10-08",
+  "applicationRevision": "6b80192",
+  "databaseBenchmark": {
+    "blocks": 1000,
+    "beforeMs": 77228,
+    "afterMs": 132,
+    "beforeBlocksPerSecond": 13,
+    "afterBlocksPerSecond": 7602,
+    "fullRowParity": true
+  },
+  "matchedRpcBenchmark": {
+    "start": 758362,
+    "results": [
+      {
+        "mode": "single8",
+        "blocks": 256,
+        "ms": 9696,
+        "blocksPerSecond": 26.4,
+        "bytes": 25062810,
+        "rateLimits": 0,
+        "digest": "7fa556c858b1c40db87073fbde60732e40eda2352d482e34cd47ea3fb3e8d598"
+      },
+      {
+        "mode": "batch16x4",
+        "blocks": 256,
+        "ms": 15748,
+        "blocksPerSecond": 16.3,
+        "bytes": 25062810,
+        "rateLimits": 30,
+        "digest": "7fa556c858b1c40db87073fbde60732e40eda2352d482e34cd47ea3fb3e8d598"
+      }
+    ],
+    "fullReceiptParity": true
+  },
+  "eventRangeProbe": {
+    "from": 773505,
+    "results": [
+      {
+        "window": 10000,
+        "events": 432,
+        "pages": 1,
+        "complete": true,
+        "ms": 777,
+        "rangeBlocksPerSecond": 12877
+      },
+      {
+        "window": 100000,
+        "events": 1229,
+        "pages": 3,
+        "complete": true,
+        "ms": 1763,
+        "rangeBlocksPerSecond": 56730
+      }
+    ],
+    "note": "Filtered-event retrieval only; this does not prove receipt completeness or reconciliation."
+  },
+  "productionWindows": [
+    {
+      "indexed": 780028,
+      "head": 16057933,
+      "blocks": 1000,
+      "events": 67,
+      "elapsedMs": 43181,
+      "acquireMs": 41678,
+      "rateLimitedResponses": 22,
+      "commitMs": 1503,
+      "blocksPerSecond": 23.2
+    },
+    {
+      "indexed": 781028,
+      "head": 16057959,
+      "blocks": 1000,
+      "events": 5,
+      "elapsedMs": 48341,
+      "acquireMs": 48139,
+      "rateLimitedResponses": 60,
+      "commitMs": 202,
+      "blocksPerSecond": 20.7
+    },
+    {
+      "indexed": 782028,
+      "head": 16057988,
+      "blocks": 1000,
+      "events": 8,
+      "elapsedMs": 59033,
+      "acquireMs": 58793,
+      "rateLimitedResponses": 38,
+      "commitMs": 240,
+      "blocksPerSecond": 16.9
+    },
+    {
+      "indexed": 783028,
+      "head": 16058023,
+      "blocks": 1000,
+      "events": 16,
+      "elapsedMs": 65565,
+      "acquireMs": 65177,
+      "rateLimitedResponses": 0,
+      "commitMs": 388,
+      "blocksPerSecond": 15.3
+    }
+  ],
+  "productionBlocksPerSecond": 18.5,
+  "notes": [
+    "Full receipts and filtered-event coverage checks remain required in production.",
+    "The event-range probe excludes reconciliation and projection and is not an implemented fast-backfill claim.",
+    "Production indexer handoff retains one writer via the PostgreSQL lease."
+  ]
+}

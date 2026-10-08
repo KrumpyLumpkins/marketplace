@@ -77,6 +77,16 @@ export async function runtime(env = process.env) {
       marketplace: config.marketplace ? address(config.marketplace) : null,
     };
     try {
+      if (
+        !(
+          await store.query(
+            "SELECT to_regclass('chain.history_ranges') AS table_name",
+          )
+        ).rows[0].table_name
+      )
+        throw new Error(
+          "PostgreSQL schema migration 2 is required before startup.",
+        );
       const actual = (
         await store.query("SELECT value FROM chain.meta WHERE key='identity'")
       ).rows[0]?.value;

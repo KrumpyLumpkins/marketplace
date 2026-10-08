@@ -1,11 +1,11 @@
 import { fileURLToPath } from 'node:url';
 import { hiddenInput } from '../configuration/hidden-input.mjs';
 import { PROJECT_ID as PROJECT, railwayApi as api, railwayTarget } from './api.mjs';
-const KEYS = ['PUBLIC_ORIGIN','OPERATOR_TOKEN','STARKNET_RPC_URL','STARKNET_RPC_FALLBACK_URL','MARKETPLACE_REGISTRY_JSON','MARKETPLACE_BACKGROUND_ENABLED','MARKETPLACE_ADDRESS','MARKETPLACE_COLLECTIONS'];
+const KEYS = ['PUBLIC_ORIGIN','OPERATOR_TOKEN','STARKNET_RPC_URL','STARKNET_RPC_FALLBACK_URL','MARKETPLACE_REGISTRY_JSON','MARKETPLACE_BACKGROUND_ENABLED','MARKETPLACE_FAST_HISTORY_ENABLED','MARKETPLACE_ADDRESS','MARKETPLACE_COLLECTIONS'];
 export function variableInput(projectId, environmentId, name, value) {
   if (/PRIVATE_KEY|SIGNER/.test(name)) throw new Error('Signing keys must stay local. Use pnpm contracts:env.');
   if (!KEYS.includes(name)) throw new Error(`Choose one of: ${KEYS.join(', ')}`);
-  if (name === 'MARKETPLACE_BACKGROUND_ENABLED' && !['true','false'].includes(value)) throw new Error('Use true or false.');
+  if (['MARKETPLACE_BACKGROUND_ENABLED','MARKETPLACE_FAST_HISTORY_ENABLED'].includes(name) && !['true','false'].includes(value)) throw new Error('Use true or false.');
   if (name === 'MARKETPLACE_REGISTRY_JSON' && value) {
     const registry=JSON.parse(value);
     if (registry.schemaVersion !== 1 || !registry.chains) throw new Error('Use a generated version-1 deployment registry.');

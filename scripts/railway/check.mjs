@@ -13,7 +13,7 @@ for (const environment of ['staging', 'production']) {
   assert.deepEqual(web.variables.NEXT_PUBLIC_MARKETPLACE_CHAIN_ID, backend.variables.MARKETPLACE_CHAIN);
   const indexer = resources.find(r => r.address === 'service.indexer');
   const metadata = resources.find(r => r.address === 'service.metadata');
-  const postgres = resources.find(r => r.address === 'service.postgres');
+  const postgres = resources.find(r => r.address === 'database.postgres');
   assert.ok(indexer && metadata && postgres, 'PostgreSQL and independent worker services are required');
   assert.equal(resources.filter(r => r.type === 'volume').length, 2);
   assert.equal(postgres.source.image, 'postgres:18.6');

@@ -498,6 +498,17 @@ export class PgCatalog {
       ...(this.config.collections ?? []).map((c) => address(c.address)),
       ...(this.config.marketplace ? [address(this.config.marketplace)] : []),
     ];
+    let history = await this.store.get("status", "history");
+    if (history?.state === "passed") {
+      const checkpoint = await this.store.canonicalBlock(
+        history.checkpointBlock,
+      );
+      if (
+        !checkpoint ||
+        BigInt(checkpoint.hash) !== BigInt(history.checkpointHash)
+      )
+        history = { ...history, state: "invalid_checkpoint" };
+    }
     return marketStatus(this.config, {
       head: await this.store.head(),
       rpc: await this.store.get("status", "rpc"),
@@ -506,6 +517,7 @@ export class PgCatalog {
         required.map((source) => this.store.get("progress", source)),
       ),
       generation: await this.store.generation(),
+      history,
     });
   }
 }

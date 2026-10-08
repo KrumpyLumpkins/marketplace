@@ -1,4 +1,5 @@
 import { runtime } from "./runtime.mjs";
+import { indexerOptions } from "./indexer-options.mjs";
 import { scanOnce } from "./indexer.mjs";
 import { createHash } from "node:crypto";
 const { store, config, rpc } = await runtime();
@@ -36,7 +37,7 @@ try {
       : undefined;
     do {
       const result = await scanOnce(store, rpc, config, {
-        window: 100,
+        ...indexerOptions(),
         stopAt: stop,
       });
       console.log(JSON.stringify(result));

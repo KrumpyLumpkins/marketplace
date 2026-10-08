@@ -1,3 +1,8 @@
+import {
+  chooseHistoryCutoff,
+  historyProfile,
+  reconcileHistory,
+} from "./history.mjs";
 import { mapConcurrent } from "./concurrency.mjs";
 import { address, ApiError } from "./domain.mjs";
 import { decodeEvent } from "./decode.mjs";
@@ -20,7 +25,33 @@ export async function scanOnce(store, rpc, config, options = {}) {
     throw error;
   }
 }
-async function scanRange(store, rpc, config, { window = 100, stopAt } = {}) {
+async function scanRange(
+  store,
+  rpc,
+  config,
+  {
+    window = 100,
+    stopAt,
+    receiptConcurrency = 8,
+    receiptBatchSize = 1,
+    commitBatchSize = 250,
+    fastHistory = false,
+    historyWindow = 100000,
+  } = {},
+) {
+  const started = performance.now(),
+    rateLimitsBefore = rpc.rateLimits ?? 0;
+  for (const [value, max] of [
+    [receiptConcurrency, 32],
+    [receiptBatchSize, 32],
+    [commitBatchSize, 1000],
+    [historyWindow, 100000],
+  ])
+    if (!Number.isInteger(value) || value < 1 || value > max)
+      throw new ApiError(
+        "INVALID_WINDOW",
+        "Invalid bounded indexer concurrency or batch size",
+      );
   if (!Number.isSafeInteger(window) || window < 1 || window > 1000)
     throw new ApiError("INVALID_WINDOW", "Scan window must be 1–1000 blocks.");
   const identity = {
@@ -98,10 +129,24 @@ async function scanRange(store, rpc, config, { window = 100, stopAt } = {}) {
   const from = head
     ? head.number + 1
     : Math.min(...sources.map((s) => s.start));
-  const end = Math.min(
+  const history =
+    store.dialect === "postgres" ? await store.get("status", "history") : null;
+  let cutoff = history?.cutoff;
+  if (fastHistory && store.applyEventRange && !cutoff && head)
+    cutoff = await chooseHistoryCutoff(rpc, config, latest, from);
+  let useFast = !!(
+    fastHistory &&
+    store.applyEventRange &&
+    cutoff &&
+    from <= cutoff
+  );
+  if (useFast) historyProfile(config);
+  let end = Math.min(
     latest.block_number,
-    from + window - 1,
+    from + (useFast ? historyWindow : window) - 1,
     stopAt ?? Infinity,
+    ...(history && history.state !== "passed" ? [history.cutoff] : []),
+    ...(useFast ? [cutoff] : []),
   );
   await store.put("status", "rpc", {
     head: latest.block_number,
@@ -110,6 +155,8 @@ async function scanRange(store, rpc, config, { window = 100, stopAt } = {}) {
     identityVerified: !!config.marketplaceClassHash,
     error: null,
   });
+  if (history && history.state !== "passed" && head?.number >= history.cutoff)
+    return reconcileHistory(store, rpc, config, history);
   if (from > end) {
     await store.reconcileNotifications();
     return {
@@ -117,10 +164,36 @@ async function scanRange(store, rpc, config, { window = 100, stopAt } = {}) {
       head: latest.block_number,
     };
   }
-  const anchor = await rpc.call("starknet_getBlockWithTxHashes", {
+  let anchor = await rpc.call("starknet_getBlockWithTxHashes", {
     block_id: { block_number: end },
   });
+  if (useFast && anchor.status !== "ACCEPTED_ON_L1") {
+    useFast = false;
+    end = Math.min(
+      latest.block_number,
+      from + window - 1,
+      cutoff,
+      stopAt ?? Infinity,
+    );
+    anchor = await rpc.call("starknet_getBlockWithTxHashes", {
+      block_id: { block_number: end },
+    });
+  }
+  if (useFast)
+    for (const collection of config.collections) {
+      const actual = await rpc.call("starknet_getClassHashAt", {
+        block_id: { block_hash: anchor.block_hash },
+        contract_address: collection.address,
+      });
+      if (!equal(actual, collection.classHash))
+        throw new ApiError(
+          "CLASS_MISMATCH",
+          "Historical collection class differs from the reviewed profile",
+          503,
+        );
+    }
   const found = new Map();
+  let eventTotal = 0;
   for (const source of sources) {
     if (source.start > end) continue;
     const start = Math.max(from, source.start);
@@ -150,6 +223,12 @@ async function scanRange(store, rpc, config, { window = 100, stopAt } = {}) {
           address(e.from_address) !== source.address
         )
           throw new ApiError("INVALID_RPC_EVENTS", "Out-of-scope RPC event.");
+        if (++eventTotal > 20000 && useFast)
+          throw new ApiError(
+            "HISTORY_RANGE_DENSE",
+            "Reduce the historical range window: too many events",
+            503,
+          );
         const entries = found.get(e.block_number) ?? [];
         entries.push(e);
         found.set(e.block_number, entries);
@@ -170,97 +249,174 @@ async function scanRange(store, rpc, config, { window = 100, stopAt } = {}) {
       "CHAIN_CONFLICT",
       "Scan range changed during acquisition.",
     );
-  const blocks = await mapConcurrent(
-    Array.from({ length: end - from + 1 }, (_, i) => from + i),
-    8,
-    async (n) => {
-      // A filtered page can silently omit every event in a block. Sampling empty
-      // blocks cannot prove coverage; compare every block with its full receipts.
-      const block = await rpc.call("starknet_getBlockWithReceipts", {
-        block_id: { block_number: n },
-      });
-      if (
-        block.block_number !== n ||
-        !["ACCEPTED_ON_L1", "ACCEPTED_ON_L2"].includes(block.status) ||
-        !Array.isArray(block.transactions)
-      )
-        throw new ApiError(
-          "INVALID_RPC_BLOCK",
-          "Expected an accepted receipt block at the requested height.",
+  const prepare = (n, block) => {
+    if (
+      block.block_number !== n ||
+      !["ACCEPTED_ON_L1", "ACCEPTED_ON_L2"].includes(block.status) ||
+      !Array.isArray(block.transactions)
+    )
+      throw new ApiError(
+        "INVALID_RPC_BLOCK",
+        "Expected an accepted receipt block at the requested height.",
+      );
+    // Discard unrelated transactions immediately instead of retaining a whole
+    // window of full receipt payloads. Defer decoding errors to the ordered writer.
+    try {
+      return {
+        n,
+        hash: block.block_hash,
+        prepared: prepareBlock(n, block, found, sources, config, observedAt),
+      };
+    } catch (error) {
+      return { n, hash: block.block_hash, error };
+    }
+  };
+  const heights = useFast
+    ? [...new Set([...found.keys(), end])].sort((a, b) => a - b)
+    : Array.from({ length: end - from + 1 }, (_, i) => from + i);
+  let blocks;
+  if (receiptBatchSize > 1 && rpc.batch) {
+    const groups = [];
+    for (let i = 0; i < heights.length; i += receiptBatchSize)
+      groups.push(heights.slice(i, i + receiptBatchSize));
+    blocks = (
+      await mapConcurrent(groups, receiptConcurrency, async (group) => {
+        const receipts = await rpc.batch(
+          group.map((n) => ({
+            method: "starknet_getBlockWithReceipts",
+            params: { block_id: { block_number: n } },
+          })),
         );
-      return { n, block };
-    },
-  );
-  if (!equal(blocks.at(-1).block.block_hash, anchor.block_hash))
+        if (receipts.length !== group.length)
+          throw new ApiError(
+            "INVALID_RPC_BLOCK",
+            "Missing receipt block in batch",
+          );
+        return receipts.map((block, i) => prepare(group[i], block));
+      })
+    ).flat();
+  } else {
+    blocks = await mapConcurrent(heights, receiptConcurrency, async (n) =>
+      prepare(
+        n,
+        await rpc.call("starknet_getBlockWithReceipts", {
+          block_id: { block_number: n },
+        }),
+      ),
+    );
+  }
+  if (!equal(blocks.at(-1).hash, anchor.block_hash))
     throw new ApiError(
       "CHAIN_CONFLICT",
       "Range changed while reading receipts.",
     );
-  for (const { n, block: b } of blocks) {
-    const expected = found.get(n) ?? [];
-    const active = new Set(
-      sources.filter((s) => s.start <= n).map((s) => s.address),
-    );
-    const events = [],
-      actual = [];
-    for (const entry of b.transactions) {
-      const receipt = entry.receipt;
-      if (!receipt || !Array.isArray(receipt.events))
-        throw new ApiError(
-          "INVALID_RECEIPT",
-          "Missing ordered receipt events.",
-        );
-      const rawTransactionHash =
-        receipt.transaction_hash ?? entry.transaction?.transaction_hash;
-      const transactionHash = rawTransactionHash
-        ? "0x" + BigInt(rawTransactionHash).toString(16)
-        : null;
-      if (!transactionHash)
-        throw new ApiError(
-          "INVALID_RECEIPT",
-          "Receipt transaction identity missing.",
-        );
-      if (
-        receipt.transaction_hash &&
-        entry.transaction?.transaction_hash &&
-        !equal(receipt.transaction_hash, entry.transaction.transaction_hash)
-      )
-        throw new ApiError(
-          "INVALID_RECEIPT",
-          "Conflicting transaction identity.",
-        );
-      if (receipt.execution_status === "REVERTED") continue;
-      for (const [eventIndex, raw] of receipt.events.entries()) {
-        if (!active.has(address(raw.from_address))) continue;
-        actual.push({ raw, tx: transactionHash });
-        const event = decodeEvent(raw, config);
-        if (event) events.push({ ...event, raw, transactionHash, eventIndex });
-      }
+  const acquired = performance.now();
+  let eventCount = 0;
+  if (useFast) {
+    for (const block of blocks) {
+      if (block.error) throw block.error;
+      eventCount += block.prepared.events.length;
     }
-    const a = actual.map((x) => `${BigInt(x.tx)}:${signature(x.raw)}`).sort(),
-      e = expected
-        .map((x) => `${BigInt(x.transaction_hash)}:${signature(x)}`)
-        .sort();
+    await store.applyEventRange({
+      from,
+      to: end,
+      blocks: blocks.map((b) => b.prepared),
+      cutoff,
+    });
+  } else {
+    let pending = [];
+    const flush = async () => {
+      if (store.applyBlocks) await store.applyBlocks(pending);
+      else for (const b of pending) await store.applyBlock(b);
+      pending = [];
+    };
+    for (const block of blocks) {
+      if (block.error) {
+        await flush();
+        throw block.error;
+      }
+      pending.push(block.prepared);
+      eventCount += block.prepared.events.length;
+      if (pending.length >= commitBatchSize) await flush();
+    }
+    await flush();
+  }
+  const finished = performance.now(),
+    elapsedMs = Math.round(finished - started);
+  return {
+    indexed: end,
+    head: latest.block_number,
+    blocks: end - from + 1,
+    receiptBlocks: blocks.length,
+    mode: useFast ? "event_ranges" : "full_receipts",
+    events: eventCount,
+    elapsedMs,
+    acquireMs: Math.round(acquired - started),
+    rateLimitedResponses: (rpc.rateLimits ?? 0) - rateLimitsBefore,
+    commitMs: Math.round(finished - acquired),
+    blocksPerSecond: Number(
+      (((end - from + 1) * 1000) / (finished - started)).toFixed(1),
+    ),
+  };
+}
+function prepareBlock(n, b, found, sources, config, observedAt) {
+  const expected = found.get(n) ?? [];
+  const active = new Set(
+    sources.filter((s) => s.start <= n).map((s) => s.address),
+  );
+  const events = [],
+    actual = [];
+  for (const entry of b.transactions) {
+    const receipt = entry.receipt;
+    if (!receipt || !Array.isArray(receipt.events))
+      throw new ApiError("INVALID_RECEIPT", "Missing ordered receipt events.");
+    const rawTransactionHash =
+      receipt.transaction_hash ?? entry.transaction?.transaction_hash;
+    const transactionHash = rawTransactionHash
+      ? "0x" + BigInt(rawTransactionHash).toString(16)
+      : null;
+    if (!transactionHash)
+      throw new ApiError(
+        "INVALID_RECEIPT",
+        "Receipt transaction identity missing.",
+      );
     if (
-      JSON.stringify(a) !== JSON.stringify(e) ||
-      expected.some((e) => !equal(e.block_hash, b.block_hash))
+      receipt.transaction_hash &&
+      entry.transaction?.transaction_hash &&
+      !equal(receipt.transaction_hash, entry.transaction.transaction_hash)
     )
       throw new ApiError(
-        "EVENT_COVERAGE",
-        "Filtered events do not match full receipts.",
+        "INVALID_RECEIPT",
+        "Conflicting transaction identity.",
       );
-    await store.applyBlock({
-      number: n,
-      hash: b.block_hash,
-      parentHash: b.parent_hash,
-      timestamp: b.timestamp,
-      events,
-      sources: [...active],
-      sourceStarts: Object.fromEntries(
-        sources.map((s) => [s.address, s.start]),
-      ),
-      observedAt,
-    });
+    if (receipt.execution_status === "REVERTED") continue;
+    for (const [eventIndex, raw] of receipt.events.entries()) {
+      if (!active.has(address(raw.from_address))) continue;
+      actual.push({ raw, tx: transactionHash });
+      const event = decodeEvent(raw, config);
+      if (event) events.push({ ...event, raw, transactionHash, eventIndex });
+    }
   }
-  return { indexed: end, head: latest.block_number };
+  const a = actual.map((x) => `${BigInt(x.tx)}:${signature(x.raw)}`).sort(),
+    e = expected
+      .map((x) => `${BigInt(x.transaction_hash)}:${signature(x)}`)
+      .sort();
+  if (
+    JSON.stringify(a) !== JSON.stringify(e) ||
+    expected.some((e) => !equal(e.block_hash, b.block_hash))
+  )
+    throw new ApiError(
+      "EVENT_COVERAGE",
+      "Filtered events do not match full receipts.",
+    );
+  return {
+    number: n,
+    hash: b.block_hash,
+    parentHash: b.parent_hash,
+    timestamp: b.timestamp,
+    events,
+    sources: [...active],
+    sourceStarts: Object.fromEntries(sources.map((s) => [s.address, s.start])),
+    observedAt,
+  };
 }

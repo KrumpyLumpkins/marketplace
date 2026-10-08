@@ -1,4 +1,4 @@
-import { defineRailway, project, service, volume, image } from 'railway/iac';
+import { defineRailway, project, service, volume, image, database } from 'railway/iac';
 
 export default defineRailway((ctx) => {
   if (ctx.projectId && ctx.projectId !== '554683c6-4840-40d5-a60b-864d7d1f4c25') {
@@ -15,7 +15,7 @@ export default defineRailway((ctx) => {
   // Environment-local resource: never attach staging to production data.
   const data = volume('marketplace-data', { region: 'asia-southeast1-eqsg3a', sizeMB: prod ? 25600 : 5120 });
   const postgresData = volume('postgres-data', { region: 'asia-southeast1-eqsg3a', sizeMB: prod ? 25600 : 5120 });
-  const postgres = service('postgres', {
+  const postgresConfig = service('postgres', {
     source: image('postgres:18.6'),
     replicas: { 'asia-southeast1-eqsg3a': 1 },
     deploy: { restartPolicyType: 'ON_FAILURE', restartPolicyMaxRetries: 10, sleepApplication: false, requiredMountPath: '/var/lib/postgresql', overlapSeconds: 0, drainingSeconds: 30 },
@@ -26,6 +26,11 @@ export default defineRailway((ctx) => {
       PGDATA: '/var/lib/postgresql/18/docker',
     },
   });
+  // Railway recognizes PostgreSQL images as database resources after creation.
+  // Match that identity so a later plan never replaces the live database as a service.
+  const postgres = Object.assign(database('postgres', 'postgres', {
+    image: 'postgres:18.6', defaultMountPath: '/var/lib/postgresql', region: 'asia-southeast1-eqsg3a',
+  }), { variables: postgresConfig.variables, deploy: postgresConfig.deploy, volumeAttachments: postgresConfig.volumeAttachments });
   const worker = (name: 'indexer' | 'metadata', role: 'index' | 'metadata') => service(name, {
     build: { builder: 'DOCKERFILE', dockerfilePath: 'infra/railway/backend.Dockerfile' },
     start: 'node services/marketplace-backend/src/railway.mjs',
@@ -41,6 +46,7 @@ export default defineRailway((ctx) => {
       MARKETPLACE_RPC_FALLBACK_URL: ctx.shared.STARKNET_RPC_FALLBACK_URL,
       MARKETPLACE_REGISTRY_JSON: ctx.shared.MARKETPLACE_REGISTRY_JSON,
       MARKETPLACE_BACKGROUND_ENABLED: ctx.shared.POSTGRES_BACKGROUND_ENABLED,
+      ...(role === 'index' ? { MARKETPLACE_INDEX_FAST_HISTORY: ctx.shared.MARKETPLACE_FAST_HISTORY_ENABLED } : {}),
     },
   });
   const indexer = worker('indexer', 'index');

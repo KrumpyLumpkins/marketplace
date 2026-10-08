@@ -165,6 +165,23 @@ Implement a small owned JSON-RPC client with timeouts, bounded concurrency, retr
 
 The spike must compare filtered acquisition with complete receipts over a bounded interval to detect omitted events. Measure RPC requests/bytes and replay throughput before scaling historical backfill.
 
+### Approved historical acceleration (8 October 2026)
+
+The reviewed Realms mainnet profile can use event ranges before marketplace
+deployment, with finalized end anchors and complete receipts for every returned
+event-bearing block. Strict mode still checks every block for marketplace activity
+and the recent tail. This changes the historical completeness guarantee: an entirely
+omitted event block cannot be independently detected by the filtered feed alone.
+Before crossing the historical cutoff, pinned on-chain supply, every live token
+owner/approval, observed operator pairs and marketplace operator approvals must
+reconcile. Historical activity completeness is distinct from reconciled live
+inventory. The API blocks checkout while reconciliation is pending or fails.
+
+Schema v2 records sparse ranges explicitly and commits each range atomically;
+rewinding through one restores its preceding state. See the
+[operations procedure](POSTGRES-OPERATIONS.md#fast-historical-mode-schema-v2)
+for deployment order, controls, evidence and compatible rollback.
+
 ### 5.2 Decoders we own
 
 Support the versioned event ABI of our new marketplace and verified interfaces of the approved NFT collections. Do not build a generic smart-contract indexing framework.

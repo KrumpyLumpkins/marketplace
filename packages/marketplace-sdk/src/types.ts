@@ -57,6 +57,20 @@ export type IndexStatus = {
   generation: number;
   safeForCheckout: boolean;
   reasons: string[];
+  history?: {
+    mode: "event_ranges";
+    state:
+      "pending" | "reconciling" | "failed" | "passed" | "invalid_checkpoint";
+    cutoff: number;
+    lastRangeEnd?: number;
+    checkpointBlock?: number;
+    checkpointHash?: string;
+    checkedTokens?: number;
+    checkedOperators?: number;
+    supply?: string;
+    completedAt?: number;
+    error?: string | null;
+  };
 };
 export type MarketConfig = {
   chain: string;

@@ -54,7 +54,35 @@ Railway PostgreSQL dump/restore passed every source-table digest. The separate
 scanner resumed past checkpoint 721085 and metadata processing resumed.
 [Migration evidence](evidence/postgres-cutover-2026-10-08.json) records counts,
 digests and identity. The contract remains paused; full historical backfill is open.
-Backfill RPC acquisition remains a separate performance concern.
+Backfill RPC acquisition remains a separate performance concern. The follow-up
+throughput change adds bounded JSON-RPC batches, rate-limit backoff, compact receipt
+processing and atomic bulk header/progress writes. An isolated Railway database
+benchmark improved from 13 to about 7,600 empty blocks/second with exact row parity;
+this is **not** the end-to-end backfill rate. Production throughput must be measured
+against the RPC quota. See the PostgreSQL operations throughput controls.
+
+### Fast historical mode — approved 8 October 2026
+
+The user explicitly approved changing historical verification to accelerate the
+Realms backfill. Older NFT-only history may use bounded event ranges: every returned
+event-bearing block is checked against full receipts, and finalized range anchors
+are checked before and after acquisition. Empty historical blocks are not fetched
+individually. This is not a claim of independent completeness for every historical
+event; live inventory is reconciled at a pinned checkpoint before trading.
+
+The reviewed Realms ERC721Votes profile supplies a timestamp checkpoint total.
+All indexed live owners and token approvals, observed operator pairs and each live
+owner's marketplace approval are checked at that fixed block. Supply equality plus
+owner checks verifies complete live inventory. A mismatch keeps checkout blocked.
+The checkpoint is before marketplace deployment; marketplace/recent activity retains
+strict full-receipt scanning. Schema v2 records sparse historical ranges and rewinds
+an intersected range completely. Prior pre-v2 indexer binaries must not be used once
+sparse history exists; disable fast mode in a compatible v2 release for rollback.
+
+Production is running this mode. The first 300,000 blocks averaged 3,110 blocks/s;
+[recorded evidence](evidence/fast-history-2026-10-08.json) includes the pending
+reconciliation gate. This is an early-range measurement, not completed backfill
+or launch acceptance. Trading remains paused.
 
 ### Railway hosting — confirmed 8 October 2026
 
@@ -566,13 +594,13 @@ badge or soft launch announcement is not an on-chain access control.
    record release SHA, DB identity, source checkpoints, metadata report, backup
    identifier and operator approval. Poll live freshness after the API switch.
 
-The CLI currently uses 100-block backfill windows; the index worker also uses
-100-block windows and the metadata worker processes up to ten tokens per pass.
-Measure throughput before changing concurrency. Estimate remaining history from
-`(H - current indexed block) / observed blocks per second`, revise across dense
-periods, and include metadata/replay verification time. There is no measured
-production backfill duration yet and no launch-date promise based on fixture SQL
-benchmarks.
+The CLI defaults to 100-block strict windows; the index worker defaults to
+1,000-block strict windows and the approved Realms fast mode uses up to 100,000
+historical blocks per range. Metadata processes up to ten tokens per pass.
+See [throughput evidence and controls](POSTGRES-OPERATIONS.md#fast-historical-mode-schema-v2).
+Estimate remaining history from `(H - current indexed block) / observed blocks
+per second`, revise across dense periods, and include reconciliation and metadata
+time. Range coverage rate is not a full-receipt download rate or a launch promise.
 
 ### Acceptance and monitoring
 

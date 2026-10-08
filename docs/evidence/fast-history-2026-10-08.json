@@ -1,0 +1,89 @@
+{
+  "date": "2026-10-08",
+  "applicationRevision": "b6b046e",
+  "environment": "Railway production",
+  "indexerDeployment": "1fa74b73-a82a-4310-85d4-52a6a73d0115",
+  "schemaVersions": [
+    1,
+    2
+  ],
+  "strictBaselineBlocksPerSecond": 18.5,
+  "shadow": {
+    "shadowDatabase": true,
+    "baseCheckpoint": 818028,
+    "result": {
+      "indexed": 918028,
+      "head": 16059063,
+      "blocks": 100000,
+      "receiptBlocks": 372,
+      "mode": "event_ranges",
+      "events": 483,
+      "elapsedMs": 42173,
+      "acquireMs": 41709,
+      "rateLimitedResponses": 79,
+      "commitMs": 464,
+      "blocksPerSecond": 2371.2
+    },
+    "tokenCount": "4431"
+  },
+  "productionWindows": [
+    {
+      "indexed": 944028,
+      "head": 16059977,
+      "blocks": 100000,
+      "receiptBlocks": 594,
+      "mode": "event_ranges",
+      "events": 651,
+      "elapsedMs": 33702,
+      "acquireMs": 33324,
+      "rateLimitedResponses": 0,
+      "commitMs": 378,
+      "blocksPerSecond": 2967.2
+    },
+    {
+      "indexed": 1044028,
+      "head": 16059993,
+      "blocks": 100000,
+      "receiptBlocks": 784,
+      "mode": "event_ranges",
+      "events": 835,
+      "elapsedMs": 41967,
+      "acquireMs": 41642,
+      "rateLimitedResponses": 0,
+      "commitMs": 324,
+      "blocksPerSecond": 2382.8
+    },
+    {
+      "indexed": 1144028,
+      "head": 16060018,
+      "blocks": 100000,
+      "receiptBlocks": 446,
+      "mode": "event_ranges",
+      "events": 339,
+      "elapsedMs": 20795,
+      "acquireMs": 20700,
+      "rateLimitedResponses": 0,
+      "commitMs": 95,
+      "blocksPerSecond": 4808.9
+    }
+  ],
+  "productionCombinedBlocksPerSecond": 3110,
+  "cutoff": 16050532,
+  "readiness": {
+    "historyState": "pending",
+    "safeForCheckout": false,
+    "reason": "HISTORY_RECONCILIATION_REQUIRED",
+    "contractPaused": true
+  },
+  "backup": {
+    "path": "/var/lib/postgresql/marketplace-before-fast-history-2026-10-08.dump",
+    "verifiedReadable": true,
+    "restoreDrill": false
+  },
+  "notes": [
+    "Blocks/sec measures covered historical height span, including empty blocks; it is not full-receipt downloads per second.",
+    "Every returned event-bearing block and range endpoint is verified against complete receipts.",
+    "Entirely omitted historical event blocks are not independently detected by the event feed. Pinned supply/owner/approval reconciliation is required before crossing the cutoff.",
+    "Backfill and reconciliation were still pending at capture; measured early ranges are not a completion estimate."
+  ]
+}

@@ -1,5 +1,8 @@
 import { address } from "./domain.mjs";
-export function marketStatus(config, { head, rpc, cfg, progress, generation }) {
+export function marketStatus(
+  config,
+  { head, rpc, cfg, progress, generation, history },
+) {
   const required = [
     ...(config.collections ?? []).map((c) => address(c.address)),
     ...(config.marketplace ? [address(config.marketplace)] : []),
@@ -26,6 +29,8 @@ export function marketStatus(config, { head, rpc, cfg, progress, generation }) {
   const indexed = missing ? null : Math.min(...progress.map((p) => p.block));
   const lag = indexed == null || !rpc ? null : Math.max(0, rpc.head - indexed);
   const reasons = [];
+  if (history && history.state !== "passed")
+    reasons.push("HISTORY_RECONCILIATION_REQUIRED");
   if (config.demo) reasons.push("DEMO");
   if (!config.marketplace || !cfg) reasons.push("MARKETPLACE_NOT_DEPLOYED");
   if (missing) reasons.push("SOURCES_SYNCING");
@@ -44,6 +49,7 @@ export function marketStatus(config, { head, rpc, cfg, progress, generation }) {
     observedAt: rpc?.observedAt ?? null,
     generation: generation,
     sources: progress,
+    ...(history ? { history } : {}),
     safeForCheckout: !reasons.length,
     reasons,
   };
