@@ -78,7 +78,9 @@ describe("Header", () => {
     expect(
       screen.getByRole("link", { name: "Realms Market home" }),
     ).toHaveAttribute("href", "/");
-    const nav = within(screen.getByRole("navigation", { name: "Marketplace" }));
+    const nav = within(
+      screen.getByRole("navigation", { name: "Marketplace tools" }),
+    );
     expect(nav.getByRole("link", { name: "Explore" })).toHaveAttribute(
       "href",
       "/",
@@ -94,9 +96,42 @@ describe("Header", () => {
     expect(nav.getByRole("link", { name: "Explore" })).not.toHaveAttribute(
       "aria-current",
     );
+  });
+
+  it("keeps the Realms.World ecosystem bar above the marketplace tools", () => {
+    render(<Header />);
+    const ecosystem = within(
+      screen.getByRole("navigation", { name: "Realms ecosystem" }),
+    );
+    expect(ecosystem.getByRole("link", { name: "Home" })).toHaveAttribute(
+      "href",
+      "https://realms.world/",
+    );
+    expect(ecosystem.getByRole("link", { name: "Games" })).toHaveAttribute(
+      "href",
+      "https://realms.world/games",
+    );
+    expect(ecosystem.getByRole("link", { name: "Account" })).toHaveAttribute(
+      "href",
+      "https://account.realms.world/velords",
+    );
+    expect(ecosystem.getByRole("link", { name: "Marketplace" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(ecosystem.getByRole("link", { name: "Scroll" })).toHaveAttribute(
+      "href",
+      "https://realms.world/scroll",
+    );
     expect(
-      screen.queryByRole("link", { name: "Games" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("link", { name: "Realms.World home" }),
+    ).toHaveAttribute("href", "https://realms.world/");
+    expect(screen.getByRole("link", { name: "Discord" })).toHaveAttribute(
+      "href",
+      "https://discord.gg/realmsworld",
+    );
+    expect(screen.getByRole("link", { name: "X / Twitter" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "GitHub" })).toBeVisible();
   });
   it("search normalises text and encodes the URL", async () => {
     const user = userEvent.setup();
@@ -140,6 +175,7 @@ describe("Header", () => {
       "href",
       "https://realms.world/games",
     );
+    expect(menu.getByRole("link", { name: "Discord" })).toBeVisible();
   });
 
   it("login_opens_wallet_modal_with_all_connectors", async () => {

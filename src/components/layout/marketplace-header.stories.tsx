@@ -35,11 +35,17 @@ export const Desktop: Story = {
       canvas.getByRole("link", { name: "Realms Market home" }),
     ).toHaveAttribute("href", "/");
     await expect(
-      canvas.getByRole("navigation", { name: "Marketplace" }),
+      canvas.getByRole("navigation", { name: "Marketplace tools" }),
     ).toBeVisible();
     await expect(
+      canvas.getByRole("navigation", { name: "Realms ecosystem" }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("link", { name: "Marketplace" }),
+    ).toHaveAttribute("aria-current", "page");
+    await expect(
       canvas.getByRole("banner").getBoundingClientRect().height,
-    ).toBe(64);
+    ).toBe(108);
     await expect(canvas.getByRole("link", { name: "Explore" })).toHaveAttribute(
       "aria-current",
       "page",
