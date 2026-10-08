@@ -263,11 +263,11 @@ const auth = new Auth(store, {
     return BigInt(result[0]) === 0x56414c4944n;
   },
 });
-const challenge = auth.challenge(buyer.address, "http://localhost:3000");
+const challenge = await auth.challenge(buyer.address, "http://localhost:3000");
 const signed = await buyer.signMessage(challenge.typedData);
 const signature = Array.isArray(signed) ? signed : [signed.r, signed.s];
 const session = await auth.verify(challenge.id, signature);
-assert.equal(auth.account(session.token), address(buyer.address));
+assert.equal(await auth.account(session.token), address(buyer.address));
 await assert.rejects(auth.verify(challenge.id, signature));
 // Account-level maximum-cart resource measurement, including 25 independent orders.
 await execute(

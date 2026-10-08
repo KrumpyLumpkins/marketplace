@@ -23,10 +23,10 @@ Keep the current marketplace UI. Give it a backend we operate that can reconstru
 | Own the API, data storage, indexing operations, metadata delivery and recovery process | Design objective |
 | Build our own indexer; do not use Torii | Confirmed by user; supersedes the previous recommendation |
 | Node.js backend | Accepted by user |
-| No third-party runtime packages in the new backend | Conservative interpretation of “no deps”; standard Node modules only |
+| Minimal backend runtime packages | Node built-ins plus the explicitly approved `pg` PostgreSQL driver |
 | Launch with the Realms ERC-721 collection only | Confirmed 8 October 2026; other collections and permissionless onboarding deferred |
 | Native Node HTTP API, independently deployable beside the Next.js frontend | Proposed default; no Fastify, Arcade SDK, Dojo SDK or indexing framework |
-| Railway staging and production; persistent SQLite volume per environment | Confirmed 8 October 2026; API/indexer/metadata processes share one backend service |
+| Railway staging and production; PostgreSQL per environment | Confirmed 8 October 2026; separate API/indexer/metadata services with least-privilege roles |
 
 The October [current-state assessment](./INDEXER-CURRENT-STATE-2026-10-06.md) remains the historical inventory. Its Torii recommendation is superseded by the user's custom-indexer decision. PR #92 is a source of requirements and selected fixtures/interface ideas; its indexing implementation is excluded. This scope does not silently convert the prior branch's “accepted” ADR into user approval.
 
@@ -36,7 +36,7 @@ The user selected replacement contracts after the [contract assessment](./CONTRA
 
 The backend owns RPC acquisition, event/model decoding, projections, checkpoints, metadata jobs, API validation and operational commands. No Torii executable, Dojo/Cartridge indexing SDK, hosted NFT API, external indexer framework or vendor-specific database schema is part of its execution path.
 
-Use Node built-ins: `fetch`/`AbortController` for JSON-RPC, `node:http` for the API, `node:sqlite` for storage, `node:fs` for local assets, `node:crypto` for ordinary content hashes, and `node:test`/`node:assert` for backend tests. JavaScript ESM with JSDoc types is the zero-build starting point; TypeScript can remain development tooling if desired. The existing frontend's dependencies remain unchanged by this backend constraint.
+Use Node built-ins: `fetch`/`AbortController` for JSON-RPC, `node:http` for the API, `pg` for production storage, `node:sqlite` for local fixtures/migration, `node:fs` for migration snapshots, `node:crypto` for ordinary content hashes, and `node:test`/`node:assert` for backend tests. JavaScript ESM with JSDoc types is the zero-build starting point; TypeScript can remain development tooling if desired. The existing frontend's dependencies remain unchanged by this backend constraint.
 
 Starknet RPC and token metadata origins are still external data sources. “No deps” does not eliminate the need for chain access, disk, a Node runtime or hosting. Keep RPC provider URLs configurable. Versioned ABI/schema/selector fixtures are data checked into our repository, not runtime vendor packages. Any later package addition is a scope change, not an implicit exception.
 
@@ -74,7 +74,7 @@ flowchart LR
     RPC[Primary and fallback Starknet RPC] --> I[Our Node.js block reader]
     I --> D[Our marketplace and NFT event decoders]
     D --> P[Our transactional projector]
-    P --> S[Owned SQLite journal and projections]
+    P --> S[Owned PostgreSQL journal and projections]
     S --> API[Native Node HTTP API]
     M[Metadata refresh and image cache] --> API
     API --> UI[Existing Next.js UI and SEO]
@@ -85,9 +85,16 @@ flowchart LR
 
 Start with one backend codebase: a writer process per chain, an API process and a metadata fetch process. Metadata results enter a bounded queue for the single database writer. Networking can run concurrently, but projection commits follow canonical chain order. Do not introduce Kafka, Redis, Elasticsearch or an external queue.
 
-**Storage recommendation:** one owned SQLite database per chain on local persistent disk, using Node's built-in driver, WAL mode, foreign keys, explicit migrations and prepared statements. Store both the raw event journal and query projections. Keep HTTP database reads in a bounded worker pool so synchronous SQL does not block request handling. Pin and test the selected Node release: the current official documentation labels `node:sqlite` release candidate, so do not assume stable-driver guarantees across versions.
-
-The initial topology colocates writer and read workers with the database on one host. Do not share a writable SQLite file across a network filesystem or claim multi-host database availability. Back up consistent database snapshots and versioned asset files off-host using deployment tooling. PostgreSQL or a native third-party driver would be a later explicit change if measurements show this design cannot meet requirements; do not write a database protocol/driver to preserve an arbitrary package count.
+**Storage decision (8 October 2026):** PostgreSQL 18.6 with the maintained `pg`
+driver, dedicated market tables, indexed typed columns and JSONB payloads/metadata.
+Separate chain, application and media schemas protect durable user state during
+replay. Atomic block transactions advance projections and checkpoints together;
+API requests use bounded pools and consistent snapshots. Separate Railway API,
+indexer and metadata services connect privately with distinct database roles.
+SQLite remains supported for local fixtures and verified migration/rollback.
+See [PostgreSQL operations](POSTGRES-OPERATIONS.md) for schema, migration, role,
+backup and cutover details. Neither this single PostgreSQL instance nor the previous
+SQLite topology establishes high availability.
 
 Only the API is public. Database files, admin operations and RPC credentials remain private. Browser and Next.js server code share the same versioned interface. A same-origin browser path can proxy the API; the long-running indexer does not run inside a Next.js request or serverless function.
 
@@ -123,7 +130,7 @@ The chain is authoritative for orders, ownership, balances, approvals, pause and
 
 - Accept supported hex/decimal input forms, emit canonical addresses and decimal integer strings. Validate actual felt/u128/u256 ranges; matching a string pattern alone is insufficient.
 - Prices, token IDs, balances and contract quantities never pass through JavaScript floating point. Numerical game traits may use bounded validated numbers where their semantics permit it.
-- SQLite integers are insufficient for uint128/uint256. Store canonical decimal text for values and fixed-width big-endian blobs for indexed numeric ordering. Never sort decimal strings lexically or cast chain prices to SQLite REAL. Perform exact arithmetic in JavaScript bigint.
+- Keep uint128/uint256 as canonical decimal strings at API boundaries and perform arithmetic with JavaScript bigint. PostgreSQL indexed amounts use `numeric(78,0)` with range/format constraints. SQLite fixtures retain fixed-width big-endian sort keys. Never use floating-point prices.
 - Use quantity one for the new ERC-721 orders. Do not carry Arcade's zero-quantity sentinel or confuse inventory balance with token supply. If legacy orders are imported, convert them only in their separately identified adapter.
 - Distinguish stored order status from derived availability. A `placed` order may be expired, transferred, unapproved, unsupported or presently unverifiable.
 - Preserve unknown enums and provenance gaps explicitly. Never invent historical timestamps, caller identity or sale events from a current order row.
@@ -316,9 +323,9 @@ Test canonical replay, precision, source-specific progress, query semantics, wal
 
 ## 13. Remaining scope choices
 
-Custom indexing, Node.js, new standalone Cairo settlement and on-chain ERC-721 trading are settled. The full launch feature set is maintained in the build plan. Torii and Dojo are excluded from the new-market path. The conservative package policy is zero third-party backend runtime dependencies; development tooling, existing frontend dependencies and proposed Cairo security primitives are separate.
+Custom indexing, Node.js, new standalone Cairo settlement and on-chain ERC-721 trading are settled. The full launch feature set is maintained in the build plan. Torii and Dojo are excluded from the new-market path. The runtime dependency policy permits the maintained `pg` driver; development tooling, existing frontend dependencies and proposed Cairo security primitives are separate.
 
-Still open: registered collections versus permissionless onboarding, hosting/budget/operator, the exact Node release/storage operating envelope, and the economic/admin proposals in the contract scope. Registered collections and one-host SQLite remain proposed defaults. These choices do not block specifying the new-event/RPC/journal interface. Production launch still needs contract review, deployment parameters and measured capacity.
+Still open: registered collections versus permissionless onboarding, hosting/budget/operator, the exact Node release/storage operating envelope, and the economic/admin proposals in the contract scope. Realms-only onboarding and PostgreSQL on Railway are confirmed decisions. These choices do not block specifying the new-event/RPC/journal interface. Production launch still needs contract review, deployment parameters and measured capacity.
 
 ## 14. Proposed repository layout
 
@@ -328,7 +335,7 @@ services/marketplace-backend/
   src/ingest/          range scanning, receipt ordering and canonical chain tracking
   src/decode/          our versioned marketplace events and verified NFT decoders
   src/project/         deterministic state transitions and undo records
-  src/storage/         SQLite migrations, prepared queries and writer coordination
+  src/postgres/        PostgreSQL migrations, queries, roles and verified SQLite import
   src/metadata/        URI decoding, fetch policy, durable refresh work and assets
   src/api/             native HTTP routes, validation, catalog and preflight
   src/cli/             run, backfill, reconcile, rewind and rebuild commands

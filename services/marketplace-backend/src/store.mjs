@@ -1,7 +1,8 @@
+import { projectEvent } from "./projection.mjs";
 import { DatabaseSync, backup } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { address, uint, numericKey, ApiError } from "./domain.mjs";
+import { address, numericKey, ApiError } from "./domain.mjs";
 
 /** Single chain writer; the journal, before-images and progress commit together. */
 export class Store {
@@ -72,6 +73,49 @@ export class Store {
             ? numericKey(body.tokenId)
             : null,
       );
+  }
+  bindIdentity(identity) {
+    const saved = this.db
+      .prepare("SELECT value FROM meta WHERE key='identity'")
+      .get();
+    if (
+      saved &&
+      JSON.stringify(JSON.parse(saved.value)) !== JSON.stringify(identity)
+    )
+      throw new ApiError(
+        "DATABASE_IDENTITY_MISMATCH",
+        "Use a separate chain database for each chain and deployment.",
+        409,
+      );
+    this.db
+      .prepare("INSERT OR IGNORE INTO meta VALUES('identity',?)")
+      .run(JSON.stringify(identity));
+  }
+  canonicalBlock(number) {
+    return (
+      this.db.prepare("SELECT hash FROM blocks WHERE number=?").get(number) ??
+      null
+    );
+  }
+  async beginSnapshot() {
+    const previous = this.snapshotQueue ?? Promise.resolve();
+    let release;
+    this.snapshotQueue = new Promise((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    this.releaseSnapshot = release;
+    this.db.exec("BEGIN");
+    return this;
+  }
+  endSnapshot() {
+    try {
+      this.db.exec("COMMIT");
+    } finally {
+      const release = this.releaseSnapshot;
+      this.releaseSnapshot = null;
+      release?.();
+    }
   }
   head() {
     return (
@@ -152,7 +196,10 @@ export class Store {
           source,
           {
             source,
-            startBlock: this.get("progress", source)?.startBlock ?? block.sourceStarts?.[source] ?? null,
+            startBlock:
+              this.get("progress", source)?.startBlock ??
+              block.sourceStarts?.[source] ??
+              null,
             block: block.number,
             hash: block.hash,
             observedAt: block.observedAt ?? Date.now(),
@@ -199,166 +246,9 @@ export class Store {
     }
   }
   project(e, p) {
-    const height = p.blockNumber;
-    if (e.type === "transfer") {
-      const id = `${address(e.collection)}:${uint(e.tokenId)}`,
-        old = this.get("token", id);
-      this.put(
-        "token",
-        id,
-        {
-          ...old,
-          id,
-          collection: address(e.collection),
-          tokenId: uint(e.tokenId),
-          owner: address(e.to),
-          burned: BigInt(e.to) === 0n,
-          attributes: old?.attributes ?? [],
-          metadata: old?.metadata ?? {},
-          firstSeenBlock: old?.firstSeenBlock ?? height,
-          updatedAt: p,
-        },
-        height,
-      );
-      this.put("approval", id, { spender: address("0x0") }, height);
-    } else if (e.type === "approval") {
-      this.put(
-        "approval",
-        `${address(e.collection)}:${uint(e.tokenId)}`,
-        { spender: address(e.spender) },
-        height,
-      );
-    } else if (e.type === "operator_approval") {
-      this.put(
-        "operator",
-        `${address(e.collection)}:${address(e.owner)}:${address(e.operator)}`,
-        { approved: e.approved },
-        height,
-      );
-    } else if (e.type === "order_created") {
-      if (this.get("order", e.key))
-        throw new ApiError("DUPLICATE_ORDER", "Maker nonce reused.");
-      this.put(
-        "order",
-        e.key,
-        { ...e, id: e.key, state: "open", createdAt: p, updatedAt: p },
-        height,
-      );
-    } else if (e.type === "order_cancelled" || e.type === "order_filled") {
-      const order = this.get("order", e.key);
-      if (!order || order.state !== "open")
-        throw new ApiError(
-          "MISSING_ORDER",
-          "Terminal event without an open order.",
-        );
-      this.put(
-        "order",
-        e.key,
-        {
-          ...order,
-          state: e.type === "order_filled" ? "filled" : "cancelled",
-          updatedAt: p,
-          settlement: e.type === "order_filled" ? e : null,
-        },
-        height,
-      );
-    } else if (e.type === "initialized") {
-      this.put("config", "marketplace", { ...e, updatedAt: p }, height);
-    } else if (e.type === "fee_policy_changed") {
-      const cfg = this.get("config", "marketplace");
-      if (!cfg) throw new ApiError("MISSING_CONFIG", "Missing initialization.");
-      this.put(
-        "config",
-        "marketplace",
-        { ...cfg, feeBps: e.feeBps, feeRecipient: e.feeRecipient, updatedAt: p },
-        height,
-      );
-    } else if (e.type === "trading_changed") {
-      const cfg = this.get("config", "marketplace");
-      if (!cfg) throw new ApiError("MISSING_CONFIG", "Missing initialization.");
-      this.put(
-        "config",
-        "marketplace",
-        { ...cfg, paused: e.paused, updatedAt: p },
-        height,
-      );
-    } else if (e.type === "collection_policy" || e.type === "currency_policy") {
-      this.put(
-        "policy",
-        `${e.type}:${address(e.address)}`,
-        { ...e, updatedAt: p },
-        height,
-      );
-    } else if (e.type === "admin_transferred") {
-      const cfg = this.get("config", "marketplace");
-      if (!cfg) throw new ApiError("MISSING_CONFIG", "Missing initialization.");
-      this.put(
-        "config",
-        "marketplace",
-        { ...cfg, admin: e.admin, updatedAt: p },
-        height,
-      );
-      this.put(
-        "config",
-        "pending_admin",
-        { admin: address("0"), updatedAt: p },
-        height,
-      );
-    } else if (e.type === "admin_proposed") {
-      this.put(
-        "config",
-        "pending_admin",
-        { admin: e.admin, updatedAt: p },
-        height,
-      );
-    } else if (e.type === "metadata_update") {
-      this.put(
-        "metadata_job",
-        `${e.collection}:${e.tokenId ?? "*"}`,
-        { ...e, state: "pending", updatedAt: p },
-        height,
-      );
-    } else throw new ApiError("UNKNOWN_EVENT", `Unsupported event: ${e.type}`);
-    const id = `${p.blockHash}:${p.transactionHash}:${p.eventIndex}`;
-    if (e.type === "order_filled") {
-      const day = Math.floor(p.timestamp / 86400) * 86400,
-        key = `${e.collection}:${e.currency}:${day}`,
-        previous = this.get("stats_day", key);
-      this.put(
-        "stats_day",
-        key,
-        {
-          collection: e.collection,
-          currency: e.currency,
-          day,
-          volume: (
-            BigInt(previous?.volume ?? "0") + BigInt(e.buyerDebit)
-          ).toString(),
-          sales: (previous?.sales ?? 0) + 1,
-        },
-        height,
-      );
-    }
-    const notificationRecipients =
-      e.type === "order_filled"
-        ? [e.buyer, e.seller]
-        : e.type === "order_created" && e.kind === "token_offer"
-          ? [this.get("token", `${e.collection}:${e.tokenId}`)?.owner]
-          : e.type === "order_cancelled"
-            ? [e.maker]
-            : [];
-    this.put(
-      "activity",
-      id,
-      {
-        ...e,
-        id,
-        provenance: p,
-        notificationRecipients: notificationRecipients.filter(Boolean),
-      },
-      height,
-    );
+    projectEvent(e, p, this.get.bind(this), this.put.bind(this));
   }
+
   rewind(height) {
     this.db.exec("BEGIN IMMEDIATE");
     try {
@@ -440,12 +330,30 @@ export class Store {
         canonical: !!r.canonical,
       }));
   }
+  transactionStatus(hash) {
+    const row = this.db
+      .prepare(
+        "SELECT body FROM entities WHERE kind='activity' AND json_extract(body,'$.provenance.transactionHash')=? AND json_extract(body,'$.type') IN ('order_created','order_filled','order_cancelled','initialized','trading_changed','fee_policy_changed','collection_policy','currency_policy','admin_proposed','admin_transferred') LIMIT 1",
+      )
+      .get(hash);
+    const event = row ? JSON.parse(row.body) : null;
+    const canonical = event
+      ? this.canonicalBlock(event.provenance.blockNumber)
+      : null;
+    return {
+      reflected:
+        !!canonical &&
+        BigInt(canonical.hash) === BigInt(event.provenance.blockHash),
+      block: event?.provenance.blockNumber ?? null,
+    };
+  }
   async backup(path) {
     await backup(this.db, path);
     await backup(this.app, `${path}.app`);
   }
   close() {
-    this.db.close();
-    this.app.close();
+    if (this.closed) return;
+    this.closed = true;
+    try { this.db.close(); } finally { this.app.close(); }
   }
 }

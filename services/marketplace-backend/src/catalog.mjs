@@ -1,3 +1,4 @@
+import { marketStatus } from "./status.mjs";
 import { createHash } from "node:crypto";
 import { address, uint, boundedInteger, ApiError } from "./domain.mjs";
 const j = (alias, path) => `json_extract(${alias}.body,'$.${path}')`;
@@ -533,40 +534,12 @@ export class Catalog {
     const progress = required.map((source) =>
       this.store.get("progress", source),
     );
-    const starts = new Map([
-      ...(this.config.collections ?? []).map(c => [address(c.address), c.startBlock]),
-      ...(this.config.marketplace ? [[address(this.config.marketplace), this.config.marketplaceStartBlock]] : []),
-    ]);
-    const incompleteHistory = required.some((source, i) => {
-      const start = starts.get(source), p = progress[i];
-      return !Number.isSafeInteger(start) || !Number.isSafeInteger(p?.startBlock) || p.startBlock > start;
-    });
-    const missing = progress.some((p) => !p);
-    const indexed = missing ? null : Math.min(...progress.map((p) => p.block));
-    const lag =
-      indexed == null || !rpc ? null : Math.max(0, rpc.head - indexed);
-    const reasons = [];
-    if (this.config.demo) reasons.push("DEMO");
-    if (!this.config.marketplace || !cfg)
-      reasons.push("MARKETPLACE_NOT_DEPLOYED");
-    if (missing) reasons.push("SOURCES_SYNCING");
-    if (incompleteHistory) reasons.push("SOURCE_BACKFILL_REQUIRED");
-    if (!rpc || Date.now() - rpc.observedAt > 15000) reasons.push("HEAD_STALE");
-    if (lag == null || lag > 2) reasons.push("INDEX_STALE");
-    if (!rpc?.identityVerified) reasons.push("IDENTITY_UNVERIFIED");
-    if (cfg?.paused) reasons.push("PAUSED");
-    if (rpc?.error) reasons.push("RPC_ERROR");
-    return {
-      chain: this.config.chain,
-      marketplace: this.config.marketplace,
-      indexedBlock: head?.number ?? null,
-      chainHead: rpc?.head ?? null,
-      lagBlocks: lag,
-      observedAt: rpc?.observedAt ?? null,
+    return marketStatus(this.config, {
+      head,
+      rpc,
+      cfg,
+      progress,
       generation: this.store.generation(),
-      sources: progress,
-      safeForCheckout: !reasons.length,
-      reasons,
-    };
+    });
   }
 }

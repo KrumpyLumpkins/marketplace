@@ -4,7 +4,8 @@ import { createServer } from "node:http";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { createClientIdentity } from "./client-identity.mjs";
 import { bestBid } from "./bids.mjs";
-import { Catalog } from "./catalog.mjs";
+import { createCatalog } from "./catalog-access.mjs";
+import { applicationStore } from "./application-store.mjs";
 import { Auth } from "./auth.mjs";
 import { preflight } from "./preflight.mjs";
 import {
@@ -51,7 +52,7 @@ function cookieToken(req) {
     ?.slice("biblio_session=".length);
 }
 export function createApi({ store, config, rpc, verifySignature }) {
-  const catalog = new Catalog(store, config);
+  const baseStore = store;
   const origin = new URL(config.origin ?? "http://localhost:3000").origin;
   const auth = new Auth(store, {
     origin,
@@ -78,6 +79,9 @@ export function createApi({ store, config, rpc, verifySignature }) {
   const limits = new Map();
   const clientIdentity = createClientIdentity(config);
   const api = createServer(async (req, res) => {
+    let store = baseStore,
+      catalog = createCatalog(store, config),
+      app = applicationStore(store);
     const requestId = randomUUID();
     let readTransaction = false;
     res.setHeader("X-Request-ID", requestId);
@@ -109,6 +113,12 @@ export function createApi({ store, config, rpc, verifySignature }) {
         return;
       }
       const url = new URL(req.url, "http://localhost");
+      if (config.maintenance && req.method === "POST")
+        throw new ApiError(
+          "MIGRATION_IN_PROGRESS",
+          "Marketplace writes are temporarily paused for database migration.",
+          503,
+        );
       // Deployment probes must not compete with a visitor's quota.
       if (url.pathname === "/health/live") {
         send({ live: true });
@@ -135,7 +145,7 @@ export function createApi({ store, config, rpc, verifySignature }) {
         .filter(Boolean)
         .map(decodeURIComponent);
       if (url.pathname === "/health/ready") {
-        const status = catalog.status();
+        const status = await catalog.status();
         send(status, status.safeForCheckout ? 200 : 503);
         return;
       }
@@ -203,18 +213,22 @@ export function createApi({ store, config, rpc, verifySignature }) {
       const route = parts.slice(3),
         q = options(url.searchParams),
         token = cookieToken(req),
-        account = auth.account(token);
+        account = await auth.account(token);
       if (route[0] === "assets" && req.method === "GET") {
         const name = route[1];
         if (
-          !config.assetDir ||
+          (!config.assetDir && store.dialect !== "postgres") ||
           !name ||
           !/^([a-f0-9]{64})\.(png|jpg|gif|webp|svg)$/.test(name)
         )
           throw new ApiError("NOT_FOUND", "Asset unavailable.", 404);
         let bytes;
         try {
-          bytes = await readFile(join(config.assetDir, name));
+          bytes =
+            store.dialect === "postgres"
+              ? await store.asset(name)
+              : await readFile(join(config.assetDir, name));
+          if (!bytes) throw new Error("Asset missing");
         } catch {
           throw new ApiError("NOT_FOUND", "Asset unavailable.", 404);
         }
@@ -263,7 +277,9 @@ export function createApi({ store, config, rpc, verifySignature }) {
       };
       const data = req.method === "POST" ? await body(req) : null;
       if (req.method === "GET" && !["quote", "best-bid"].includes(route[3])) {
-        store.db.exec("BEGIN");
+        store = await baseStore.beginSnapshot();
+        catalog = createCatalog(store, config);
+        app = applicationStore(store);
         readTransaction = true;
       }
       let result;
@@ -275,7 +291,7 @@ export function createApi({ store, config, rpc, verifySignature }) {
         );
       if (route[0] === "auth") {
         if (route[1] === "challenge" && req.method === "POST")
-          result = auth.challenge(data.account, data.origin);
+          result = await auth.challenge(data.account, data.origin);
         else if (route[1] === "verify" && req.method === "POST") {
           const session = await auth.verify(data.id, data.signature);
           res.setHeader(
@@ -286,7 +302,7 @@ export function createApi({ store, config, rpc, verifySignature }) {
         } else if (route[1] === "session" && req.method === "GET")
           result = { account };
         else if (route[1] === "logout" && req.method === "POST") {
-          auth.logout(token);
+          await auth.logout(token);
           res.setHeader(
             "Set-Cookie",
             "biblio_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0",
@@ -295,15 +311,11 @@ export function createApi({ store, config, rpc, verifySignature }) {
         }
       } else if (route[0] === "notifications") {
         const a = requireAccount();
-        if (req.method === "GET") result = store.notifications(a);
+        if (req.method === "GET") result = await store.notifications(a);
         else if (req.method === "POST" && route[1] === "read") {
           if (typeof data.id !== "string")
             throw new ApiError("INVALID_QUERY", "Notification ID required.");
-          store.app
-            .prepare(
-              "UPDATE notifications SET is_read=1 WHERE account=? AND id=?",
-            )
-            .run(a, data.id);
+          await app.readNotification(a, data.id);
           result = { updated: true };
         }
       } else if (route[0] === "reports" && req.method === "POST") {
@@ -318,78 +330,49 @@ export function createApi({ store, config, rpc, verifySignature }) {
             "A reason of 5–2000 characters is required.",
           );
         const collection = address(data.collection);
-        catalog.collection(collection);
+        await catalog.collection(collection);
         const id = randomUUID();
-        store.app
-          .prepare(
-            "INSERT INTO reports(id,account,body,created) VALUES(?,?,?,?)",
-          )
-          .run(
-            id,
-            a,
-            JSON.stringify({
-              collection,
-              tokenId: data.tokenId == null ? null : uint(data.tokenId),
-              reason: data.reason.trim(),
-            }),
-            Date.now(),
-          );
+        await app.createReport(
+          id,
+          a,
+          {
+            collection,
+            tokenId: data.tokenId == null ? null : uint(data.tokenId),
+            reason: data.reason.trim(),
+          },
+          Date.now(),
+        );
         result = { id, status: "open" };
       } else if (route[0] === "operator") {
         operator();
         if (route[1] === "reports" && req.method === "GET")
-          result = store.app
-            .prepare("SELECT * FROM reports ORDER BY created DESC LIMIT 100")
-            .all()
-            .map((r) => ({ ...r, body: JSON.parse(r.body) }));
+          result = await app.reports();
         else if (route[1] === "reports" && req.method === "POST") {
           if (!["open", "resolved", "dismissed"].includes(data.status))
             throw new ApiError("INVALID_QUERY", "Invalid report state.");
-          store.app
-            .prepare("UPDATE reports SET status=? WHERE id=?")
-            .run(data.status, data.id);
+          await app.updateReport(data.id, data.status);
           result = { updated: true };
         } else if (route[1] === "collections" && req.method === "POST") {
           const collection = address(data.address),
-            old = store.get("collection", collection);
+            old = await store.get("collection", collection);
           if (!old)
             throw new ApiError(
               "NOT_REGISTERED",
               "Add contract/start block to registry before publishing.",
               409,
             );
-          if (data.hidden === true)
-            store.app
-              .prepare("INSERT OR REPLACE INTO moderation VALUES(?,?)")
-              .run(
-                collection,
-                JSON.stringify({
-                  reason: String(data.reason ?? "Under review"),
-                  at: Date.now(),
-                }),
-              );
-          else if (data.hidden === false)
-            store.app
-              .prepare("DELETE FROM moderation WHERE collection=?")
-              .run(collection);
-          if (typeof data.verified === "boolean")
-            store.app
-              .prepare("INSERT OR REPLACE INTO app_meta VALUES(?,?)")
-              .run(
-                `verification:${collection}`,
-                JSON.stringify({ verified: data.verified, at: Date.now() }),
-              );
+          await app.setCollection(collection, data);
           result = { updated: true };
         }
         if (route[1] === "metadata" && req.method === "POST") {
           const collection = address(data.collection);
-          if (!store.get("collection", collection))
+          if (!(await store.get("collection", collection)))
             throw new ApiError(
               "NOT_REGISTERED",
               "Collection is not registered.",
             );
           const tokenId = data.tokenId == null ? null : uint(data.tokenId);
-          store.put("metadata_job", `${collection}:${tokenId ?? "*"}`, {
+          await store.put("metadata_job", `${collection}:${tokenId ?? "*"}`, {
             collection,
             tokenId,
             state: "pending",
@@ -398,15 +381,8 @@ export function createApi({ store, config, rpc, verifySignature }) {
           result = { queued: true };
         }
         if (route[1] === "audit" && req.method === "GET")
-          result = store.app
-            .prepare("SELECT * FROM audit ORDER BY id DESC LIMIT 100")
-            .all();
-        if (req.method === "POST")
-          store.app
-            .prepare(
-              "INSERT INTO audit(actor,action,body,created) VALUES(?,?,?,?)",
-            )
-            .run("operator", route.join("/"), JSON.stringify(data), Date.now());
+          result = await app.audit();
+        if (req.method === "POST") await app.recordAudit(route.join("/"), data);
       } else if (
         route[0] === "checkout" &&
         route[1] === "preflight" &&
@@ -425,47 +401,55 @@ export function createApi({ store, config, rpc, verifySignature }) {
         )
           throw new ApiError("INVALID_QUERY", "Expected 1–25 order keys.");
         result = {
-          orders: data.orders.map((k) => ({
-            key: k,
-            order: store.get(
-              "order",
-              orderKey(
-                config.chain,
-                config.marketplace ?? "0",
-                k.maker,
-                k.nonce,
+          orders: await Promise.all(
+            data.orders.map(async (k) => ({
+              key: k,
+              order: await store.get(
+                "order",
+                orderKey(
+                  config.chain,
+                  config.marketplace ?? "0",
+                  k.maker,
+                  k.nonce,
+                ),
               ),
-            ),
-          })),
+            })),
+          ),
         };
       } else if (req.method === "GET") {
         if (route[0] === "collections") {
-          if (!route[1]) result = catalog.collections();
-          else if (!route[2]) result = catalog.collection(route[1]);
-          else if (route[2] === "tokens") result = catalog.tokens(route[1], q);
+          if (!route[1]) result = await catalog.collections();
+          else if (!route[2]) result = await catalog.collection(route[1]);
+          else if (route[2] === "tokens")
+            result = await catalog.tokens(route[1], q);
           else if (route[2] === "traits")
-            result = catalog.traits(route[1], { ...q, traitName: route[3] });
-          else if (route[2] === "orders") result = catalog.orders(route[1], q);
+            result = await catalog.traits(route[1], {
+              ...q,
+              traitName: route[3],
+            });
+          else if (route[2] === "orders")
+            result = await catalog.orders(route[1], q);
           else if (route[2] === "listings")
-            result = catalog.orders(route[1], {
+            result = await catalog.orders(route[1], {
               ...q,
               kind: "listing",
               state: "open",
               availableOnly: true,
             });
           else if (route[2] === "offers")
-            result = catalog.orders(route[1], {
+            result = await catalog.orders(route[1], {
               ...q,
               kind: "offer",
               state: "open",
             });
-          else if (route[2] === "stats") result = catalog.stats(route[1], q);
+          else if (route[2] === "stats")
+            result = await catalog.stats(route[1], q);
           else if (route[2] === "activity")
-            result = catalog.activity({ ...q, collection: route[1] });
+            result = await catalog.activity({ ...q, collection: route[1] });
         } else if (route[0] === "tokens" && route[1] && route[2]) {
-          if (!route[3]) result = catalog.token(route[1], route[2]);
+          if (!route[3]) result = await catalog.token(route[1], route[2]);
           else if (route[3] === "activity")
-            result = catalog.activity({
+            result = await catalog.activity({
               ...q,
               collection: route[1],
               tokenId: uint(route[2]),
@@ -503,9 +487,10 @@ export function createApi({ store, config, rpc, verifySignature }) {
             };
           }
         } else if (route[0] === "accounts" && route[1]) {
-          if (route[2] === "holdings") result = catalog.holdings(route[1], q);
+          if (route[2] === "holdings")
+            result = await catalog.holdings(route[1], q);
           else if (route[2] === "orders")
-            result = catalog.orders(q.collection, {
+            result = await catalog.orders(q.collection, {
               ...q,
               ...(q.direction === "received"
                 ? { received: route[1] }
@@ -513,39 +498,23 @@ export function createApi({ store, config, rpc, verifySignature }) {
               ...(q.direction === "listed" ? { kind: "listing" } : {}),
             });
           else if (route[2] === "activity")
-            result = catalog.activity({ ...q, account: route[1] });
+            result = await catalog.activity({ ...q, account: route[1] });
         } else if (route[0] === "transactions" && route[1]) {
           const hash = "0x" + BigInt(uint(route[1], 252)).toString(16);
-          const activity = store.db
-            .prepare(
-              "SELECT body FROM entities WHERE kind='activity' AND json_extract(body,'$.provenance.transactionHash')=? AND json_extract(body,'$.type') IN ('order_created','order_filled','order_cancelled','initialized','trading_changed','fee_policy_changed','collection_policy','currency_policy','admin_proposed','admin_transferred') LIMIT 1",
-            )
-            .get(hash);
-          const event = activity ? JSON.parse(activity.body) : null;
-          const canonical = event
-            ? store.db
-                .prepare("SELECT hash FROM blocks WHERE number=?")
-                .get(event.provenance.blockNumber)
-            : null;
-          result = {
-            reflected:
-              !!canonical &&
-              BigInt(canonical.hash) === BigInt(event.provenance.blockHash),
-            block: event?.provenance.blockNumber ?? null,
-          };
-        } else if (route[0] === "search") result = catalog.search(q.q);
+          result = await store.transactionStatus(hash);
+        } else if (route[0] === "search") result = await catalog.search(q.q);
         else if (route[0] === "indexer" && route[1] === "status")
-          result = catalog.status();
+          result = await catalog.status();
         else if (route[0] === "marketplace" && route[1] === "config")
           result = {
-            ...store.get("config", "marketplace"),
+            ...(await store.get("config", "marketplace")),
             chain: config.chain,
             chainId: config.chainId,
             marketplace: config.marketplace,
             currencies: config.currencies,
             collections: config.collections,
             demo: !!config.demo,
-            status: catalog.status(),
+            status: await catalog.status(),
           };
       }
       if (result === undefined)
@@ -556,19 +525,25 @@ export function createApi({ store, config, rpc, verifySignature }) {
           schemaVersion: "1.0.0",
           chain: config.chain,
           marketplace: config.marketplace,
-          indexedBlock: store.head()?.number ?? null,
-          generation: store.generation(),
+          indexedBlock: (await store.head())?.number ?? null,
+          generation: await store.generation(),
           generatedAt: new Date().toISOString(),
         },
         requestId,
       };
       if (readTransaction) {
-        store.db.exec("COMMIT");
+        await store.endSnapshot();
         readTransaction = false;
       }
       send(response);
     } catch (e) {
-      if (readTransaction) store.db.exec("ROLLBACK");
+      if (readTransaction) {
+        try {
+          await store.endSnapshot();
+        } catch {
+          /* A dead connection must not escape the request error handler. */
+        }
+      }
       if (!res.headersSent)
         send(
           {

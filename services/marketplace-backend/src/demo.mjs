@@ -1,7 +1,8 @@
 import { runtime } from "./runtime.mjs";
 import { createApi } from "./api.mjs";
 import { address, orderKey } from "./domain.mjs";
-const { store, config } = runtime({
+if (process.env.MARKETPLACE_STORE === "postgres" || process.env.DATABASE_URL) throw new Error("Demo seeding requires a separate local SQLite fixture environment.");
+const { store, config } = await runtime({
   ...process.env,
   MARKETPLACE_DB:
     process.env.MARKETPLACE_DB ??

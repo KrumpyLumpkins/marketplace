@@ -1,12 +1,13 @@
 # Operating the owned marketplace
 
 Railway is the selected staging/production host. Follow [Railway setup](RAILWAY.md)
-for its two-service topology and per-environment volumes. The native/Compose
+and [PostgreSQL operations](POSTGRES-OPERATIONS.md) for the split service topology,
+verified migration and per-environment databases. The native/Compose
 instructions below remain useful for local rehearsal on a shared host.
 
 ## Deployment boundaries
 
-Use one chain database per chain and marketplace deployment. Keep application state in its adjacent `.app` file and assets in the configured directory. Run one indexing worker and one metadata worker per database. The API supports 1–8 Node workers with `MARKETPLACE_API_WORKERS`; keep embedded indexing off when using multiple API workers. SQLite WAL permits readers during a writer transaction; this topology is not high availability.
+Use one PostgreSQL database per chain and marketplace deployment, with protected application and media schemas. Run one leased indexing worker and a separate metadata worker; API replicas use independent pools and embedded indexing stays off. The retained SQLite/Compose path uses an adjacent `.app` file and asset directory for local fixtures and migration. Neither topology currently provides automatic database failover.
 
 Deploy the non-upgradeable marketplace with explicit administrator, protocol fee basis points (0–500) and fee recipient. Enable each reviewed ERC-721 collection and standard ERC-20 currency through administrator transactions. Record the source/compiler/class hashes, deployment block and administration addresses in the registry. The paused production deployment and approved asset addresses are recorded in `config/marketplace/deployment.mainnet.json` and `registry.mainnet.json`; Railway consumes that exported registry. The administrator can update the default fee rate (0–500 bps) and recipient atomically with `set_fee`; old orders retain their fee rate and all future fills use the current recipient. Follow the SDK administration flow and monitor `FeePolicyChanged` in the indexer. A contract-code change requires a new deployment and an explicit migration.
 
@@ -245,3 +246,12 @@ even before another scanner run. Old progress without a recorded start is
 unverified and requires a fresh backfill database. Moving the configured boundary
 later never rewrites the original covered start. Preserve the adjacent application
 database when replacing chain history, following the onboarding procedure above.
+
+### PostgreSQL release dependency update — 8 October 2026
+
+Next.js and its ESLint config are pinned to 16.3.8 to address the newly reported
+[image optimization SSRF advisory](https://github.com/advisories/GHSA-cjq9-62q9-8jv4).
+The refreshed production audit has zero high/critical findings and the same five
+moderate findings tracked above. The database migration adds `pg` 8.23.1 as the
+backend's sole direct runtime package. Node containers/CI use 22.23.3; its bundled
+SQLite 3.51.3 is also used for the retained migration/rollback path.

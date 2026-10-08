@@ -23,30 +23,49 @@ OpenSea is the NFT product benchmark, not a claim of exhaustive feature parity. 
 | Order creation | On-chain, confirmed by user |
 | Core assets/actions | ERC-721 listings, token offers, atomic single-currency cart, confirmed by user |
 | Indexing | Our own Node.js implementation; direct configurable Starknet RPC |
-| Backend dependencies | Zero third-party runtime packages as the conservative interpretation of “no deps”; Node built-ins |
+| Backend dependencies | Owned Node indexer with Node built-ins; `pg` PostgreSQL driver approved on 8 October 2026 |
 | OpenSea launch expansion | Include collection offers, bulk seller workflows, trader dashboard, search/analytics, trust tools and in-product notifications in this consolidated target plan |
 | Collection offers | One-shot offers for any NFT in a specified collection; no partial fills. Implemented in the version-1 ABI |
 | Data scope | Realms ERC-721 only at launch, confirmed 8 October 2026; other collections deferred to operator-led onboarding |
-| Backend storage | Implemented SQLite/local persistent storage with one writer per chain and off-host backups |
+| Backend storage | Migrating to PostgreSQL, with separate market/chain/application schemas, ordered block commits and protected application data |
 | Pricing | Confirmed fixed buyer debit, fees/royalties deducted from that total; no executor surcharge |
 | Royalties | Confirmed snapshots for token-specific orders; bounded fill-time royalties for collection offers |
 | Administration | Confirmed non-upgradeable contract, limited multisig administration, cancellation available while paused |
-| Hosting | Railway staging (Sepolia) and production (mainnet), confirmed 8 October 2026; workspace, domains, operator and capacity still to select |
+| Hosting | Railway staging (Sepolia) and production (mainnet), confirmed 8 October 2026; project provisioned; launch monitoring and capacity acceptance still open |
 
-User confirmed inclusive buyer pricing, token-order royalty snapshots, capped fill-time collection royalties and a non-upgradeable contract with limited administration on 6 October 2026. The implementation caps protocol fees at 500 basis points; production economics and administration must be recorded as explicit deployment inputs. These are material decisions, not numbers to invent during deployment. On 8 October 2026 the user authorized administrator updates to fee rate and recipient. `set_fee` atomically changes the new-order rate (0–500 bps) and future-fill recipient. Orders snapshot their rate; creation binds `max_fee_bps` so signing-time increases cannot change agreed deductions. Existing orders retain their rate, while fees route to the current recipient. Contract code remains non-upgradeable. The user subsequently selected an initial 500-bps fee and the local deployer signer as its recipient; the local deployment draft records that address. STRK and LORDS are selected payment currencies. Initial administrator and per-transaction STRK ceiling still need selection. The broader product target does not change the user's selection of on-chain orders or ERC-721-only launch.
+User confirmed inclusive buyer pricing, token-order royalty snapshots, capped fill-time collection royalties and a non-upgradeable contract with limited administration on 6 October 2026. The implementation caps protocol fees at 500 basis points; production economics and administration must be recorded as explicit deployment inputs. These are material decisions, not numbers to invent during deployment. On 8 October 2026 the user authorized administrator updates to fee rate and recipient. `set_fee` atomically changes the new-order rate (0–500 bps) and future-fill recipient. Orders snapshot their rate; creation binds `max_fee_bps` so signing-time increases cannot change agreed deductions. Existing orders retain their rate, while fees route to the current recipient. Contract code remains non-upgradeable. The user subsequently selected an initial 500-bps fee and the local deployer signer as its recipient; the local deployment draft records that address. STRK and LORDS are selected payment currencies. The signer was subsequently confirmed as initial administrator, with a 60 STRK per-transaction ceiling; deployment records capture the completed paused bootstrap. The broader product target does not change the user's selection of on-chain orders or ERC-721-only launch.
+
+### PostgreSQL migration — authorized 8 October 2026
+
+Replace the production SQLite store with PostgreSQL using `pg`. Preserve the public
+SDK/API and deployed Cairo contracts. Use dedicated market tables and indexed
+columns, JSONB metadata, separate application permissions, a single ordered
+projection writer and bounded connection pools. Split Railway API, index and
+metadata processes into services with per-environment PostgreSQL. Preserve current
+SQLite/app/media snapshots for rollback; compare imported row counts, full-content
+digests and checkpoint identity before switching. Trading stays paused. This is
+implemented and under deployment validation. Twenty PostgreSQL integration tests
+cover migration, scanner/replay parity, concurrent reads/auth, roles, crashes, leases
+and recovery. A PostgreSQL 18 dump/restore of the saved 3,163-block/1,623-token
+Realms sample passed full-content parity; this is not a production-size restore
+claim. Both Railway environments have migrated to PostgreSQL. Production imported
+56,824 blocks, 3,938 tokens, 4,108 events and 89 assets at checkpoint 720985; its
+Railway PostgreSQL dump/restore passed every source-table digest. The separate
+scanner resumed past checkpoint 721085 and metadata processing resumed.
+[Migration evidence](evidence/postgres-cutover-2026-10-08.json) records counts,
+digests and identity. The contract remains paused; full historical backfill is open.
+Backfill RPC acquisition remains a separate performance concern.
 
 ### Railway hosting — confirmed 8 October 2026
 
-Host both frontend and backend on Railway, with isolated `staging` and
-`production` environments. `.railway/railway.ts` defines a web service plus a
-single backend service supervising API/indexer/metadata processes on one attached
-SQLite volume per environment. Railway cannot share that volume across services;
-keep one backend replica. Staging defaults to Sepolia and production to mainnet.
-See [Railway setup](RAILWAY.md) for configuration and operating steps. The supplied
-Railway project now has healthy web/backend deployments in both environments,
-separate volume instances, daily/weekly backups and a verified ingress identity
-rule. Index workers and trading remain disabled pending RPC and contract inputs;
-hosting setup does not close the remaining launch gates.
+Host frontend, API, indexer, metadata and PostgreSQL on Railway with isolated
+`staging` and `production` environments. `.railway/railway.ts` defines separate
+services and environment-local PostgreSQL volumes; the old SQLite volumes remain
+for migration rollback. The retained backend volume currently requires one API
+replica and no overlapping deployments. See [Railway setup](RAILWAY.md) and
+[PostgreSQL operations](POSTGRES-OPERATIONS.md). Production uses the paused mainnet
+contract and continues Realms backfill; staging stays on Sepolia and still needs
+its funded signer/test deployment. Infrastructure setup does not close launch gates.
 
 ### Realms-only launch baseline — confirmed 8 October 2026
 
@@ -127,7 +146,7 @@ flowchart LR
 - **Application data:** sessions, notifications, reports and verification decisions. These cannot be regenerated from chain events and need separate backups/migrations.
 - **Frontend:** user intent, wallet signing, clear totals/errors and transaction/index progress. It cannot silently mutate order terms.
 
-Use a single backend codebase with separate writer, API and metadata processes. No required external queue or search service at launch. Preserve a clean product interface so later storage changes do not rewrite the UI. Cairo compiler/test tooling and proposed reviewed contract primitives are distinct from the zero-package Node runtime constraint.
+Use a single backend codebase with separate writer, API and metadata processes. No required external queue or search service at launch. Preserve a clean product interface so later storage changes do not rewrite the UI. Cairo compiler/test tooling and proposed reviewed contract primitives are separate from the backend dependency policy, which now permits `pg` for PostgreSQL.
 
 ### Reusable marketplace packages — extraction map, 7 October 2026
 
@@ -259,7 +278,7 @@ Critical path: M0 → M1 → M2 → validated event/API integration → complete
 | Area | Implemented locally | Remaining launch evidence |
 | --- | --- | --- |
 | Cairo | Standalone non-upgradeable v1, 17 entrypoints, listing/token/collection offers, atomic cart and limited administration | Independent audit; actual launch-asset compatibility and fork/resource checks |
-| Indexer/API | Native Node/SQLite journal, replay, per-source progress, metadata, preflight, sessions, reports and notifications | Historical backfill, fixed-checkpoint external reconciliation, dynamic game policies, production load/restore/failover |
+| Indexer/API | Owned Node scanner, async PostgreSQL store/catalog, verified SQLite import, replay, metadata, preflight, sessions, reports and notifications | Historical backfill, fixed-checkpoint external reconciliation, dynamic game policies, production load/restore/failover |
 | SDK | Private workspace packages, TanStack fetching, full v1 ABI coverage, direct reads, governance and recovery | Deployment integration; packages are not published |
 | UI | Owned reads/trading, wallet entry points, full-width discovery, consistent spacing, reusable Storybook components | Real supported-wallet trading/recovery; on-chain admin console is not implemented |
 | Local verification | Unit, Storybook/a11y, SDK packed consumers, backend, Cairo and devnet replay suites exist; CI runs required checks | Green remote CI, Sepolia rehearsal, migration decision and seven-day soak |
@@ -499,12 +518,12 @@ badge or soft launch announcement is not an on-chain access control.
    promotable: changing a database from no marketplace to the new address raises
    `DATABASE_IDENTITY_MISMATCH`.
 3. **Allocate a fresh production candidate.** Give this chain/deployment its own
-   chain DB, adjacent `.app` DB and asset directory. Run exactly one event scanner:
-   either the backfill CLI or the live index worker, never both against that DB.
-   Keep embedded indexing off in API processes. Start with one API worker; scale
-   within the implemented 1–8 range only after contention/load measurement. One
-   index worker, one metadata worker and APIs share the local persistent volume;
-   metadata/API writes are serialized by SQLite, not independent HA replicas.
+   PostgreSQL database, initialized with the reviewed registry, schema and runtime
+   roles. Run exactly one leased event scanner: backfill CLI or live index worker.
+   Keep embedded API indexing off. Metadata has its own service and restricted role;
+   it cannot overwrite ownership. For an existing SQLite source, use the verified
+   migration procedure instead of restarting or discarding history. Scale API pools
+   only after load measurement; the single database still has an outage/restore risk.
 4. **Backfill to a fixed checkpoint H.** Record H and its accepted hash. Run
    `indexer-cli.mjs backfill` with `MARKETPLACE_STOP_BLOCK=H`, using the final
    registry and candidate DB. Keep public traffic away from incomplete data.
@@ -571,7 +590,7 @@ benchmarks.
 These are release criteria and monitoring work, not a claim that an alerting
 platform, coverage dashboard or full reconciliation automation is already deployed.
 Collection verification badges and metadata completeness are not checks inside
-`safeForCheckout`; obtain separate operator evidence. The one-host SQLite topology
+`safeForCheckout`; obtain separate operator evidence. The single-instance PostgreSQL topology
 has an explicit outage/restore tradeoff and does not establish 99.9% availability.
 
 ### Cutover, rollback and later collections
@@ -592,13 +611,12 @@ has an explicit outage/restore tradeoff and does not establish 99.9% availabilit
   buttons alone cannot stop direct contract calls. The pause is not instantaneous:
   transactions ordered before it may settle and must be reconciled. Retain submitted
   hashes; never replay user transactions automatically.
-- **Database replacement/restore:** stop API application writes, metadata and the
-  index worker for the final paired checkpoint/backup. Restore/copy databases using
-  SQLite backup facilities or a fully stopped, correctly checkpointed dataset—not
-  an arbitrary copy of a live WAL database. Preserve the latest `.app` state; its
-  sessions, reports, moderation, verification and notification read state are not
-  disposable. Runtime derives its path as `<chain DB path>.app`, so a renamed chain
-  DB needs the intended app DB alongside it. Verify both before restarting.
+- **Database replacement/restore:** freeze application writes and index/metadata
+  workers. Use verified PostgreSQL logical backups and isolated restore drills;
+  SQLite migration sources need paired backup-API snapshots plus frozen assets.
+  Preserve sessions, reports, moderation, verification and notification read state.
+  Follow [the recovery runbook](POSTGRES-OPERATIONS.md); after new PostgreSQL app
+  writes, the retained SQLite snapshot cannot be used as a lossless rollback.
 - **Expansion:** approve the next collection/currency and its policy separately.
   Build a replacement chain DB with the complete expanded registry from historical
   starts; the existing live DB can keep tailing independently. Catch the replacement

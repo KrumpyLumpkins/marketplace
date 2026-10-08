@@ -12,8 +12,8 @@ export async function scanOnce(store, rpc, config, options = {}) {
   try {
     return await scanRange(store, rpc, config, options);
   } catch (error) {
-    store.put("status", "rpc", {
-      ...store.get("status", "rpc"),
+    await store.put("status", "rpc", {
+      ...(await store.get("status", "rpc")),
       error: error.code ?? "INDEXER_ERROR",
       identityVerified: false,
     });
@@ -27,22 +27,7 @@ async function scanRange(store, rpc, config, { window = 100, stopAt } = {}) {
     chainId: "0x" + BigInt(config.chainId).toString(16),
     marketplace: config.marketplace ? address(config.marketplace) : null,
   };
-  const saved = store.db
-    .prepare("SELECT value FROM meta WHERE key='identity'")
-    .get();
-  if (
-    saved &&
-    JSON.stringify(JSON.parse(saved.value)) !== JSON.stringify(identity)
-  )
-    throw new ApiError(
-      "DATABASE_IDENTITY_MISMATCH",
-      "Use a separate chain database for each chain and deployment.",
-      409,
-    );
-  store.db
-    .prepare("INSERT OR IGNORE INTO meta VALUES('identity',?)")
-    .run(JSON.stringify(identity));
-
+  await store.bindIdentity(identity);
   if (!equal(await rpc.call("starknet_chainId", []), config.chainId))
     throw new ApiError("CHAIN_MISMATCH", "RPC is on another chain.");
   const latest = await rpc.call("starknet_getBlockWithTxHashes", {
@@ -62,14 +47,14 @@ async function scanRange(store, rpc, config, { window = 100, stopAt } = {}) {
         "Marketplace code identity changed.",
       );
   }
-  let head = store.head();
+  let head = await store.head();
   while (head) {
     const canonical = await rpc.call("starknet_getBlockWithTxHashes", {
       block_id: { block_number: head.number },
     });
     if (equal(canonical.block_hash, head.hash)) break;
-    store.rewind(head.number - 1);
-    head = store.head();
+    await store.rewind(head.number - 1);
+    head = await store.head();
   }
   const sources = [
     ...config.collections.map((c) => ({
@@ -94,7 +79,7 @@ async function scanRange(store, rpc, config, { window = 100, stopAt } = {}) {
       "Verified source start blocks are required.",
     );
   for (const source of sources) {
-    const progress = store.get("progress", source.address);
+    const progress = await store.get("progress", source.address);
     if (
       head &&
       source.start <= head.number &&
@@ -118,7 +103,7 @@ async function scanRange(store, rpc, config, { window = 100, stopAt } = {}) {
     from + window - 1,
     stopAt ?? Infinity,
   );
-  store.put("status", "rpc", {
+  await store.put("status", "rpc", {
     head: latest.block_number,
     hash: latest.block_hash,
     observedAt,
@@ -126,8 +111,11 @@ async function scanRange(store, rpc, config, { window = 100, stopAt } = {}) {
     error: null,
   });
   if (from > end) {
-    store.reconcileNotifications();
-    return { indexed: store.head()?.number ?? null, head: latest.block_number };
+    await store.reconcileNotifications();
+    return {
+      indexed: (await store.head())?.number ?? null,
+      head: latest.block_number,
+    };
   }
   const anchor = await rpc.call("starknet_getBlockWithTxHashes", {
     block_id: { block_number: end },
@@ -188,14 +176,18 @@ async function scanRange(store, rpc, config, { window = 100, stopAt } = {}) {
     async (n) => {
       // A filtered page can silently omit every event in a block. Sampling empty
       // blocks cannot prove coverage; compare every block with its full receipts.
-      const block = await rpc.call(
-        "starknet_getBlockWithReceipts",
-        { block_id: { block_number: n } },
-      );
-      if (block.block_number !== n ||
-          !["ACCEPTED_ON_L1", "ACCEPTED_ON_L2"].includes(block.status) ||
-          !Array.isArray(block.transactions))
-        throw new ApiError("INVALID_RPC_BLOCK", "Expected an accepted receipt block at the requested height.");
+      const block = await rpc.call("starknet_getBlockWithReceipts", {
+        block_id: { block_number: n },
+      });
+      if (
+        block.block_number !== n ||
+        !["ACCEPTED_ON_L1", "ACCEPTED_ON_L2"].includes(block.status) ||
+        !Array.isArray(block.transactions)
+      )
+        throw new ApiError(
+          "INVALID_RPC_BLOCK",
+          "Expected an accepted receipt block at the requested height.",
+        );
       return { n, block };
     },
   );
@@ -218,8 +210,11 @@ async function scanRange(store, rpc, config, { window = 100, stopAt } = {}) {
           "INVALID_RECEIPT",
           "Missing ordered receipt events.",
         );
-      const rawTransactionHash = receipt.transaction_hash ?? entry.transaction?.transaction_hash;
-      const transactionHash = rawTransactionHash ? "0x"+BigInt(rawTransactionHash).toString(16) : null;
+      const rawTransactionHash =
+        receipt.transaction_hash ?? entry.transaction?.transaction_hash;
+      const transactionHash = rawTransactionHash
+        ? "0x" + BigInt(rawTransactionHash).toString(16)
+        : null;
       if (!transactionHash)
         throw new ApiError(
           "INVALID_RECEIPT",
@@ -239,8 +234,7 @@ async function scanRange(store, rpc, config, { window = 100, stopAt } = {}) {
         if (!active.has(address(raw.from_address))) continue;
         actual.push({ raw, tx: transactionHash });
         const event = decodeEvent(raw, config);
-        if (event)
-          events.push({ ...event, raw, transactionHash, eventIndex });
+        if (event) events.push({ ...event, raw, transactionHash, eventIndex });
       }
     }
     const a = actual.map((x) => `${BigInt(x.tx)}:${signature(x.raw)}`).sort(),
@@ -255,14 +249,16 @@ async function scanRange(store, rpc, config, { window = 100, stopAt } = {}) {
         "EVENT_COVERAGE",
         "Filtered events do not match full receipts.",
       );
-    store.applyBlock({
+    await store.applyBlock({
       number: n,
       hash: b.block_hash,
       parentHash: b.parent_hash,
       timestamp: b.timestamp,
       events,
       sources: [...active],
-      sourceStarts: Object.fromEntries(sources.map(s => [s.address, s.start])),
+      sourceStarts: Object.fromEntries(
+        sources.map((s) => [s.address, s.start]),
+      ),
       observedAt,
     });
   }

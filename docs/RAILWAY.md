@@ -4,8 +4,8 @@ Railway is the selected host for the complete marketplace, confirmed 8 October
 2026. The supplied project `554683c6-4840-40d5-a60b-864d7d1f4c25` is provisioned with
 staging and production services and persistent volume instances. Production is connected to the paused mainnet deployment and its index/metadata
 workers are backfilling Realms history. Staging services are deployed but still
-use a verified PublicNode Sepolia RPC but need a funded Sepolia deployer and test deployment. Trading remains disabled. Existing Vercel previews are historical;
-removing that GitHub integration is a separate account setting, not a code deploy.
+use a verified PublicNode Sepolia RPC but need a funded Sepolia deployer and test deployment. Trading remains disabled. Existing Vercel previews are historical. `vercel.json` disables automatic Git
+deployments per [Vercel configuration](https://vercel.com/docs/project-configuration/git-configuration#turning-off-all-automatic-deployments); removing the installed integration itself remains an account setting.
 
 ## Topology
 
@@ -13,24 +13,21 @@ One project, `realms-marketplace`, with two isolated Railway environments:
 
 | Environment | Chain | Services | Persistent storage |
 | --- | --- | --- | --- |
-| `staging` | Starknet Sepolia | `web`, `backend` | Its own `marketplace-data` volume |
-| `production` | Starknet mainnet | `web`, `backend` | Its own `marketplace-data` volume |
+| `staging` | Starknet Sepolia | `web`, `backend`, `indexer`, `metadata`, `postgres` | Independent PostgreSQL volume; retained SQLite rollback volume |
+| `production` | Starknet mainnet | `web`, `backend`, `indexer`, `metadata`, `postgres` | Independent PostgreSQL volume; retained SQLite rollback volume |
 
-Each backend runs three supervised Node processes: API, one index scanner and one
-metadata worker. They share `/data/chain.sqlite`, its adjacent `.app` database and
-`/data/assets` inside the same service. A child exit stops its peers and exits
-nonzero so Railway restarts the group; shutdown sends SIGTERM and escalates to
-SIGKILL after five seconds. API embedded indexing is forced off. Workers start
-only when `MARKETPLACE_BACKGROUND_ENABLED=true`; initial configuration uses false.
+Both environments now use PostgreSQL. Follow [the migration runbook](POSTGRES-OPERATIONS.md)
+and the build plan's evidence before changing store selection. `backend` serves
+HTTP, `indexer` owns the ordered scanner lease, and `metadata` handles enrichment.
+Workers share PostgreSQL through private networking and have distinct restricted
+roles. Staging workers stay disabled until its Sepolia registry is deployed.
 
-Railway volumes attach to one service and do not support replicas. Separate
-Railway API/indexer services cannot share this SQLite volume. Backend replicas
-are fixed at one, with no overlapping deployment. Expect brief backend downtime
-on redeploy; this is not a high-availability design. Frontend and backend default
-to Singapore, with 25 GiB for production and 5 GiB for staging. Production was increased after
-the initial 500-block sample occupied roughly 400 KiB before significant NFT
-events; the full 15.4-million-block history would exceed 5 GiB. Continue monitoring
-actual growth and metadata storage; this sample is not a final capacity forecast. See [Railway volume limits](https://docs.railway.com/volumes/reference).
+Services default to Singapore. PostgreSQL storage is 25 GiB in production and
+5 GiB in staging, with daily/weekly volume backups. The old `marketplace-data`
+volume remains attached to backend for rollback. While it is retained, backend
+still runs one replica with no deployment overlap. PostgreSQL itself is a single
+instance; this is not automatic failover or a high-availability claim. Monitor
+actual data/WAL/media growth and provision capacity before exhaustion.
 
 The frontend is a Next.js standalone container. It proxies `/api/marketplace/*`
 over `http://backend.railway.internal:3100` and exposes port 3000. Only `web` needs
@@ -40,10 +37,10 @@ Neither the backend nor frontend contains deployment signing keys.
 ## Configuration files and local verification
 
 - `.railway/railway.ts`: current Railway project/environment IaC, with the pinned
-  development-only `railway` SDK. The native backend still has zero runtime packages.
+  development-only `railway` SDK. The backend uses the approved `pg` driver.
 - `infra/railway/frontend.Dockerfile`: frozen pnpm install, SDK and Next build,
   minimal standalone runtime as user `node`.
-- `infra/railway/backend.Dockerfile`: Node built-ins only and supervised entrypoint.
+- `infra/railway/backend.Dockerfile`: Node built-ins, pinned `pg` and a supervised per-service entrypoint.
   It runs as root because Railway mounts the persistent volume as root. Volume
   presence and write access are checked before starting the API.
 - `infra/railway/variables.example.json`: environment-specific **shared variable**
@@ -104,7 +101,9 @@ Shared variables (defined in Railway, referenced by the IaC):
 | `STARKNET_RPC_URL` | Mainnet RPC in production, Sepolia RPC in staging; never expose credentials to web |
 | `STARKNET_RPC_FALLBACK_URL` | Independently configured fallback, or empty |
 | `MARKETPLACE_REGISTRY_JSON` | Full generated deployment registry JSON; empty only for initial undeployed setup |
-| `MARKETPLACE_BACKGROUND_ENABLED` | `false` during initial setup; `true` after source/RPC review and before backfill |
+| `MARKETPLACE_BACKGROUND_ENABLED` | Legacy SQLite workers only; `false` after migration |
+| `MARKETPLACE_STORE`, `MARKETPLACE_MAINTENANCE`, `POSTGRES_BACKGROUND_ENABLED` | Cutover flags documented in the PostgreSQL runbook |
+| `POSTGRES_ADMIN_PASSWORD`, `POSTGRES_API_DATABASE_URL`, `POSTGRES_INDEX_DATABASE_URL`, `POSTGRES_METADATA_DATABASE_URL` | Generated separately for each environment by `scripts/railway/postgres-env.mjs` |
 | `MARKETPLACE_ADDRESS` | Reviewed settlement deployment address, or empty while undeployed |
 | `MARKETPLACE_COLLECTIONS` | Frontend collection configuration from the deployment export, or empty while undeployed |
 

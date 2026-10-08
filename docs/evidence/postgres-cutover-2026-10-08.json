@@ -1,0 +1,135 @@
+{
+  "date": "2026-10-08",
+  "environment": "production",
+  "applicationRevision": "4b716f1",
+  "sourceEngine": "SQLite 3.51.3",
+  "targetEngine": "PostgreSQL 18.6",
+  "identity": {
+    "chainId": "0x534e5f4d41494e",
+    "marketplace": "0x07ced79b9da11b280209425dce4329d6b8aa5fa03f81a807b9bf3cfbd64cb9d7"
+  },
+  "sourceHead": {
+    "number": 720985,
+    "hash": "0x2b617cedc7825402bcedb2aa52479057a8afaba4eb5ffa39a6daade5ee364e"
+  },
+  "generationBefore": 1,
+  "generationAfter": 2,
+  "importVerified": true,
+  "railwayLogicalRestoreVerified": true,
+  "migrationSqlSha256": "9338855faa332dfb43de500af1bc7bd0d695dfff31085478c9ce286bcfc7d72e",
+  "tables": {
+    "chain.blocks": {
+      "count": 56824,
+      "digest": "d9429feec9465c5e2cbcb1aa2796b948ef11b6ddaa02fec529a132c5e1d732f2"
+    },
+    "chain.events": {
+      "count": 4108,
+      "digest": "0f17fdec31b95b17fd8542d47014fe9865d56102d7f62b8a7ca495c7996fd8f4"
+    },
+    "chain.undo": {
+      "count": 69094,
+      "digest": "56eaceeaa61bea39ac12de9d1d16a6b7b844ee751751c55e5fb7bbbc483967cd"
+    },
+    "chain.meta": {
+      "count": 2,
+      "digest": "332e4e3327256d07aa675458e3ab7fdd45678d08bb531b2f6188a91f7336be4a"
+    },
+    "entity.collection": {
+      "count": 1,
+      "digest": "a6408b263cda897394c19a631eddf68bef230b1ff0c8307bdf9598242bcf214c"
+    },
+    "entity.token": {
+      "count": 3938,
+      "digest": "1d12555f60bdb19a22b09108a6667dc902772ed9d888b77e8a6cd96f9040412c"
+    },
+    "entity.order": {
+      "count": 0,
+      "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "entity.activity": {
+      "count": 4108,
+      "digest": "3e845fa80ecf14a7ecd73972d86b4eacc2ffa70ce5139cca245011669fd360af"
+    },
+    "entity.progress": {
+      "count": 1,
+      "digest": "e8bb8baf2dea525792d5ee7b330727b0d04c41d27e9e0e922cb3792e35b42bb2"
+    },
+    "entity.status": {
+      "count": 1,
+      "digest": "a20e90f160546eb7b40a8132b729fe12abe939145d0c54f0520e7cffbf8013ab"
+    },
+    "entity.config": {
+      "count": 0,
+      "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "entity.policy": {
+      "count": 0,
+      "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "entity.approval": {
+      "count": 3938,
+      "digest": "d040e8fdb39e91664984da3966102d473017cde64ecbefa4f1889da27d61da91"
+    },
+    "entity.operator": {
+      "count": 4,
+      "digest": "60e2cb5caf00f47eee8f09de7e1da60e64f3496710ab71f296c76308ec1ca749"
+    },
+    "entity.metadata_job": {
+      "count": 3921,
+      "digest": "c92b139e4bcd28af70f323062e163e53de55c21b464649451ad6ce060debd657"
+    },
+    "entity.stats_day": {
+      "count": 0,
+      "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "entity.floor_current": {
+      "count": 0,
+      "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "entity.floor_history": {
+      "count": 0,
+      "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "app.app_meta": {
+      "count": 2,
+      "digest": "35c70ac24c294a9e3ec5ec57945e0bb82e3c72e37361b993c38f228aec979b04"
+    },
+    "app.challenges": {
+      "count": 0,
+      "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "app.sessions": {
+      "count": 0,
+      "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "app.reports": {
+      "count": 0,
+      "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "app.moderation": {
+      "count": 0,
+      "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "app.audit": {
+      "count": 1,
+      "digest": "f803dacde3d542886aa9c8592cb8471bc4f65121120c5f00fa4cfd1eff1b3f2b"
+    },
+    "app.notifications": {
+      "count": 0,
+      "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "media.assets": {
+      "count": 89,
+      "digest": "23f706a1fd70a810d16685125c373af35926419ac1f3fb8d5138ecb1b800d788"
+    }
+  },
+  "firstObservedResumedCheckpoint": 721085,
+  "observedChainHeadAtResume": 16054487,
+  "contractPaused": true,
+  "oldSqliteVolumeRetained": true,
+  "limitations": [
+    "This is migration and restore parity, not a completed historical backfill.",
+    "Sepolia contract/wallet acceptance and independent contract audit remain open.",
+    "Daily/weekly volume backups do not satisfy the proposed one-hour application recovery point target."
+  ]
+}

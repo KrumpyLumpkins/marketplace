@@ -1,15 +1,18 @@
 import { runtime } from "./runtime.mjs";
 import { scanOnce } from "./indexer.mjs";
 import { createHash } from "node:crypto";
-const { store, config, rpc } = runtime();
+const { store, config, rpc } = await runtime();
+let releaseLease;
 try {
   const command = process.argv[2] ?? "once";
+  if (command !== "reconcile" && store.acquireIndexerLease)
+    releaseLease = await store.acquireIndexerLease();
   if (command === "reconcile") {
     const state = {
-      head: store.head(),
-      tokens: store.list("token"),
-      orders: store.list("order"),
-      config: store.get("config", "marketplace"),
+      head: await store.head(),
+      tokens: await store.list("token"),
+      orders: await store.list("order"),
+      config: await store.get("config", "marketplace"),
     };
     console.log(
       JSON.stringify({
@@ -24,8 +27,8 @@ try {
     const height = Number(process.argv[3]);
     if (!Number.isSafeInteger(height) || height < 0)
       throw new Error("Specify a nonnegative rewind block.");
-    store.rewind(height);
-    console.log(JSON.stringify({ rewoundTo: store.head() }));
+    await store.rewind(height);
+    console.log(JSON.stringify({ rewoundTo: await store.head() }));
   } else {
     if (!rpc) throw new Error("MARKETPLACE_RPC_URL is required.");
     const stop = process.env.MARKETPLACE_STOP_BLOCK
@@ -45,5 +48,6 @@ try {
     } while (true);
   }
 } finally {
-  store.close();
+  if (releaseLease) await releaseLease();
+  await store.close();
 }

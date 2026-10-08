@@ -1,3 +1,4 @@
+import { applicationStore } from "./application-store.mjs";
 import { createHash, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { address, uint, ApiError } from "./domain.mjs";
@@ -71,13 +72,13 @@ export function loginHash(data, account) {
 const digest = (v) => createHash("sha256").update(v).digest("hex");
 export class Auth {
   constructor(store, { origin, chainId, verify, now = () => Date.now() }) {
-    this.db = store.app;
+    this.app = applicationStore(store);
     this.origin = new URL(origin).origin;
     this.chainId = chainId;
     this.verifySignature = verify;
     this.now = now;
   }
-  challenge(account, origin) {
+  async challenge(account, origin) {
     if (origin !== this.origin)
       throw new ApiError(
         "ORIGIN_MISMATCH",
@@ -104,14 +105,13 @@ export class Auth {
         expires: String(expires),
       },
     };
-    this.db
-      .prepare("DELETE FROM challenges WHERE expires<?")
-      .run(Math.floor(this.now() / 1000));
-    this.db
-      .prepare(
-        "INSERT INTO challenges(id,account,message,expires) VALUES(?,?,?,?)",
-      )
-      .run(id, a, JSON.stringify(typedData), expires);
+    await this.app.createChallenge(
+      id,
+      a,
+      typedData,
+      expires,
+      Math.floor(this.now() / 1000),
+    );
     return {
       id,
       account: a,
@@ -128,7 +128,7 @@ export class Auth {
       signature.length > 256
     )
       throw new ApiError("INVALID_SIGNATURE", "Invalid signature.");
-    const c = this.db.prepare("SELECT * FROM challenges WHERE id=?").get(id);
+    const c = await this.app.challenge(id);
     if (!c || c.used || c.expires <= Math.floor(this.now() / 1000))
       throw new ApiError(
         "CHALLENGE_EXPIRED",
@@ -148,38 +148,29 @@ export class Auth {
         "Wallet signature was not accepted.",
         401,
       );
-    const used = this.db
-      .prepare(
-        "UPDATE challenges SET used=1 WHERE id=? AND used=0 AND expires>?",
-      )
-      .run(id, Math.floor(this.now() / 1000));
-    if (!used.changes)
+    const token = randomBytes(32).toString("base64url"),
+      expires = Math.floor(this.now() / 1000) + 86400;
+    const used = await this.app.consumeChallenge(
+      id,
+      Math.floor(this.now() / 1000),
+      digest(token),
+      c.account,
+      expires,
+    );
+    if (!used)
       throw new ApiError(
         "CHALLENGE_EXPIRED",
         "Challenge has already been used.",
         401,
       );
-    const token = randomBytes(32).toString("base64url"),
-      expires = Math.floor(this.now() / 1000) + 86400;
-    this.db
-      .prepare("INSERT INTO sessions VALUES(?,?,?)")
-      .run(digest(token), c.account, expires);
     return { token, account: c.account, expires };
   }
-  account(token) {
-    if (!token) return null;
-    return (
-      this.db
-        .prepare(
-          "SELECT account FROM sessions WHERE token_hash=? AND expires>?",
-        )
-        .get(digest(token), Math.floor(this.now() / 1000))?.account ?? null
-    );
+  async account(token) {
+    return token
+      ? this.app.account(digest(token), Math.floor(this.now() / 1000))
+      : null;
   }
-  logout(token) {
-    if (token)
-      this.db
-        .prepare("DELETE FROM sessions WHERE token_hash=?")
-        .run(digest(token));
+  async logout(token) {
+    if (token) await this.app.logout(digest(token));
   }
 }

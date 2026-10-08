@@ -20,7 +20,7 @@ if (workers > 1 && cluster.isPrimary) {
       for (const worker of Object.values(cluster.workers)) worker?.kill(signal);
     });
 } else {
-  const { store, config, rpc } = runtime();
+  const { store, config, rpc } = await runtime();
   const api = createApi({ store, config, rpc });
   let stopped = false;
   api.listen(
@@ -46,8 +46,8 @@ if (workers > 1 && cluster.isPrimary) {
             limit: 3,
           });
       } catch (e) {
-        store.put("status", "rpc", {
-          ...store.get("status", "rpc"),
+        await store.put("status", "rpc", {
+          ...(await store.get("status", "rpc")),
           error: e.code ?? e.message,
           identityVerified: false,
         });

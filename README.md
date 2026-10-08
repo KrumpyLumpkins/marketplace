@@ -2,11 +2,11 @@
 
 A Starknet ERC-721 marketplace with standalone Cairo settlement, an owned Node.js indexer/API, and the retained Next.js UI. Trading uses on-chain listings, token offers, one-shot collection offers and atomic carts of up to 25 NFTs in one currency.
 
-The backend uses Node built-ins only. It has no Torii, Dojo or Arcade dependency. Cartridge remains an optional wallet connector; it supplies no marketplace data. Application RPC uses the owned backend relay, with a configurable direct RPC override. Controller manages its own authentication and wallet transport.
+The backend uses Node built-ins and the approved `pg` PostgreSQL driver. It has no Torii, Dojo or Arcade dependency. Cartridge remains an optional wallet connector; it supplies no marketplace data. Application RPC uses the owned backend relay, with a configurable direct RPC override. Controller manages its own authentication and wallet transport.
 
 ## Run locally
 
-Use Node **22.22.0** and pnpm **10.8.1**.
+Use Node **22.23.3** and pnpm **10.8.1**.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -44,7 +44,7 @@ Public service status is at `/ops`. Authorized moderation and collection control
 
 ## Reusable SDK and React bindings
 
-The marketplace app consumes private workspace packages: [`@biblio/marketplace`](packages/marketplace-sdk/README.md) for TanStack Query Core fetching and trading workflows, and [`@biblio/marketplace-react`](packages/marketplace-react/README.md) for React Query hooks/providers. The indexer remains a separate service with no third-party runtime dependencies. Packages are not published to npm.
+The marketplace app consumes private workspace packages: [`@biblio/marketplace`](packages/marketplace-sdk/README.md) for TanStack Query Core fetching and trading workflows, and [`@biblio/marketplace-react`](packages/marketplace-react/README.md) for React Query hooks/providers. The owned indexer remains a separate service; its only direct runtime package is `pg`. Packages are not published to npm.
 
 ```sh
 pnpm sdk:build       # ESM, declarations and contract ABI assets
@@ -136,3 +136,5 @@ Set local deployment credentials with `pnpm contracts:env` (hidden input; ignore
 `pnpm railway:variable -- staging STARKNET_RPC_URL` (or `production`). These
 commands do not deploy contracts or enable trading. The [Railway guide](docs/RAILWAY.md)
 lists the deployed URLs, remaining inputs and redeploy commands.
+
+PostgreSQL deployment and verified SQLite migration: [operations runbook](docs/POSTGRES-OPERATIONS.md). Run `pnpm backend:pg:test` with an isolated `PG_TEST_DATABASE_URL` alongside the normal backend suite.

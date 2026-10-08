@@ -9,7 +9,7 @@ import {
   ApiError,
 } from "./domain.mjs";
 import { SELECTORS, readTerms } from "./decode.mjs";
-import { Catalog } from "./catalog.mjs";
+import { createCatalog } from "./catalog-access.mjs";
 export async function preflight(store, rpc, config, input) {
   const account = address(input.account),
     items = input.items;
@@ -20,7 +20,7 @@ export async function preflight(store, rpc, config, input) {
   );
   if (new Set(keys).size !== keys.length)
     throw new ApiError("DUPLICATE_ORDER", "Duplicate cart order.");
-  const status = new Catalog(store, config).status();
+  const status = await createCatalog(store, config).status();
   if (!status.safeForCheckout || !rpc)
     return {
       canSubmit: false,
@@ -60,7 +60,7 @@ export async function preflight(store, rpc, config, input) {
   await mapConcurrent(items, 8, async (item, index) => {
     const key = keys[index];
     try {
-      const indexed = store.get("order", key);
+      const indexed = await store.get("order", key);
       if (!indexed)
         throw new ApiError("MISSING_ORDER", "Order is not indexed.");
       const values = await rpc.contract(
@@ -155,7 +155,7 @@ export async function preflight(store, rpc, config, input) {
       let royalty = order.royaltyAmount,
         royaltyRecipient = order.royaltyRecipient;
       if (order.kind === "collection_offer") {
-        const policy = store.get(
+        const policy = await store.get(
           "policy",
           `collection_policy:${order.collection}`,
         );
@@ -186,14 +186,16 @@ export async function preflight(store, rpc, config, input) {
           throw new ApiError("ROYALTY_CAP", "Royalty exceeds maker limit.");
       }
       if (
-        !store.get("policy", `currency_policy:${order.currency}`)?.enabled ||
-        !store.get("policy", `collection_policy:${order.collection}`)?.enabled
+        !(await store.get("policy", `currency_policy:${order.currency}`))
+          ?.enabled ||
+        !(await store.get("policy", `collection_policy:${order.collection}`))
+          ?.enabled
       )
         throw new ApiError(
           "ASSET_DISABLED",
           "Asset is disabled or not indexed.",
         );
-      const sourceProgress = store.get("progress", order.collection);
+      const sourceProgress = await store.get("progress", order.collection);
       if (!sourceProgress || block.block_number - sourceProgress.block > 2)
         throw new ApiError("INDEX_STALE", "Collection index is behind.");
       const amounts = allocations(order.buyerDebit, order.feeBps, royalty);

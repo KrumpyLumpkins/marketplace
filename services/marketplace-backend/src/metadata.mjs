@@ -1,11 +1,17 @@
+import {
+  expandMetadataJobs,
+  metadataCandidates,
+  claimMetadataJob,
+  completeMetadataJob,
+} from "./metadata-store.mjs";
 import http from "node:http";
 import https from "node:https";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { ApiError, u256Felts, numericKey, MAX_U256 } from "./domain.mjs";
+import { ApiError, u256Felts } from "./domain.mjs";
 import { SELECTORS } from "./decode.mjs";
 export function publicAddress(ip) {
   if (isIP(ip) === 4) {
@@ -191,70 +197,13 @@ export async function refreshMetadata(
   config,
   { assetDir, limit = 10 } = {},
 ) {
-  // Expand collection/range refresh events incrementally, never as an unbounded write.
-  const batches = store.db
-    .prepare(
-      "SELECT id,body FROM entities WHERE kind='metadata_job' AND json_extract(body,'$.state')='pending' AND id LIKE '%:*' LIMIT 1",
-    )
-    .all();
-  for (const row of batches) {
-    store.db.exec("BEGIN IMMEDIATE");
-    try {
-      const job = JSON.parse(row.body);
-      const tokens = store.db
-        .prepare(
-          "SELECT id,body FROM entities WHERE kind='token' AND json_extract(body,'$.collection')=? AND num_key>=? AND num_key<=? AND (? IS NULL OR num_key>?) ORDER BY num_key LIMIT 100",
-        )
-        .all(
-          job.collection,
-          numericKey(job.fromTokenId ?? "0"),
-          numericKey(job.toTokenId ?? MAX_U256),
-          job.cursor ?? null,
-          job.cursor ? numericKey(job.cursor) : null,
-        );
-      for (const token of tokens)
-        store.put("metadata_job", token.id, {
-          state: "pending",
-          updatedAt: job.updatedAt,
-        });
-      store.put("metadata_job", row.id, {
-        ...job,
-        state: tokens.length === 100 ? "pending" : "complete",
-        cursor: tokens.length
-          ? JSON.parse(tokens.at(-1).body).tokenId
-          : job.cursor,
-      });
-      store.db.exec("COMMIT");
-    } catch (error) {
-      store.db.exec("ROLLBACK");
-      throw error;
-    }
-  }
+  await expandMetadataJobs(store);
   const now = Date.now();
-  const tokens = store.db
-    .prepare(
-      "SELECT t.body FROM entities t LEFT JOIN entities job ON job.kind='metadata_job' AND job.id=t.id WHERE t.kind='token' AND COALESCE(json_extract(t.body,'$.burned'),0)=0 AND COALESCE(json_extract(job.body,'$.leaseUntil'),0)<? AND (COALESCE(json_extract(t.body,'$.metadataNextAttempt'),0)<? OR json_extract(job.body,'$.state')='pending') ORDER BY COALESCE(json_extract(t.body,'$.metadataFetchedAt'),0) LIMIT ?",
-    )
-    .all(now, now, limit)
-    .map((r) => JSON.parse(r.body));
+  const tokens = await metadataCandidates(store, now, limit);
   for (const token of tokens) {
     let patch;
-    const generation = store.generation();
-    store.db.exec("BEGIN IMMEDIATE");
-    const job = store.get("metadata_job", token.id) ?? { attempts: 0 };
-    if ((job.leaseUntil ?? 0) > now) {
-      store.db.exec("ROLLBACK");
-      continue;
-    }
-    const lease = randomUUID();
-    store.put("metadata_job", token.id, {
-      ...job,
-      state: "running",
-      lease,
-      leaseUntil: now + 60000,
-      attempts: (job.attempts ?? 0) + 1,
-    });
-    store.db.exec("COMMIT");
+    const claim = await claimMetadataJob(store, token, now);
+    if (!claim) continue;
     try {
       let values;
       try {
@@ -289,7 +238,7 @@ export async function refreshMetadata(
       const raw = JSON.parse(bytes.toString()),
         metadata = normalizeMetadata(raw);
       let image = null;
-      if (metadata.image && assetDir) {
+      if (metadata.image && (assetDir || store.dialect === "postgres")) {
         try {
           const asset = await fetchPublic(
             resolveUri(
@@ -310,8 +259,12 @@ export async function refreshMetadata(
               createHash("sha256").update(asset.bytes).digest("hex") +
               "." +
               ext;
-            await mkdir(assetDir, { recursive: true });
-            await writeFile(join(assetDir, name), asset.bytes);
+            if (store.dialect === "postgres")
+              await store.saveAsset(name, asset.contentType, asset.bytes);
+            else {
+              await mkdir(assetDir, { recursive: true });
+              await writeFile(join(assetDir, name), asset.bytes);
+            }
             image = `/api/marketplace/v1/chains/${config.chain}/assets/${name}`;
           }
         } catch {
@@ -345,28 +298,7 @@ export async function refreshMetadata(
         metadataNextAttempt: now + 300000,
       };
     }
-    store.db.exec("BEGIN IMMEDIATE");
-    try {
-      const current = store.get("token", token.id);
-      if (
-        store.generation() === generation &&
-        current?.updatedAt?.blockHash === token.updatedAt?.blockHash &&
-        store.get("metadata_job", token.id)?.lease === lease
-      ) {
-        store.put("token", token.id, { ...current, ...patch });
-        store.put("metadata_job", token.id, {
-          state: patch.metadataStatus === "ready" ? "complete" : "failed",
-          attempts: (job.attempts ?? 0) + 1,
-          leaseUntil: 0,
-          nextAttempt: patch.metadataNextAttempt,
-          error: patch.metadataError,
-        });
-      }
-      store.db.exec("COMMIT");
-    } catch (e) {
-      store.db.exec("ROLLBACK");
-      throw e;
-    }
+    await completeMetadataJob(store, token, claim, patch);
   }
   return tokens.length;
 }

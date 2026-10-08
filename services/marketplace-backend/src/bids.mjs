@@ -1,4 +1,4 @@
-import { Catalog } from "./catalog.mjs";
+import { createCatalog } from "./catalog-access.mjs";
 import { preflight } from "./preflight.mjs";
 import { ApiError, address, boundedInteger } from "./domain.mjs";
 /** Descending gross price is an upper bound on net proceeds. Never label a truncated search complete. */
@@ -15,10 +15,10 @@ export async function bestBid(
       "CURRENCY_REQUIRED",
       "Choose a currency for bid comparison.",
     );
-  const catalog = new Catalog(store, config),
-    token = catalog.token(collection, tokenId);
+  const catalog = createCatalog(store, config),
+    token = await catalog.token(collection, tokenId);
   maxChecks = boundedInteger(maxChecks, 50, 50);
-  const status = catalog.status();
+  const status = await catalog.status();
   if (!status.safeForCheckout)
     throw new ApiError("INDEX_STALE", status.reasons.join(", "), 503);
   const deadline = Date.now() + 5000;
@@ -28,7 +28,7 @@ export async function bestBid(
     checked = 0,
     complete = false;
   do {
-    const page = catalog.orders(collection, {
+    const page = await catalog.orders(collection, {
       kind: "offer",
       state: "open",
       tokenMatch: tokenId,

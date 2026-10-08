@@ -18,7 +18,7 @@ The build plan takes precedence over supporting scope documents. Preserve unreso
 ## Implementation rules
 
 - Preserve shadcn/ui primitives, Tailwind tokens, accessibility and URL-based discovery state. Put reusable fetching and trading rules in `packages/marketplace-sdk`, React bindings in `packages/marketplace-react`, and app presentation/adapters in `src/features` or `src/lib`; routes orchestrate them.
-- Keep strict types. New backend code uses local modules and Node built-ins, without third-party runtime packages. Existing frontend dependencies and Cairo development/security primitives have separate policies in the plan.
+- Keep strict types. Backend indexing and protocol code use local modules and Node built-ins. PostgreSQL access uses the maintained `pg` driver, explicitly approved on 8 October 2026; keep other runtime dependencies scoped and justified. Existing frontend dependencies and Cairo development/security primitives have separate policies in the plan.
 - Use our contract ABI and explicit events for new-market trading. Torii, Dojo World storage and Arcade trading SDK logic belong only to explicitly scoped legacy compatibility work.
 - Implement behavior changes test-first: demonstrate the failure, implement the smallest correction, then refactor. Test public behavior and invariants rather than mirroring implementation details.
 - Keep chain values lossless and order identity deployment-aware. Derive payment bounds from contract terms; preflight is advisory, while the contract enforces authorization and settlement.
