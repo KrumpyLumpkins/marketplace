@@ -1,57 +1,60 @@
 import { describe, expect, it } from "vitest";
-import { activeFiltersFromSearchParams } from "@/lib/marketplace/traits";
 import {
   collectionDiscoveryStateFromSearchParams,
   collectionDiscoveryStateToSearchParams,
   sortModeFromSearchParams,
-} from "@/features/collections/collection-query-params";
+  tabFromSearchParams,
+} from "./collection-query-params";
 
 describe("collection query params", () => {
-  it("parses_sort_mode_with_price_asc_as_default", () => {
-    expect(sortModeFromSearchParams(new URLSearchParams("sort=price-asc"))).toBe("price-asc");
-    expect(sortModeFromSearchParams(new URLSearchParams("sort=power-desc"))).toBe("power-desc");
-    expect(sortModeFromSearchParams(new URLSearchParams("sort=resource-count-desc"))).toBe("resource-count-desc");
-    expect(sortModeFromSearchParams(new URLSearchParams("sort=unknown"))).toBe("price-asc");
-    expect(sortModeFromSearchParams(new URLSearchParams())).toBe("price-asc");
+  it("defaults sort, tab and search state", () => {
+    const state = collectionDiscoveryStateFromSearchParams(new URLSearchParams());
+    expect(state.sortMode).toBe("price-asc");
+    expect(state.tab).toBe("items");
+    expect(state.query).toBe("");
+    expect(state.listedOnly).toBe(false);
+    expect(state.activeFilters).toEqual({});
   });
 
-  it("serializes_filters_and_sort_and_resets_cursor", () => {
-    const params = collectionDiscoveryStateToSearchParams(
-      new URLSearchParams("cursor=page-2&foo=bar&trait=Eyes:Big"),
-      {
-        activeFilters: {
-          Background: new Set(["Blue"]),
-        },
-        sortMode: "price-desc",
-      },
-    );
-
-    expect(params.get("cursor")).toBeNull();
-    expect(params.get("foo")).toBe("bar");
-    expect(params.get("sort")).toBe("price-desc");
-    expect(activeFiltersFromSearchParams(params)).toEqual({
-      Background: new Set(["Blue"]),
-    });
+  it("reads supported sort modes and ignores unknown ones", () => {
+    expect(sortModeFromSearchParams(new URLSearchParams("sort=recent"))).toBe("recent");
+    expect(sortModeFromSearchParams(new URLSearchParams("sort=bogus"))).toBe("price-asc");
   });
 
-  it("omits_sort_param_when_sort_mode_is_price_asc", () => {
-    const params = collectionDiscoveryStateToSearchParams(
-      new URLSearchParams("sort=price-asc"),
-      {
-        activeFilters: {},
-        sortMode: "price-asc",
-      },
-    );
-
-    expect(params.get("sort")).toBeNull();
-  });
-
-  it("parses_combined_discovery_state_from_query", () => {
+  it("reads the tab, search and listed-only flags", () => {
     const state = collectionDiscoveryStateFromSearchParams(
-      new URLSearchParams("trait=Eyes:Big&sort=price-desc"),
+      new URLSearchParams("tab=analytics&q=%20dragon%20&listed=1&trait=Resource%3AGold"),
     );
+    expect(state.tab).toBe("analytics");
+    expect(state.query).toBe("dragon");
+    expect(state.listedOnly).toBe(true);
+    expect(state.activeFilters).toEqual({ Resource: new Set(["Gold"]) });
+    expect(tabFromSearchParams(new URLSearchParams("tab=nope"))).toBe("items");
+  });
 
-    expect(Array.from(state.activeFilters.Eyes)).toEqual(["Big"]);
-    expect(state.sortMode).toBe("price-desc");
+  it("serialises only non-default state and drops the cursor", () => {
+    const params = collectionDiscoveryStateToSearchParams(new URLSearchParams("cursor=abc&other=1"), {
+      activeFilters: { Resource: new Set(["Gold"]) },
+      sortMode: "price-desc",
+      query: "fox",
+      listedOnly: true,
+      tab: "offers",
+    });
+    expect(params.get("cursor")).toBeNull();
+    expect(params.get("other")).toBe("1");
+    expect(params.getAll("trait")).toEqual(["Resource:Gold"]);
+    expect(params.get("sort")).toBe("price-desc");
+    expect(params.get("q")).toBe("fox");
+    expect(params.get("listed")).toBe("1");
+    expect(params.get("tab")).toBe("offers");
+
+    const defaults = collectionDiscoveryStateToSearchParams(new URLSearchParams("tab=offers&q=x&listed=1"), {
+      activeFilters: {},
+      sortMode: "price-asc",
+      query: "",
+      listedOnly: false,
+      tab: "items",
+    });
+    expect(defaults.toString()).toBe("");
   });
 });

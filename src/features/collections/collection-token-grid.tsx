@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AssetGrid } from "@/components/marketplace/asset-grid";
 import { useMarketCurrency } from "@/lib/marketplace/currency-store";
 import { decodeRangeFilterValue } from "@/lib/marketplace/traits";
-import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useReducer, useRef, type ReactNode } from "react";
 import type { NormalizedToken } from "@/lib/marketplace/types";
 import {
   useCollectionListingsQuery,
@@ -59,12 +59,20 @@ type CollectionTokenGridProps = {
   activeFilters?: ActiveFilters;
   sortMode?: CollectionSortMode;
   onTokensChange?: (tokens: NormalizedToken[]) => void;
-  sortControls?: ReactNode;
+  /** Controls rendered above the grid (search, sort, layout). */
+  toolbar?: ReactNode;
+  /** Comfortable or dense cards, or a table. */
+  layout?: GridLayoutMode;
+  /** Name substring or exact token id. */
+  query?: string;
+  /** Only tokens with a live listing in the market currency. */
+  listedOnly?: boolean;
+  /** Called with whether another page can be loaded. */
+  onCanLoadMoreChange?: (canLoadMore: boolean) => void;
   sweepPreviewTokenIds?: Set<string>;
 };
 
-type GridDensityMode = "compact" | "dense";
-type GridLayoutMode = GridDensityMode | "list";
+export type GridLayoutMode = "compact" | "dense" | "list";
 
 const EMPTY_ACTIVE_FILTERS: ActiveFilters = {};
 
@@ -204,7 +212,11 @@ export function CollectionTokenGrid({
   activeFilters,
   sortMode = "recent",
   onTokensChange,
-  sortControls,
+  toolbar,
+  layout = "compact",
+  query = "",
+  listedOnly = false,
+  onCanLoadMoreChange,
   sweepPreviewTokenIds,
 }: CollectionTokenGridProps) {
   const currency = useMarketCurrency(state => state.currency);
@@ -215,7 +227,7 @@ export function CollectionTokenGrid({
   );
   const showInlineResources = collectionFilterConfig.showInlineResources === true;
   const tokenCardConfig = collectionFilterConfig.tokenCard;
-  const [gridMode, setGridMode] = useState<GridLayoutMode>("compact");
+  const gridMode = layout;
   const tokenIdsKey = useMemo(() => tokenIds?.join(",") ?? "", [tokenIds]);
   const activeFiltersKey = useMemo(
     () =>
@@ -246,6 +258,8 @@ export function CollectionTokenGrid({
     attributeFilters,
     sort: sortMode,
     currency,
+    q: query || undefined,
+    listedOnly,
     filters: Object.entries(activeFilters ?? {}).map(([name, values]) => {
       const range = [...values].map(decodeRangeFilterValue).find(Boolean);
       return range ? {name, ...range} : {name, values: [...values].map(v => v === "true" ? true : v === "false" ? false : /^\d+$/.test(v) && Number.isSafeInteger(Number(v)) ? Number(v) : v)};
@@ -266,7 +280,7 @@ export function CollectionTokenGrid({
 
   useEffect(() => {
     dispatch({ type: "RESET" });
-  }, [address, projectId, limit, tokenIdsKey, activeFiltersKey, sortMode, currency]);
+  }, [address, projectId, limit, tokenIdsKey, activeFiltersKey, sortMode, currency, query, listedOnly]);
 
   useEffect(() => {
     if (!tokenQuery.isSuccess) return;
@@ -288,6 +302,13 @@ export function CollectionTokenGrid({
 
   const nextCursor = tokenQuery.data?.page?.nextCursor ?? null;
   const canLoadMore = Boolean(nextCursor);
+  const onCanLoadMoreChangeRef = useRef(onCanLoadMoreChange);
+  useEffect(() => {
+    onCanLoadMoreChangeRef.current = onCanLoadMoreChange;
+  });
+  useEffect(() => {
+    onCanLoadMoreChangeRef.current?.(canLoadMore);
+  }, [canLoadMore]);
   // The API applies sorting and filters across the full collection before pagination.
   const visibleTokens = pagination.tokens;
   const filteredVisibleTokens = useMemo(
@@ -332,42 +353,8 @@ export function CollectionTokenGrid({
   });
 
   return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>{sortControls}</div>
-        <div className="flex items-center justify-end gap-1">
-          <Button
-            aria-pressed={gridMode === "compact"}
-            onClick={() => setGridMode("compact")}
-            size="sm"
-            type="button"
-            variant={gridMode === "compact" ? "default" : "outline"}
-            className="h-7 px-2 text-xs"
-          >
-            Compact
-          </Button>
-          <Button
-            aria-pressed={gridMode === "dense"}
-            onClick={() => setGridMode("dense")}
-            size="sm"
-            type="button"
-            variant={gridMode === "dense" ? "default" : "outline"}
-            className="h-7 px-2 text-xs"
-          >
-            Dense
-          </Button>
-          <Button
-            aria-pressed={gridMode === "list"}
-            onClick={() => setGridMode("list")}
-            size="sm"
-            type="button"
-            variant={gridMode === "list" ? "default" : "outline"}
-            className="h-7 px-2 text-xs"
-          >
-            List
-          </Button>
-        </div>
-      </div>
+    <section className="space-y-4" data-testid="collection-token-grid">
+      {toolbar}
 
       {tokenQuery.isLoading && pagination.tokens.length === 0 ? (
         <AssetGrid density={density}>
@@ -549,23 +536,31 @@ export function CollectionTokenGrid({
       {tokenQuery.isSuccess && displayTokens.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="pt-6 text-sm text-muted-foreground">
-            No tokens match your filters. Try removing some filters.
+            {query
+              ? `Nothing matches "${query}". Try a name or an exact token id.`
+              : listedOnly
+                ? "No listed items match these filters. Turn off \"Listed only\" to see every item."
+                : "No tokens match your filters. Try removing some filters."}
           </CardContent>
         </Card>
       ) : null}
 
       {canLoadMore ? (
-        <Button
-          disabled={tokenQuery.isFetching}
-          onClick={() => {
-            if (nextCursor) {
-              dispatch({ type: "ADVANCE_CURSOR", cursor: nextCursor });
-            }
-          }}
-          type="button"
-        >
-          Load more
-        </Button>
+        <div className="flex justify-center">
+          <Button
+            disabled={tokenQuery.isFetching}
+            onClick={() => {
+              if (nextCursor) {
+                dispatch({ type: "ADVANCE_CURSOR", cursor: nextCursor });
+              }
+            }}
+            type="button"
+            variant="outline"
+            className="min-h-11 px-6"
+          >
+            {tokenQuery.isFetching ? "Loading…" : "Load more items"}
+          </Button>
+        </div>
       ) : null}
     </section>
   );

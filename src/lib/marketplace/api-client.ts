@@ -109,6 +109,8 @@ export async function fetchCollectionTokens(o: FetchCollectionTokensOptions) {
       filters,
       sort: o.sort ?? "token-asc",
       currency: o.currency ?? DEFAULT_CURRENCY,
+      q: o.q?.trim() || undefined,
+      listedOnly: o.listedOnly ? true : undefined,
     },
   );
   return {

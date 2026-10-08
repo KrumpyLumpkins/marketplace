@@ -67,7 +67,12 @@ export function useCollectionTokensQuery(
       options.cursor,
       options.tokenIds,
       options.attributeFilters,
+      options.filters,
       options.limit,
+      options.sort,
+      options.currency,
+      options.q,
+      options.listedOnly,
     ] as const,
     queryFn: async () => {
       const { fetchCollectionTokens } = await import(

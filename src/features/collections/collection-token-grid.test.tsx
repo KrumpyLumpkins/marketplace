@@ -710,13 +710,16 @@ describe("collection token grid", () => {
       refetch: vi.fn(),
     });
 
-    render(<CollectionTokenGrid address="0xabc" projectId="project-a" />);
+    render(
+      <CollectionTokenGrid
+        address="0xabc"
+        projectId="project-a"
+        toolbar={<div data-testid="toolbar-slot">Toolbar</div>}
+      />,
+    );
 
-    expect(screen.getByRole("button", { name: /compact/i })).toBeVisible();
-    expect(screen.getByRole("button", { name: /dense/i })).toBeVisible();
-    expect(screen.getByRole("button", { name: /list/i })).toBeVisible();
-    expect(screen.queryByRole("button", { name: /standard/i })).toBeNull();
-    expect(screen.queryByRole("button", { name: /comfort/i })).toBeNull();
+    expect(screen.getByTestId("toolbar-slot")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /compact/i })).toBeNull();
     expect(screen.getByTestId("collection-token-grid-cards")).toHaveClass(
       "market-asset-grid",
     );
@@ -739,16 +742,15 @@ describe("collection token grid", () => {
       refetch: vi.fn(),
     });
 
-    const user = userEvent.setup();
-    render(<CollectionTokenGrid address="0xabc" projectId="project-a" />);
+    const { rerender } = render(
+      <CollectionTokenGrid address="0xabc" projectId="project-a" layout="compact" />,
+    );
 
-    const grid = screen.getByTestId("collection-token-grid-cards");
-    await user.click(screen.getByRole("button", { name: /compact/i }));
-    expect(grid).toHaveClass("market-asset-grid");
+    expect(screen.getByTestId("collection-token-grid-cards")).toHaveClass("market-asset-grid");
+    expect(screen.getByTestId("collection-token-grid-cards")).not.toHaveClass("market-asset-grid-dense");
 
-    await user.click(screen.getByRole("button", { name: /dense/i }));
-    const denseGrid = screen.getByTestId("collection-token-grid-cards");
-    expect(denseGrid).toHaveClass("market-asset-grid-dense");
+    rerender(<CollectionTokenGrid address="0xabc" projectId="project-a" layout="dense" />);
+    expect(screen.getByTestId("collection-token-grid-cards")).toHaveClass("market-asset-grid-dense");
   });
 
   it("list_view_renders_tokens_in_a_table_layout", async () => {
@@ -773,10 +775,7 @@ describe("collection token grid", () => {
       ]),
     );
 
-    const user = userEvent.setup();
-    render(<CollectionTokenGrid address="0xabc" projectId="project-a" />);
-
-    await user.click(screen.getByRole("button", { name: /list/i }));
+    render(<CollectionTokenGrid address="0xabc" projectId="project-a" layout="list" />);
 
     const table = screen.getByTestId("collection-token-grid-table");
     expect(table).toBeVisible();
@@ -965,10 +964,7 @@ describe("collection token grid", () => {
       refetch: vi.fn(),
     });
 
-    const user = userEvent.setup();
-    render(<CollectionTokenGrid address="0x123" projectId="project-realms" />);
-
-    await user.click(screen.getByRole("button", { name: "List" }));
+    render(<CollectionTokenGrid address="0x123" projectId="project-realms" layout="list" />);
 
     const traitIcons = await screen.findByTestId("resource-trait-icons");
     expect(traitIcons).toHaveTextContent("Coal");

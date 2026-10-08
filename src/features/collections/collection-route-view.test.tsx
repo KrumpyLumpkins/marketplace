@@ -57,8 +57,8 @@ vi.mock("@/features/collections/collection-token-grid", () => ({
     mockTokenGridRender(props);
     return (
       <div data-testid="collection-token-grid">
-        <div data-testid="collection-sort-controls">{props.sortControls as ReactNode}</div>
-        Token Grid: {props.address as string} | Sort: {String(props.sortMode ?? "recent")}
+        <div data-testid="collection-toolbar-slot">{props.toolbar as ReactNode}</div>
+        Token Grid: {props.address as string} | Sort: {String(props.sortMode ?? "recent")} | Layout: {String(props.layout)} | Query: {String(props.query ?? "")} | Listed: {String(props.listedOnly)}
         <div data-testid="token-grid-sweep-preview">
           {Array.from((props.sweepPreviewTokenIds as Set<string> | undefined) ?? []).join(",")}
         </div>
@@ -75,10 +75,28 @@ vi.mock("@/features/collections/collection-token-grid", () => ({
   },
 }));
 
-vi.mock("@/features/collections/collection-market-panel", () => ({
-  CollectionMarketPanel: (props: Record<string, unknown>) => (
-    <div data-testid="collection-market-panel">Market Panel: {props.address as string}</div>
+vi.mock("@/features/collections/collection-activity-feed", () => ({
+  CollectionActivityFeed: (props: Record<string, unknown>) => (
+    <div data-testid="collection-activity-feed">Activity: {props.address as string}</div>
   ),
+}));
+vi.mock("@/features/collections/collection-offers-panel", () => ({
+  CollectionOffersPanel: (props: Record<string, unknown>) => (
+    <div data-testid="collection-offers-panel">Offers: {props.address as string} in {props.currency as string}</div>
+  ),
+}));
+vi.mock("@/features/collections/analytics/collection-analytics", () => ({
+  CollectionAnalytics: (props: Record<string, unknown>) => (
+    <div data-testid="collection-analytics">Analytics: {props.address as string}</div>
+  ),
+}));
+vi.mock("@/features/collections/collection-stats-strip", () => ({
+  CollectionStatsStrip: (props: Record<string, unknown>) => (
+    <dl data-testid="collection-stats-strip">Stats: {props.address as string} in {props.currency as string}</dl>
+  ),
+}));
+vi.mock("@/features/trading/currency-switcher", () => ({
+  CurrencySwitcher: () => <div data-testid="currency-switcher">Currency switcher</div>,
 }));
 
 vi.mock("@/features/collections/trait-filter-sidebar", () => ({
@@ -226,25 +244,97 @@ describe("collection route view", () => {
     expect(screen.getByText(/find collection/i)).toBeVisible();
   });
 
-  it("shows_tokens_tab_by_default", () => {
+  it("shows_items_tab_by_default_with_market_header", () => {
     mockUseCollectionQuery.mockReturnValue(successQuery(null));
 
     render(<CollectionRouteView address="0xabc" collections={collections} />);
 
-    expect(screen.getByRole("tab", { name: /tokens/i })).toBeVisible();
-    expect(screen.getByRole("tab", { name: /market activity/i })).toBeVisible();
+    for (const name of ["Items", "Offers", "Activity", "Analytics"]) {
+      expect(screen.getByRole("tab", { name })).toBeVisible();
+    }
+    expect(screen.getByRole("tab", { name: "Items" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("collection-token-grid")).toBeVisible();
+    expect(screen.getByTestId("collection-stats-strip")).toHaveTextContent("Stats: 0xabc");
+    expect(screen.getByTestId("currency-switcher")).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "Search this collection" })).toBeVisible();
+    expect(screen.getByRole("switch", { name: "Listed only" })).toBeVisible();
   });
 
-  it("switches_to_market_activity_tab", async () => {
+  it("tab_changes_are_reported_to_the_url_owner_and_render_the_right_panel", async () => {
+    mockUseCollectionQuery.mockReturnValue(successQuery(null));
+    const onTabChange = vi.fn();
+    const user = userEvent.setup();
+
+    const { rerender } = render(
+      <CollectionRouteView address="0xabc" collections={collections} onTabChange={onTabChange} />,
+    );
+    await user.click(screen.getByRole("tab", { name: "Activity" }));
+    expect(onTabChange).toHaveBeenCalledWith("activity");
+
+    rerender(<CollectionRouteView address="0xabc" collections={collections} tab="activity" onTabChange={onTabChange} />);
+    expect(await screen.findByTestId("collection-activity-feed")).toHaveTextContent("Activity: 0xabc");
+    expect(screen.queryByTestId("collection-token-grid")).toBeNull();
+
+    rerender(<CollectionRouteView address="0xabc" collections={collections} tab="offers" onTabChange={onTabChange} />);
+    expect(await screen.findByTestId("collection-offers-panel")).toHaveTextContent("Offers: 0xabc");
+
+    rerender(<CollectionRouteView address="0xabc" collections={collections} tab="analytics" onTabChange={onTabChange} />);
+    expect(await screen.findByTestId("collection-analytics")).toHaveTextContent("Analytics: 0xabc");
+  });
+
+  it("search_and_listed_only_controls_report_changes", async () => {
+    mockUseCollectionQuery.mockReturnValue(successQuery(null));
+    const onQueryChange = vi.fn();
+    const onListedOnlyChange = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <CollectionRouteView
+        address="0xabc"
+        collections={collections}
+        onQueryChange={onQueryChange}
+        onListedOnlyChange={onListedOnlyChange}
+      />,
+    );
+
+    await user.type(screen.getByRole("textbox", { name: "Search this collection" }), "fox{enter}");
+    expect(onQueryChange).toHaveBeenCalledWith("fox");
+
+    await user.click(screen.getByRole("switch", { name: "Listed only" }));
+    expect(onListedOnlyChange).toHaveBeenCalledWith(true);
+  });
+
+  it("passes_query_listed_only_and_layout_to_the_grid", async () => {
     mockUseCollectionQuery.mockReturnValue(successQuery(null));
     const user = userEvent.setup();
 
-    render(<CollectionRouteView address="0xabc" collections={collections} />);
+    render(<CollectionRouteView address="0xabc" collections={collections} query="fox" listedOnly />);
 
-    await user.click(screen.getByRole("tab", { name: /market activity/i }));
+    expect(screen.getByTestId("collection-token-grid")).toHaveTextContent("Query: fox | Listed: true");
+    expect(screen.getByTestId("collection-token-grid")).toHaveTextContent("Layout: compact");
+    await user.click(screen.getByRole("radio", { name: "Dense grid" }));
+    expect(screen.getByTestId("collection-token-grid")).toHaveTextContent("Layout: dense");
+  });
 
-    expect(screen.getByTestId("collection-market-panel")).toBeVisible();
+  it("active_filters_render_removable_chips", async () => {
+    mockUseCollectionQuery.mockReturnValue(successQuery(null));
+    const onActiveFiltersChange = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <CollectionRouteView
+        address="0xabc"
+        collections={collections}
+        activeFilters={{ Resource: new Set(["Gold", "Wood"]) }}
+        onActiveFiltersChange={onActiveFiltersChange}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Remove filter Resource: Gold" }));
+    expect(onActiveFiltersChange).toHaveBeenCalledWith({ Resource: new Set(["Wood"]) });
+
+    await user.click(screen.getByRole("button", { name: "Clear all" }));
+    expect(onActiveFiltersChange).toHaveBeenLastCalledWith({});
   });
 
   it("trait_sidebar_has_sticky_positioning", () => {
@@ -285,42 +375,6 @@ describe("collection route view", () => {
     );
   });
 
-  it("collection_route_uses_unverified_listings_query_for_browse", () => {
-    mockUseCollectionQuery.mockReturnValue(successQuery(null));
-
-    render(<CollectionRouteView address="0xabc" collections={collections} />);
-
-    expect(mockUseCollectionListingsQuery).toHaveBeenCalledWith(
-      expect.objectContaining({
-        collection: "0xabc",
-        projectId: "project-a",
-        limit: 100,
-        verifyOwnership: false,
-      }),
-    );
-  });
-
-  it("listed_count_matches_visible_listed_tokens", async () => {
-    mockUseCollectionQuery.mockReturnValue(successQuery(null));
-    mockUseCollectionListingsQuery.mockReturnValue(successQuery([
-      { id: 11, tokenId: 11, price: 300, currency: "0xfee", quantity: 1 },
-      { id: 12, tokenId: 12, price: 100, currency: "0xfee", quantity: 1 },
-    ]));
-    setMockVisibleTokens([token("12")]);
-    const user = userEvent.setup();
-
-    render(<CollectionRouteView address="0xabc" collections={collections} />);
-
-    await user.click(screen.getByRole("button", { name: /emit visible tokens/i }));
-
-    expect(
-      screen.getByText((_, node) => node?.textContent === "1 listed"),
-    ).toBeVisible();
-    expect(
-      screen.queryByText((_, node) => node?.textContent === "2 listed"),
-    ).toBeNull();
-  });
-
   it("does_not_issue_secondary_token_query_for_sweep_candidates", () => {
     mockUseCollectionQuery.mockReturnValue(successQuery(null));
 
@@ -359,40 +413,12 @@ describe("collection route view", () => {
     expect(screen.queryByText(/contract type/i)).toBeNull();
   });
 
-  it("default_collections_show_recent_and_price_sort_buttons", () => {
-    mockUseCollectionQuery.mockReturnValue(successQuery(null));
-
-    render(
-      <CollectionRouteView
-        address="0xabc"
-        collections={collections}
-      />,
-    );
-
-    expect(screen.queryByRole("combobox", { name: /sort/i })).toBeNull();
-    expect(screen.getByRole("button", { name: "Recent" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Price" })).toBeVisible();
-  });
-
-  it("price_sort_button_toggles_between_ascending_and_descending", async () => {
+  it("default_collections_offer_price_and_recent_sorts_in_a_select", async () => {
     mockUseCollectionQuery.mockReturnValue(successQuery(null));
     const onSortModeChange = vi.fn();
     const user = userEvent.setup();
 
-    const { rerender } = render(
-      <CollectionRouteView
-        address="0xabc"
-        collections={collections}
-        sortMode="recent"
-        onSortModeChange={onSortModeChange}
-      />,
-    );
-
-    await user.click(screen.getByRole("button", { name: "Price" }));
-
-    expect(onSortModeChange).toHaveBeenCalledWith("price-asc");
-
-    rerender(
+    render(
       <CollectionRouteView
         address="0xabc"
         collections={collections}
@@ -401,12 +427,18 @@ describe("collection route view", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Price ↑" }));
+    const sort = screen.getByRole("combobox", { name: "Sort items" });
+    expect(sort).toHaveTextContent("Price: low to high");
+    await user.click(sort);
+    expect(await screen.findByRole("option", { name: "Price: high to low" })).toBeVisible();
+    expect(screen.getByRole("option", { name: "Recently added" })).toBeVisible();
+    expect(screen.queryByRole("option", { name: /power/i })).toBeNull();
 
-    expect(onSortModeChange).toHaveBeenLastCalledWith("price-desc");
+    await user.click(screen.getByRole("option", { name: "Price: high to low" }));
+    expect(onSortModeChange).toHaveBeenCalledWith("price-desc");
   });
 
-  it("beasts_collection_shows_custom_sort_buttons_and_toggles_desc_first", async () => {
+  it("beasts_collection_offers_custom_sorts_with_high_to_low_first", async () => {
     mockUseCollectionQuery.mockReturnValue(successQuery(null));
     const onSortModeChange = vi.fn();
     const user = userEvent.setup();
@@ -414,7 +446,7 @@ describe("collection route view", () => {
       { address: "0xbeast", name: "Beasts", projectId: "project-beasts" },
     ];
 
-    const { rerender } = render(
+    render(
       <CollectionRouteView
         address="0xbeast"
         collections={beastCollections}
@@ -423,31 +455,24 @@ describe("collection route view", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: "Recent" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Price ↑" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Power" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Level" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Health" })).toBeVisible();
+    await user.click(screen.getByRole("combobox", { name: "Sort items" }));
+    const options = (await screen.findAllByRole("option")).map((option) => option.textContent);
+    expect(options).toEqual([
+      "Price: low to high",
+      "Price: high to low",
+      "Power: high to low",
+      "Power: low to high",
+      "Level: high to low",
+      "Level: low to high",
+      "Health: high to low",
+      "Health: low to high",
+    ]);
 
-    await user.click(screen.getByRole("button", { name: "Power" }));
-
+    await user.click(screen.getByRole("option", { name: "Power: high to low" }));
     expect(onSortModeChange).toHaveBeenCalledWith("power-desc");
-
-    rerender(
-      <CollectionRouteView
-        address="0xbeast"
-        collections={beastCollections}
-        sortMode="power-desc"
-        onSortModeChange={onSortModeChange}
-      />,
-    );
-
-    await user.click(screen.getByRole("button", { name: "Power ↓" }));
-
-    expect(onSortModeChange).toHaveBeenLastCalledWith("power-asc");
   });
 
-  it("realms_collection_shows_resource_sort_button", async () => {
+  it("realms_collection_offers_a_resources_sort", async () => {
     mockUseCollectionQuery.mockReturnValue(successQuery(null));
     const onSortModeChange = vi.fn();
     const user = userEvent.setup();
@@ -455,25 +480,7 @@ describe("collection route view", () => {
       { address: "0xrealm5", name: "Realms", projectId: "project-realms" },
     ];
 
-    const { rerender } = render(
-      <CollectionRouteView
-        address="0xrealm5"
-        collections={realmsCollections}
-        sortMode="price-asc"
-        onSortModeChange={onSortModeChange}
-      />,
-    );
-
-    expect(screen.getByRole("button", { name: "Recent" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Price ↑" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Resources" })).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Power" })).toBeNull();
-
-    await user.click(screen.getByRole("button", { name: "Resources" }));
-
-    expect(onSortModeChange).toHaveBeenCalledWith("resource-count-desc");
-
-    rerender(
+    render(
       <CollectionRouteView
         address="0xrealm5"
         collections={realmsCollections}
@@ -482,9 +489,13 @@ describe("collection route view", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Resources ↓" }));
-
-    expect(onSortModeChange).toHaveBeenLastCalledWith("resource-count-asc");
+    const sort = screen.getByRole("combobox", { name: "Sort items" });
+    expect(sort).toHaveTextContent("Resources: high to low");
+    await user.click(sort);
+    expect(await screen.findByRole("option", { name: "Recently added" })).toBeVisible();
+    expect(screen.queryByRole("option", { name: /power/i })).toBeNull();
+    await user.click(screen.getByRole("option", { name: "Resources: low to high" }));
+    expect(onSortModeChange).toHaveBeenCalledWith("resource-count-asc");
   });
 
   it("renders_banner_fallback_when_collection_metadata_has_no_image", () => {
@@ -617,4 +628,3 @@ describe("collection route view", () => {
   });
 });
 
-vi.mock("@/features/trading/collection-tools", () => ({ CollectionTools: () => null }));
