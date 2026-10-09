@@ -64,6 +64,21 @@ applying the graph creates configuration, while uploading an explicitly reviewed
 checkout deploys the application. Do not turn on production auto-deploys as part
 of initial provisioning.
 
+## Base image registry
+
+Application Dockerfiles use `public.ecr.aws/docker/library/node:22.23.3-bookworm-slim`,
+the Docker Official Node image distributed through Amazon ECR Public. This keeps
+our pinned Node version while avoiding Docker Hub requests from Railway builders.
+The frontend build on 10 October 2026 (Sydney time) failed before dependency
+installation because Docker Hub returned `429 Too Many Requests` for its manifest.
+The matching ECR tag was verified to include Linux AMD64 and ARM64 manifests.
+See [Docker Official Images on ECR Public](https://www.docker.com/blog/news-from-aws-reinvent-docker-official-images-on-amazon-ecr-public/).
+
+After this registry change, upload the updated checkout with `railway up --service web`
+in the intended environment. Retrying an older source snapshot retains its old
+Docker Hub reference. The backend Dockerfiles use the same ECR image for future
+builds; no database or runtime configuration change is required.
+
 ## Inspect or update the existing environments
 
 The CLI must be authenticated in the intended workspace. The graph owns the

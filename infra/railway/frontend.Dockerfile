@@ -1,4 +1,4 @@
-FROM node:22.23.3-bookworm-slim AS build
+FROM public.ecr.aws/docker/library/node:22.23.3-bookworm-slim AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@10.8.1 --activate
 COPY . .
@@ -18,7 +18,7 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
 RUN test -n "$MARKETPLACE_API_URL" && test -n "$NEXT_PUBLIC_SITE_URL" && test -n "$NEXT_PUBLIC_MARKETPLACE_CHAIN_ID"
 RUN pnpm build
 
-FROM node:22.23.3-bookworm-slim AS runtime
+FROM public.ecr.aws/docker/library/node:22.23.3-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=:: PORT=3000
 COPY --from=build --chown=node:node /app/.next/standalone ./

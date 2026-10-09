@@ -1,4 +1,4 @@
-FROM node:22.23.3-bookworm-slim AS dependencies
+FROM public.ecr.aws/docker/library/node:22.23.3-bookworm-slim AS dependencies
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@10.8.1 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
@@ -9,7 +9,7 @@ RUN pnpm install --filter @biblio/marketplace-backend --prod --frozen-lockfile -
 COPY services/marketplace-backend/ services/marketplace-backend/
 RUN pnpm --filter @biblio/marketplace-backend deploy --prod --legacy /backend
 
-FROM node:22.23.3-bookworm-slim
+FROM public.ecr.aws/docker/library/node:22.23.3-bookworm-slim
 WORKDIR /app
 COPY --from=dependencies /backend services/marketplace-backend/
 COPY config/marketplace/ config/marketplace/
