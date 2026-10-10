@@ -24,7 +24,6 @@ const listedRealm: TokenShareData = {
   tokenId: "4",
   collectionName: "Realms",
   verified: true,
-  description: null,
   price: { kind: "listing", amount: "27160000000000000000", currency: STRK, symbol: "STRK", display: "27.16" },
   traits: {
     layout: "resources",
@@ -141,5 +140,32 @@ describe("share images", () => {
       ),
     );
     await expectPng(await renderSiteShareImage({ maxAge: 3600 }));
+  });
+
+  it("retries loading the fonts after a failed read", async () => {
+    vi.resetModules();
+    let failNextFontRead = true;
+    vi.doMock("node:fs/promises", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs/promises")>();
+      return {
+        ...actual,
+        readFile: ((path: Parameters<typeof actual.readFile>[0], ...rest: unknown[]) => {
+          if (failNextFontRead && String(path).endsWith(".ttf")) {
+            failNextFontRead = false;
+            return Promise.reject(new Error("EMFILE: too many open files"));
+          }
+          return (actual.readFile as (...args: unknown[]) => unknown)(path, ...rest);
+        }) as typeof actual.readFile,
+      };
+    });
+
+    try {
+      const fresh = await import("./render-share-image");
+      await expect(fresh.renderSiteShareImage({ maxAge: 60 })).rejects.toThrow("EMFILE");
+      await expectPng(await fresh.renderSiteShareImage({ maxAge: 60 }));
+    } finally {
+      vi.doUnmock("node:fs/promises");
+      vi.resetModules();
+    }
   });
 });

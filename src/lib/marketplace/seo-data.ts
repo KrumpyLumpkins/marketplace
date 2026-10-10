@@ -14,6 +14,7 @@ import {
 } from "@/lib/marketplace/token-display";
 import type { ApiOrder, ApiPage, MarketConfig } from "@/lib/marketplace/types";
 import {
+  decimalTokenId,
   PREFERRED_SHARE_CURRENCY,
   selectCollectionFloor,
   selectListingPrice,
@@ -66,7 +67,6 @@ export type TokenShareData = {
   tokenId: string;
   collectionName: string;
   verified: boolean;
-  description: string | null;
   price: SharePrice | null;
   traits: ShareTraitSummary;
   /** Artwork references in preference order: the token's, then the collection's. */
@@ -102,14 +102,6 @@ function asNonEmptyString(value: unknown) {
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
-}
-
-function decimalTokenId(rawTokenId: string) {
-  try {
-    return BigInt(rawTokenId.trim()).toString();
-  } catch {
-    return rawTokenId.trim();
-  }
 }
 
 function alternateTokenId(rawTokenId: string) {
@@ -188,11 +180,17 @@ function collectionArtwork(name: string, image: string | null) {
 
 let marketplaceModulePromise: Promise<MarketplaceModule | null> | undefined;
 
-/** Imported once per process; concurrent callers share the same import. */
+/**
+ * Imported once per process; concurrent callers share the same import. A
+ * failed import is not kept, so the next caller retries it.
+ */
 function loadMarketplaceModule() {
   marketplaceModulePromise ??= import("@/lib/marketplace/api-client").then(
     (loaded) => loaded as unknown as MarketplaceModule,
-    () => null,
+    () => {
+      marketplaceModulePromise = undefined;
+      return null;
+    },
   );
   return marketplaceModulePromise;
 }
@@ -348,7 +346,6 @@ async function buildTokenShareData(address: string, rawTokenId: string): Promise
       tokenId: decimalTokenId(rawTokenId),
       collectionName,
       verified: collection.verified,
-      description: null,
       price: null,
       traits: { layout: "list", items: [] },
       artwork: fallbackArtwork,
@@ -378,7 +375,6 @@ async function buildTokenShareData(address: string, rawTokenId: string): Promise
     tokenId,
     collectionName,
     verified: collection.verified,
-    description: asNonEmptyString(asRecord(token.metadata)?.description),
     price,
     traits: summarizeShareTraits({
       collectionName,

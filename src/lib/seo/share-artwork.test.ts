@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
 import { loadShareArtwork, shareImageDataUri, type ShareArtworkSources } from "./share-artwork";
 
@@ -150,6 +151,42 @@ describe("defaultShareArtworkSources.fetchCachedAsset", () => {
     } finally {
       process.env.MARKETPLACE_API_URL = previous;
       await new Promise((resolve) => server.close(resolve));
+    }
+  });
+});
+
+describe("defaultShareArtworkSources.readPublicFile", () => {
+  it("reads each public file from disk once and retries files it could not read", async () => {
+    vi.resetModules();
+    const reads: string[] = [];
+    let failNext = true;
+    vi.doMock("node:fs/promises", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs/promises")>();
+      return {
+        ...actual,
+        readFile: (async (path: string) => {
+          reads.push(String(path));
+          if (String(path).endsWith("beasts.jpg") && failNext) {
+            failNext = false;
+            throw new Error("EMFILE: too many open files");
+          }
+          return Buffer.from(JPEG);
+        }) as unknown as typeof actual.readFile,
+      };
+    });
+
+    try {
+      const { defaultShareArtworkSources: io } = await import("./share-artwork");
+      await expect(io.readPublicFile("share/banners/realms.jpg")).resolves.toEqual(JPEG);
+      await expect(io.readPublicFile("share/banners/realms.jpg")).resolves.toEqual(JPEG);
+      await expect(io.readPublicFile("share/banners/beasts.jpg")).resolves.toBeNull();
+      await expect(io.readPublicFile("share/banners/beasts.jpg")).resolves.toEqual(JPEG);
+
+      expect(reads.filter((path) => path.endsWith("realms.jpg"))).toHaveLength(1);
+      expect(reads.filter((path) => path.endsWith("beasts.jpg"))).toHaveLength(2);
+    } finally {
+      vi.doUnmock("node:fs/promises");
+      vi.resetModules();
     }
   });
 });

@@ -8,9 +8,37 @@ import { xShareUrl } from "./share-links";
 import type { ShareTarget } from "./share-menu";
 import { COPY_STATUS_TEXT, useCopyLink } from "./use-copy-link";
 
+const DISMISSED_KEY = "realms-market-share-prompt-dismissed";
+
+function readDismissed(): string[] {
+  try {
+    const value: unknown = JSON.parse(window.localStorage.getItem(DISMISSED_KEY) ?? "[]");
+    return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Whether the seller already dismissed the prompt for this listing. */
+export function isSharePromptDismissed(listingId: string) {
+  if (typeof window === "undefined") return false;
+  return readDismissed().includes(listingId);
+}
+
+/** Remembers a dismissal on this device; the last 50 listings are kept. */
+export function rememberSharePromptDismissed(listingId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const ids = [...readDismissed().filter((id) => id !== listingId), listingId].slice(-50);
+    window.localStorage.setItem(DISMISSED_KEY, JSON.stringify(ids));
+  } catch {
+    // Storage can be unavailable; the dismissal then lasts for this visit.
+  }
+}
+
 /**
- * Shown to a seller once their listing is indexed, so the link preview
- * already carries the price they set.
+ * Shown to a seller once their listing is indexed. Preview data is cached for
+ * up to a minute, so the copy does not promise the price is already there.
  */
 export function ListingSharePrompt({
   target,
@@ -46,8 +74,9 @@ export function ListingSharePrompt({
           Your listing is live
         </h2>
         <p className="text-sm text-muted-foreground">
-          Share it. The link preview shows the artwork and your price of{" "}
-          <span className="whitespace-nowrap text-foreground">{price}</span>.
+          Share it. Link previews show the artwork and your price of{" "}
+          <span className="whitespace-nowrap text-foreground">{price}</span>, usually
+          within a minute of listing.
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">

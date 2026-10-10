@@ -157,6 +157,7 @@ export const ListingLivePrompt: StoryObj<typeof ListingSharePrompt> = {
   play: async ({ canvas, args, userEvent }) => {
     await expect(canvas.getByRole("heading", { name: "Your listing is live" })).toBeVisible();
     await expect(canvas.getByText("27.16 STRK")).toBeVisible();
+    await expect(canvas.getByText(/usually within a minute of listing/)).toBeVisible();
 
     await userEvent.click(canvas.getByRole("button", { name: "Copy link" }));
     await expect(writeText).toHaveBeenCalledWith(target.url);

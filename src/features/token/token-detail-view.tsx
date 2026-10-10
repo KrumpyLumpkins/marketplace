@@ -19,7 +19,11 @@ import {
   cheapestListingByTokenId,
 } from "@/features/cart/listing-utils";
 import { useCartStore } from "@/features/cart/store/cart-store";
-import { ListingSharePrompt } from "@/features/share/listing-share-prompt";
+import {
+  ListingSharePrompt,
+  isSharePromptDismissed,
+  rememberSharePromptDismissed,
+} from "@/features/share/listing-share-prompt";
 import { assetShareText } from "@/features/share/share-links";
 import { ShareMenu } from "@/features/share/share-menu";
 import { AcceptOffer } from "@/features/trading/accept-offer";
@@ -189,18 +193,33 @@ export function TokenDetailView({
   const owner =
     ownership.holderAddress ?? (isOwner ? (trade.address ?? null) : null);
 
+  // Like the link preview, only price the share text from the holder's own
+  // listings; a previous owner's listing can linger in the index.
+  const holder = ownership.holderAddress;
+  const shareListing = holder
+    ? cheapestListingByTokenId(
+        tokenListings.filter((listing) => sameAddress(listing.owner, holder)),
+      ).get(BigInt(tokenId).toString())
+    : cheapest;
   const shareTarget = {
     url: toAbsoluteUrl(`/collections/${address}/${tokenId}`),
     title: `${name} | ${collectionName} | Realms.market`,
     text: assetShareText({
       name,
-      price: cheapest ? displayPrice(cheapest.price, cheapest.currency) : null,
+      price: shareListing
+        ? displayPrice(shareListing.price, shareListing.currency)
+        : null,
     }),
   };
   // Listings come from the index, so an owner's listing here is already
-  // reflected and the link preview carries its price.
+  // reflected; the link preview picks up its price once its cache refreshes.
   const sharePrompt =
-    isOwner && myListing && dismissedShareFor !== myListing.id ? myListing : null;
+    isOwner &&
+    myListing &&
+    dismissedShareFor !== myListing.id &&
+    !isSharePromptDismissed(myListing.id)
+      ? myListing
+      : null;
 
   const toggleComposer = (kind: ComposerKind) =>
     setComposer((current) => (current === kind ? null : kind));
@@ -311,7 +330,10 @@ export function TokenDetailView({
               <ListingSharePrompt
                 target={shareTarget}
                 price={displayPrice(sharePrompt.price, sharePrompt.currency)}
-                onDismiss={() => setDismissedShareFor(sharePrompt.id)}
+                onDismiss={() => {
+                  rememberSharePromptDismissed(sharePrompt.id);
+                  setDismissedShareFor(sharePrompt.id);
+                }}
               />
             ) : null}
             <div className="flex flex-wrap gap-2">

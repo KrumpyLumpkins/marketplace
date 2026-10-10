@@ -16,7 +16,8 @@ export function sameCurrency(a: string | null | undefined, b: string | null | un
   }
 }
 
-function parseAmount(value: string) {
+/** A base-unit amount as a bigint, or null when it is not an integer. */
+export function parseAmount(value: string) {
   try {
     return BigInt(value);
   } catch {

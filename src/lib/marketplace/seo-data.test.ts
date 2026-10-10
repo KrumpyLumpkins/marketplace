@@ -129,7 +129,6 @@ describe("marketplace share data", () => {
       tokenId: "4",
       collectionName: "Realms",
       verified: true,
-      description: "A realm by the sea.",
       price: { kind: "listing", display: "27.16", symbol: "STRK", currency: STRK },
       traits: {
         layout: "resources",
@@ -169,6 +168,37 @@ describe("marketplace share data", () => {
       tokenMatch: "4",
       limit: 50,
     });
+  });
+
+  it("retries the API client import after a failed load", async () => {
+    let loads = 0;
+    vi.doMock("@/lib/marketplace/api-client", () => {
+      loads += 1;
+      if (loads === 1) throw new Error("chunk load failed");
+      return {
+        createMarketplaceClient: mockCreateMarketplaceClient,
+        marketplaceRequest: mockRequest,
+      };
+    });
+    mockGetCollection.mockResolvedValue(collection);
+    routeRequests({
+      "/marketplace/config": { currencies: [] },
+      "/collections/0xabc/offers": { items: [], nextCursor: null },
+    });
+
+    try {
+      const { getCollectionShareData } = await import("@/lib/marketplace/seo-data");
+      const first = await getCollectionShareData("0xabc");
+      const second = await getCollectionShareData("0xabc");
+
+      expect(first.exists).toBe(false);
+      expect(second.exists).toBe(true);
+    } finally {
+      vi.doMock("@/lib/marketplace/api-client", () => ({
+        createMarketplaceClient: mockCreateMarketplaceClient,
+        marketplaceRequest: mockRequest,
+      }));
+    }
   });
 
   it("changes the version when the price changes", async () => {
@@ -216,7 +246,6 @@ describe("marketplace share data", () => {
       exists: false,
       tokenName: "Token #999",
       collectionName: "Realms",
-      description: null,
       price: null,
       traits: { layout: "list", items: [] },
     });

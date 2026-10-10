@@ -351,7 +351,15 @@ checked against the fixture backend; not evidence of production validation:
   data URIs; it never fetches metadata origins. WebP/AVIF and uncached art
   fall back to collection artwork rather than adding a transcoder.
 - The asset page has a Share menu, and an owner sees a share prompt once
-  their listing is indexed.
+  their listing is indexed. Dismissing it hides it for that listing on that
+  device. Token preview data is cached for up to 60 seconds, so the prompt
+  says the price usually appears within a minute rather than immediately.
+  The share text prices from the holder's own listings, as the card does.
+- Cosmetics has a local collection image, a banner collage and a share
+  banner, so its cards, header and link previews no longer depend on IPFS
+  artwork.
+- Share rendering retries a failed font load, API client import or public
+  file read on the next request instead of failing until restart.
 
 Remaining evidence: share real launch-collection assets from staging to
 Discord, X and Telegram; measure how much artwork is WebP/AVIF or uncached;

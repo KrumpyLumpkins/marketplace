@@ -3,6 +3,7 @@ import { resourceIconSrc } from "@/components/marketplace/resource-icon";
 import type { TokenActivityItem } from "@/features/token/token-activity";
 import { normalizeMarketplaceAddress } from "@/lib/marketplace/address";
 import {
+  parseAmount,
   pickLastSale,
   pickTopOffer,
   sameCurrency,
@@ -48,14 +49,6 @@ export const PREFERRED_SHARE_CURRENCY =
 export const MAX_SHARE_TRAITS = 7;
 const MAX_TRAIT_VALUE_LENGTH = 32;
 const DEFAULT_DECIMALS = 18;
-
-function parseAmount(value: string) {
-  try {
-    return BigInt(value);
-  } catch {
-    return null;
-  }
-}
 
 function toSharePrice(
   kind: SharePrice["kind"],
@@ -234,7 +227,8 @@ function shorten(value: string) {
     : value;
 }
 
-function decimalTokenId(tokenId: string) {
+/** A token ID in decimal; input that is not an integer is returned trimmed. */
+export function decimalTokenId(tokenId: string) {
   try {
     return BigInt(tokenId.trim()).toString();
   } catch {

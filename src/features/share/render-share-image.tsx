@@ -33,17 +33,26 @@ async function readFont(path: string) {
   return Uint8Array.from(bytes).buffer;
 }
 
-/** Static font files; the renderer cannot parse the site's variable fonts. */
+/**
+ * Static font files; the renderer cannot parse the site's variable fonts. A
+ * failed read is not kept, so the next render retries it.
+ */
 function loadShareFonts() {
   fontsPromise ??= Promise.all([
     readFont("brand/fonts/exo-2-400-static.ttf"),
     readFont("brand/fonts/exo-2-600-static.ttf"),
     readFont("brand/im-fell-english-sc-regular.ttf"),
-  ]).then(([regular, semibold, display]): ShareFont[] => [
-    { name: shareFonts.ui, data: regular, weight: 400, style: "normal" },
-    { name: shareFonts.ui, data: semibold, weight: 600, style: "normal" },
-    { name: shareFonts.display, data: display, weight: 400, style: "normal" },
-  ]);
+  ]).then(
+    ([regular, semibold, display]): ShareFont[] => [
+      { name: shareFonts.ui, data: regular, weight: 400, style: "normal" },
+      { name: shareFonts.ui, data: semibold, weight: 600, style: "normal" },
+      { name: shareFonts.display, data: display, weight: 400, style: "normal" },
+    ],
+    (error: unknown) => {
+      fontsPromise = undefined;
+      throw error;
+    },
+  );
   return fontsPromise;
 }
 

@@ -107,16 +107,26 @@ export async function loadShareArtwork(
 }
 
 const publicDirectory = resolve(process.cwd(), "public");
+/** Files under `public/` do not change while the server runs. */
+const publicFiles = new Map<string, Promise<Uint8Array | null>>();
 
 export const defaultShareArtworkSources: ShareArtworkSources = {
-  async readPublicFile(relativePath) {
+  readPublicFile(relativePath) {
     const path = resolve(join(publicDirectory, relativePath));
-    if (!path.startsWith(publicDirectory + sep)) return null;
-    try {
-      return new Uint8Array(await readFile(path));
-    } catch {
-      return null;
+    if (!path.startsWith(publicDirectory + sep)) return Promise.resolve(null);
+    let bytes = publicFiles.get(path);
+    if (!bytes) {
+      bytes = readFile(path).then(
+        (buffer) => new Uint8Array(buffer),
+        () => {
+          // Not kept, so a missing or briefly unreadable file is retried.
+          publicFiles.delete(path);
+          return null;
+        },
+      );
+      publicFiles.set(path, bytes);
     }
+    return bytes;
   },
   fetchCachedAsset(chain, file) {
     const base = (process.env.MARKETPLACE_API_URL ?? "http://127.0.0.1:3100").replace(/\/$/, "");
