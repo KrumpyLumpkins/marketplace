@@ -6,23 +6,26 @@ export type SiteShareCardProps = {
   logo: string | null;
 };
 
-const PANEL_WIDTH = 240;
+const MAX_PANELS = 6;
 
 /** Default link preview for pages without their own card (home, portfolio, profiles). */
 export function SiteShareCard({ banners, logo }: SiteShareCardProps) {
+  const panels = banners.slice(0, MAX_PANELS);
+  const panelWidth = Math.ceil(1200 / Math.max(panels.length, 1));
+
   return (
     <ShareCanvas>
       <div style={{ display: "flex", position: "absolute", top: 0, left: 0, height: 630 }}>
-        {banners.slice(0, 5).map((banner, index) => (
+        {panels.map((banner, index) => (
           // eslint-disable-next-line @next/next/no-img-element -- Satori renders plain img elements only.
           <img
             key={banner}
             src={banner}
             alt=""
-            width={PANEL_WIDTH}
+            width={panelWidth}
             height={630}
             style={{
-              width: PANEL_WIDTH,
+              width: panelWidth,
               height: 630,
               objectFit: "cover",
               opacity: 0.7,

@@ -1,7 +1,10 @@
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import type { TokenActivityItem } from "@/features/token/token-activity";
-import { getCollectionShareBanner } from "@/lib/marketplace/collection-banners";
+import {
+  getCollectionShareBanner,
+  getCollectionSquareImage,
+} from "@/lib/marketplace/collection-banners";
 import { getCollectionFilterConfig } from "@/lib/marketplace/collection-filter-config";
 import { getMarketplaceRuntimeConfig } from "@/lib/marketplace/config";
 import {
@@ -331,7 +334,11 @@ async function buildTokenShareData(address: string, rawTokenId: string): Promise
 
   const collection = collectionFields(rawCollection);
   const collectionName = collection.name ?? context.name;
-  const fallbackArtwork = collectionArtwork(collectionName, collection.image);
+  // The token card's artwork plate is square, so square collection art beats a banner.
+  const fallbackArtwork = [
+    getCollectionSquareImage(collectionName),
+    ...collectionArtwork(collectionName, collection.image),
+  ].filter((value, index, all): value is string => !!value && all.indexOf(value) === index);
   const token = tokenDetail?.token;
 
   if (!token) {

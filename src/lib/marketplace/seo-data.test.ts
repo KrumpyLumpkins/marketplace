@@ -223,6 +223,27 @@ describe("marketplace share data", () => {
     expect(result.artwork).toEqual(["/share/banners/realms.jpg", "/banners/realms.png"]);
   });
 
+  it("falls back to Cosmetics' square artwork, then its banner, when token art cannot be used", async () => {
+    mockGetCollection.mockResolvedValue({
+      ...collection,
+      image: null,
+      metadata: { name: "Cosmetics" },
+    });
+    mockGetToken.mockResolvedValue(
+      token([], { image: null, metadata: { name: "Legacy Keep", image: "ipfs://QmLegacyKeep" } }),
+    );
+
+    const { getTokenShareData, getCollectionShareData } = await import("@/lib/marketplace/seo-data");
+    const tokenCard = await getTokenShareData("0xabc", "1");
+    const collectionCard = await getCollectionShareData("0xabc");
+
+    expect(tokenCard.artwork.slice(-2)).toEqual([
+      "/collection-images/cosmetics.jpg",
+      "/share/banners/cosmetics.jpg",
+    ]);
+    expect(collectionCard.artwork).toEqual(["/share/banners/cosmetics.jpg"]);
+  });
+
   it("still returns a card when the client cannot start", async () => {
     mockCreateMarketplaceClient.mockImplementation(() => {
       throw new Error("init failed");

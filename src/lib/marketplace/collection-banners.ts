@@ -43,6 +43,7 @@ export function getCollectionImage(name: string | null | undefined) {
 const COLLECTION_SHARE_BANNERS_BY_NAME: Record<string, string> = {
   adventurers: "/share/banners/adventurers.jpg",
   beasts: "/share/banners/beasts.jpg",
+  cosmetics: "/share/banners/cosmetics.jpg",
   "golden token": "/share/banners/golden-token.jpg",
   "loot chests": "/share/banners/loot-chests.jpg",
   realms: "/share/banners/realms.jpg",
@@ -51,9 +52,16 @@ const COLLECTION_SHARE_BANNERS_BY_NAME: Record<string, string> = {
 export const SHARE_BANNERS = Object.values(COLLECTION_SHARE_BANNERS_BY_NAME);
 
 export function getCollectionShareBanner(name: string | null | undefined) {
-  if (!name) {
+  const key = collectionKey(name);
+  if (!key) {
     return null;
   }
 
-  return COLLECTION_SHARE_BANNERS_BY_NAME[name.trim().toLowerCase()] ?? null;
+  return COLLECTION_SHARE_BANNERS_BY_NAME[key] ?? null;
+}
+
+/** Square artwork made for a collection, when it has one (not a banner). */
+export function getCollectionSquareImage(name: string | null | undefined) {
+  const key = collectionKey(name);
+  return key ? (COLLECTION_IMAGES_BY_NAME[key] ?? null) : null;
 }
