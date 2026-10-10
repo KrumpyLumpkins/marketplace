@@ -19,7 +19,8 @@ describe("getCollectionImage", () => {
 });
 
 describe("getCollectionBannerImage", () => {
-  it("does not reuse collection artwork as a Cosmetics banner", () => {
-    expect(getCollectionBannerImage("Cosmetics")).toBeNull();
+  it("uses the item collage as the Cosmetics banner, separate from its square artwork", () => {
+    expect(getCollectionBannerImage("Cosmetics")).toBe("/banners/cosmetics.jpg");
+    expect(getCollectionImage("Cosmetics")).toBe("/collection-images/cosmetics.jpg");
   });
 });
