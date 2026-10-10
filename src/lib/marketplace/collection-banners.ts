@@ -35,3 +35,25 @@ export function getCollectionImage(name: string | null | undefined) {
 
   return COLLECTION_IMAGES_BY_NAME[key] ?? getCollectionBannerImage(name);
 }
+
+/**
+ * Downscaled JPEG copies of the banners for server-rendered share images,
+ * which decode the whole file on every render (see public/share/banners).
+ */
+const COLLECTION_SHARE_BANNERS_BY_NAME: Record<string, string> = {
+  adventurers: "/share/banners/adventurers.jpg",
+  beasts: "/share/banners/beasts.jpg",
+  "golden token": "/share/banners/golden-token.jpg",
+  "loot chests": "/share/banners/loot-chests.jpg",
+  realms: "/share/banners/realms.jpg",
+};
+
+export const SHARE_BANNERS = Object.values(COLLECTION_SHARE_BANNERS_BY_NAME);
+
+export function getCollectionShareBanner(name: string | null | undefined) {
+  if (!name) {
+    return null;
+  }
+
+  return COLLECTION_SHARE_BANNERS_BY_NAME[name.trim().toLowerCase()] ?? null;
+}

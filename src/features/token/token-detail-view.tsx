@@ -19,11 +19,15 @@ import {
   cheapestListingByTokenId,
 } from "@/features/cart/listing-utils";
 import { useCartStore } from "@/features/cart/store/cart-store";
+import { ListingSharePrompt } from "@/features/share/listing-share-prompt";
+import { assetShareText } from "@/features/share/share-links";
+import { ShareMenu } from "@/features/share/share-menu";
 import { AcceptOffer } from "@/features/trading/accept-offer";
 import { BestBid } from "@/features/trading/best-bid";
 import { OrderComposer } from "@/features/trading/order-composer";
 import { ReportToken } from "@/features/trading/report-token";
 import { normalizeMarketplaceAddress } from "@/lib/marketplace/address";
+import { formatCurrencyAmount } from "@/lib/marketplace/amount-display";
 import { marketplaceRequest } from "@/lib/marketplace/api-client";
 import { getMarketplaceRuntimeConfig } from "@/lib/marketplace/config";
 import {
@@ -35,11 +39,13 @@ import { useCollectionOffersQuery } from "@/lib/marketplace/market-data";
 import {
   displayTokenId,
   formatAddress,
+  getTokenSymbol,
   tokenMediaSources,
   tokenName,
 } from "@/lib/marketplace/token-display";
 import type { ApiPage } from "@/lib/marketplace/types";
 import { useTrade } from "@/lib/marketplace/use-trade";
+import { toAbsoluteUrl } from "@/lib/seo/site-url";
 import { ListingPurchase } from "./listing-purchase";
 import { OfferList } from "./offer-list";
 import { TokenActivity, type TokenActivityItem } from "./token-activity";
@@ -77,6 +83,10 @@ function seedCollectionName(address: string) {
   return getMarketplaceRuntimeConfig().collections.find(
     (collection) => normalizeMarketplaceAddress(collection.address) === target,
   )?.name;
+}
+
+function displayPrice(amount: string, currency: string) {
+  return `${formatCurrencyAmount(amount, currency)} ${getTokenSymbol(currency)}`;
 }
 
 const focusRing =
@@ -129,6 +139,7 @@ export function TokenDetailView({
       ),
   });
   const [composer, setComposer] = useState<ComposerKind | null>(null);
+  const [dismissedShareFor, setDismissedShareFor] = useState<string | null>(null);
   const composerId = useId();
 
   const offerItems = (
@@ -178,6 +189,19 @@ export function TokenDetailView({
   const owner =
     ownership.holderAddress ?? (isOwner ? (trade.address ?? null) : null);
 
+  const shareTarget = {
+    url: toAbsoluteUrl(`/collections/${address}/${tokenId}`),
+    title: `${name} | ${collectionName} | Realms.market`,
+    text: assetShareText({
+      name,
+      price: cheapest ? displayPrice(cheapest.price, cheapest.currency) : null,
+    }),
+  };
+  // Listings come from the index, so an owner's listing here is already
+  // reflected and the link preview carries its price.
+  const sharePrompt =
+    isOwner && myListing && dismissedShareFor !== myListing.id ? myListing : null;
+
   const toggleComposer = (kind: ComposerKind) =>
     setComposer((current) => (current === kind ? null : kind));
 
@@ -199,6 +223,7 @@ export function TokenDetailView({
             #{displayTokenId(token)}
           </Badge>
           <Badge variant="outline">ERC-721</Badge>
+          <ShareMenu target={shareTarget} className="sm:ml-auto" />
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="realm-kicker text-xs">Owner</span>
@@ -282,6 +307,13 @@ export function TokenDetailView({
             </CardContent>
           </Card>
           <div className="space-y-3">
+            {sharePrompt ? (
+              <ListingSharePrompt
+                target={shareTarget}
+                price={displayPrice(sharePrompt.price, sharePrompt.currency)}
+                onDismiss={() => setDismissedShareFor(sharePrompt.id)}
+              />
+            ) : null}
             <div className="flex flex-wrap gap-2">
               {isOwner ? (
                 <>
